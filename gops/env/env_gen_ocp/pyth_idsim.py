@@ -47,7 +47,7 @@ class idSimState(State):
 
 
 class idSimEnv(CrossRoad, Env):
-    def __new__(cls: type[Self], env_config: Config, model_config: Dict[str, Any]) -> Self:
+    def __new__(cls, env_config: Config, model_config: Dict[str, Any]) -> Self:
 
         return super(idSimEnv, cls).__new__(cls, env_config)
     
