@@ -40,14 +40,14 @@ class ApproxContainer(ApprBase):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # create q networks
-        q_args = get_apprfunc_dict("value", kwargs["value_func_type"], **kwargs)
+        q_args = get_apprfunc_dict("value", **kwargs)
         self.q1: nn.Module = create_apprfunc(**q_args)
         self.q2: nn.Module = create_apprfunc(**q_args)
         self.q1_target = deepcopy(self.q1)
         self.q2_target = deepcopy(self.q2)
 
         # create policy network
-        policy_args = get_apprfunc_dict("policy", kwargs["policy_func_type"], **kwargs)
+        policy_args = get_apprfunc_dict("policy", **kwargs)
         self.policy: nn.Module = create_apprfunc(**policy_args)
         self.policy_target = deepcopy(self.policy)
 
@@ -75,9 +75,9 @@ class ApproxContainer(ApprBase):
 
 
 class DSAC2(AlgorithmBase):
-    """Modified DSAC algorithm
+    """DSAC algorithm with three refinements, higher performance and more stable.
 
-    Paper: https://arxiv.org/pdf/2001.02811
+    Paper: https://arxiv.org/abs/2310.05858
 
     :param float gamma: discount factor.
     :param float tau: param for soft update of target network.
@@ -171,7 +171,7 @@ class DSAC2(AlgorithmBase):
 
         self.networks.q1_optimizer.zero_grad()
         self.networks.q2_optimizer.zero_grad()
-        loss_q, q1, q2, std1, std2 = self.__compute_loss_q(data)
+        loss_q, q1, q2, std1, std2, min_std1, min_std2 = self.__compute_loss_q(data)
         loss_q.backward()
 
         for p in self.networks.q1.parameters():
@@ -199,6 +199,8 @@ class DSAC2(AlgorithmBase):
             "DSAC2/critic_avg_q2-RL iter": q2.item(),
             "DSAC2/critic_avg_std1-RL iter": std1.item(),
             "DSAC2/critic_avg_std2-RL iter": std2.item(),
+            "DSAC2/critic_avg_min_std1-RL iter": min_std1.item(),
+            "DSAC2/critic_avg_min_std2-RL iter": min_std2.item(),
             tb_tags["loss_actor"]: loss_policy.item(),
             tb_tags["loss_critic"]: loss_q.item(),
             "DSAC2/policy_mean-RL iter": policy_mean,
@@ -212,8 +214,7 @@ class DSAC2(AlgorithmBase):
 
     def __q_evaluate(self, obs, act, qnet):
         StochaQ = qnet(obs, act)
-        mean, log_std = StochaQ[..., 0], StochaQ[..., -1]
-        std = log_std.exp()
+        mean, std = StochaQ[..., 0], StochaQ[..., -1]
         normal = Normal(torch.zeros_like(mean), torch.ones_like(std))
         z = normal.sample()
         z = torch.clamp(z, -3, 3)
@@ -233,7 +234,10 @@ class DSAC2(AlgorithmBase):
         act2, log_prob_act2 = act2_dist.rsample()
 
         q1, q1_std, _ = self.__q_evaluate(obs, act, self.networks.q1)
+        _, q1_std_target, _ = self.__q_evaluate(obs, act, self.networks.q1_target)
         q2, q2_std, _ = self.__q_evaluate(obs, act, self.networks.q2)
+        _, q2_std_target, _ = self.__q_evaluate(obs, act, self.networks.q2_target)
+
 
         q1_next, _, q1_next_sample = self.__q_evaluate(
             obs2, act2, self.networks.q1_target
@@ -246,33 +250,45 @@ class DSAC2(AlgorithmBase):
         q_next_sample = torch.where(q1_next < q2_next, q1_next_sample, q2_next_sample)
 
         target_q1, target_q1_bound = self.__compute_target_q(
-            rew, done, q1.detach(),q1_std.detach(), q_next.detach(), q_next_sample.detach(), log_prob_act2.detach(),
+            rew,
+            done,
+            q1.detach(),
+            q1_std_target.detach(),
+            q_next.detach(),
+            q_next_sample.detach(),
+            log_prob_act2.detach(),
         )
         
         target_q2, target_q2_bound = self.__compute_target_q(
-            rew, done, q2.detach(), q2_std.detach(),q_next.detach(), q_next_sample.detach(), log_prob_act2.detach(),
+            rew,
+            done,
+            q2.detach(),
+            q2_std_target.detach(),
+            q_next.detach(),
+            q_next_sample.detach(),
+            log_prob_act2.detach(),
+        )
+
+        weight = 1.0
+        q1_std_detach = q1_std.detach()
+        q2_std_detach = q2_std.detach()
+        eps = 0.1
+
+
+        q1_loss = weight*torch.mean(
+            -(target_q1 - q1).detach() / ( torch.pow(q1_std_detach, 2)+ eps)*q1
+            -((torch.pow(q1.detach() - target_q1_bound, 2)- q1_std_detach.pow(2) )/ (torch.pow(q1_std_detach, 3) +eps)
+            )*q1_std
+        )
+
+        q2_loss = weight*torch.mean(
+            -(target_q2 - q2).detach() / ( torch.pow(q2_std_detach, 2)+ eps)*q2
+            -((torch.pow(q2.detach() - target_q2_bound, 2)- q2_std_detach.pow(2) )/ (torch.pow(q2_std_detach, 3) +eps)
+            )*q2_std
         )
 
 
-        beta1 = min(1/torch.sqrt(torch.mean(torch.pow(q1.detach() - target_q1_bound, 2))),1)
-
-        q1_loss = torch.mean(
-            torch.pow(q1 - target_q1, 2) / (2 * torch.pow(q1_std.detach(), 2))
-            +beta1 *(torch.pow(q1.detach() - target_q1_bound, 2) / (2 * torch.pow(q1_std, 2))
-            + torch.log(q1_std))
-        )
-
-
-        beta2 = min(1 / torch.sqrt(torch.mean(torch.pow(q2.detach() - target_q2_bound, 2))), 1)
-
-        q2_loss = torch.mean(
-            torch.pow(q2 - target_q2, 2) / (2 * torch.pow(q2_std.detach(), 2))
-            + beta2*(torch.pow(q2.detach() - target_q2_bound, 2) / (2 * torch.pow(q2_std, 2))
-            + torch.log(q2_std))
-        )
-
-
-        return q1_loss +q2_loss, q1.detach().mean(), q2.detach().mean(), q1_std.detach().mean(), q2_std.detach().mean()
+        return q1_loss +q2_loss, q1.detach().mean(), q2.detach().mean(), q1_std.detach().mean(), q2_std.detach().mean(), q1_std.min().detach(), q2_std.min().detach()
 
     def __compute_target_q(self, r, done, q,q_std, q_next, q_next_sample, log_prob_a_next):
         target_q = r + (1 - done) * self.gamma * (
@@ -281,7 +297,7 @@ class DSAC2(AlgorithmBase):
         target_q_sample = r + (1 - done) * self.gamma * (
             q_next_sample - self.__get_alpha() * log_prob_a_next
         )
-        td_bound = 3*q_std
+        td_bound = 3 * torch.mean(q_std)
         difference = torch.clamp(target_q_sample - q, -td_bound, td_bound)
         target_q_bound = q + difference
         return target_q.detach(), target_q_bound.detach()
