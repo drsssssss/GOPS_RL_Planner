@@ -7,7 +7,7 @@
 #  Email: lisb04@gmail.com
 #
 #  Description: example for fhadp2 + idsim + mlp + off_serial
-#  Update Date: 2022-9-21, Jiaxin Gao: create example
+#  Update Date: 2022-9-21, Jiaxin Gao: create  example
 
 
 import argparse
@@ -130,8 +130,9 @@ if __name__ == "__main__":
     }
     parser.add_argument("--env_config", type=dict, default=env_config_param)
     parser.add_argument("--env_model_config", type=dict, default=model_config)
+    parser.add_argument("--max_episode_steps", type=int, default=500)
 
-    parser.add_argument("--algorithm", type=str, default="FHADP2", help="RL algorithm")
+    parser.add_argument("--algorithm", type=str, default="FHADP", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
     parser.add_argument("--seed", default=2099945076, help="seed")
     parser.add_argument("--pre_horizon", type=int, default=pre_horizon)
@@ -161,11 +162,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_func_name",
         type=str,
-        default="FiniteHorizonFullPolicy",
-        help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy",
+        default="AttentionPolicy",
+        help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy/AttentionPolicy",
     )
+
+    parser.add_argument("--attn_in_per_dim",type=int,default=8)
+    parser.add_argument("--attn_out_dim",type=int,default=20)
+
+    parser.add_argument("--attn_begin",type=int,default=162)
+    parser.add_argument("--attn_end",type=int,default=201)
+
     parser.add_argument(
-        "--policy_func_type", type=str, default="MLP", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS"
+        "--policy_func_type", type=str, default="Attention", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS/Attention"
     )
     parser.add_argument(
         "--policy_act_distribution",
@@ -242,8 +250,8 @@ if __name__ == "__main__":
 
     start_tensorboard(args["save_folder"])
     # Step 1: create algorithm and approximate function
-
-    alg = create_alg(**{**args, "env": env})
+    args["env"] = env
+    alg = create_alg(**args)  # create appr_model in algo **vars(args)
     # Step 2: create sampler in trainer
     sampler = create_sampler(**args)
     # Step 3: create buffer in trainer

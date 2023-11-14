@@ -32,6 +32,7 @@ if __name__ == "__main__":
 
     ################################################
     # Key Parameters for users
+    parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
     MAP_ROOT = 'YOUR_MAP_ROOT'
     pre_horizon = 30
     env_config_param = {
@@ -69,7 +70,6 @@ if __name__ == "__main__":
         "obs_ref_interval": 0.8,
         "vehicle_spec": (1880.0, 1536.7, 1.13, 1.52, -128915.5, -85943.6, 20.0, 0.0),
         "singleton_mode": "reuse",
-        "seed": 1
     }
     model_config = {
         "N": pre_horizon,
@@ -129,6 +129,7 @@ if __name__ == "__main__":
     }
     parser.add_argument("--env_config", type=dict, default=env_config_param)
     parser.add_argument("--env_model_config", type=dict, default=model_config)
+    parser.add_argument("--max_episode_steps", type=int, default=500)
 
     parser.add_argument("--algorithm", type=str, default="FHADP", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
@@ -173,7 +174,7 @@ if __name__ == "__main__":
         help="Options: default/TanhGaussDistribution/GaussDistribution",
     )
     policy_func_type = parser.parse_known_args()[0].policy_func_type
-    parser.add_argument("--policy_hidden_sizes", type=list, default=[64, 64])
+    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256])
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
@@ -181,8 +182,8 @@ if __name__ == "__main__":
 
     ################################################
     # 3. Parameters for RL algorithm
-    parser.add_argument("--value_learning_rate", type=float, default=1e-3)
-    parser.add_argument("--policy_learning_rate", type=float, default=1e-3)
+    parser.add_argument("--value_learning_rate", type=float, default=1e-4)
+    parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
 
     ################################################
     # 4. Parameters for trainer
@@ -193,7 +194,7 @@ if __name__ == "__main__":
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
     # Maximum iteration number
-    parser.add_argument("--max_iteration", type=int, default=16000)
+    parser.add_argument("--max_iteration", type=int, default=200000)
     trainer_type = parser.parse_known_args()[0].trainer
     parser.add_argument("--ini_network_dir", type=str, default=None)
 
@@ -214,24 +215,24 @@ if __name__ == "__main__":
     # 5. Parameters for sampler
     parser.add_argument("--sampler_name", type=str, default="off_sampler", help="Options: on_sampler/off_sampler")
     # Batch size of sampler for buffer store
-    parser.add_argument("--sample_batch_size", type=int, default=8)
+    parser.add_argument("--sample_batch_size", type=int, default=128)
     # Add noise to actions for better exploration
     parser.add_argument("--noise_params", type=dict, default=None)
 
     ################################################
     # 6. Parameters for evaluator
     parser.add_argument("--evaluator_name", type=str, default="evaluator")
-    parser.add_argument("--num_eval_episode", type=int, default=10)
-    parser.add_argument("--eval_interval", type=int, default=100)
+    parser.add_argument("--num_eval_episode", type=int, default=20)
+    parser.add_argument("--eval_interval", type=int, default=1000)
     parser.add_argument("--eval_save", type=str, default=False, help="save evaluation data")
 
     ################################################
     # 7. Data savings
     parser.add_argument("--save_folder", type=str, default=None)
     # Save value/policy every N updates
-    parser.add_argument("--apprfunc_save_interval", type=int, default=1000)
+    parser.add_argument("--apprfunc_save_interval", type=int, default=10000)
     # Save key info every N updates
-    parser.add_argument("--log_save_interval", type=int, default=200)
+    parser.add_argument("--log_save_interval", type=int, default=1000)
 
     ################################################
     # Get parameter dictionary
