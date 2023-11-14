@@ -182,8 +182,8 @@ if __name__ == "__main__":
 
     ################################################
     # 3. Parameters for RL algorithm
-    parser.add_argument("--value_learning_rate", type=float, default=1e-3)
-    parser.add_argument("--policy_learning_rate", type=float, default=1e-3)
+    parser.add_argument("--value_learning_rate", type=float, default=1e-4)
+    parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
 
     ################################################
     # 4. Parameters for trainer
@@ -197,12 +197,6 @@ if __name__ == "__main__":
     parser.add_argument("--max_iteration", type=int, default=200000)
     trainer_type = parser.parse_known_args()[0].trainer
     parser.add_argument("--ini_network_dir", type=str, default=None)
-
-    # import ray
-    # ray.init('local')
-    # parser.add_argument("--num_algs", type=int, default=4, help="number of algs")
-    # parser.add_argument("--num_samplers", type=int, default=1, help="number of samplers")
-    # parser.add_argument("--num_buffers", type=int, default=1, help="number of buffers")
 
     # 4.1. Parameters for off_serial_trainer
     parser.add_argument(
@@ -248,8 +242,8 @@ if __name__ == "__main__":
 
     start_tensorboard(args["save_folder"])
     # Step 1: create algorithm and approximate function
-    args["env"] = env
-    alg = create_alg(**args)  # create appr_model in algo **vars(args)
+
+    alg = create_alg(**{**args, "env": env})
     # Step 2: create sampler in trainer
     sampler = create_sampler(**args)
     # Step 3: create buffer in trainer
