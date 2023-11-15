@@ -155,7 +155,6 @@ class Robot(metaclass=ABCMeta):
         return np.zeros_like(self.state_space.low)
 
 
-# TODO: Static constraint value
 class Context(metaclass=ABCMeta):
     state: ContextState[np.ndarray]
     

@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+from copy import deepcopy
 from typing import Optional, TypeVar, Callable, Sequence
 
 import torch
@@ -93,11 +94,8 @@ class EnvModel(Model, metaclass=ABCMeta):
     get_terminal_cost: Callable[[State], torch.Tensor] = None
 
     def get_next_state(self, state: State, action: torch.Tensor) -> State:
-        next_context_state = ContextState(
-            reference = state.context_state.reference,
-            constraint = state.context_state.constraint,
-            t = state.context_state.t + 1,
-        )
+        next_context_state = deepcopy(state.context_state)
+        next_context_state.t = state.context_state.t + 1
         return State(
             robot_state = self.robot_model.get_next_state(state.robot_state, action),
             context_state = next_context_state
