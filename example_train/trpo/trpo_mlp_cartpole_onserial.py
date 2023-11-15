@@ -39,7 +39,6 @@ if __name__ == "__main__":
     parser.add_argument("--action_num", type=int, default=None, help="dim(Action)")
     parser.add_argument("--action_high_limit", type=list, default=None)
     parser.add_argument("--action_low_limit", type=list, default=None)
-    parser.add_argument("--action_type", type=str, default="discret", help="Options: continu/discret")
     parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
 
     ################################################
@@ -79,7 +78,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
-    parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
     parser.add_argument("--policy_std_type", type=str, default="parameter")
     parser.add_argument("--policy_min_log_std", type=int, default=-20)
     parser.add_argument("--policy_max_log_std", type=int, default=1)

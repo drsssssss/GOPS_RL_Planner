@@ -14,6 +14,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional, Union
 
+import gym
 import numpy as np
 from gym.wrappers.time_limit import TimeLimit
 from gops.create_pkg.create_env_model import register as register_env_model
@@ -64,7 +65,7 @@ for env_dir_name in env_dir_list:
     env_dir_abs_path = os.path.join(env_path, env_dir_name)
     file_list = os.listdir(env_dir_abs_path)
     for file in file_list:
-        if file.endswith(".py") and file[0] != "_":
+        if file.endswith(".py") and file[0] != "_" and "base" not in file:
             try:
                 env_id = file[:-3]
                 mdl = importlib.import_module(f"gops.env.{env_dir_name}.{env_id}")
@@ -84,7 +85,7 @@ for env_dir_name in env_dir_list:
         continue
     file_list = os.listdir(env_model_path)
     for file in file_list:
-        if file.endswith(".py") and file[0] != "_":
+        if file.endswith(".py") and file[0] != "_" and "base" not in file:
             env_id = file[:-3]
             mdl = importlib.import_module(f"gops.env.{env_dir_name}.env_model.{env_id}")
             env_id_camel = underline2camel(env_id)
@@ -183,7 +184,7 @@ def create_env(
             _obs_shift = 0.0 if obs_shift is None else obs_shift
             env = ScaleObservationData(env, _obs_shift, _obs_scale)
 
-        if action_scale:
+        if action_scale and isinstance(env.action_space, gym.spaces.Box):
             env = ScaleActionData(env, min_action, max_action)
         
         if gym2gymnasium:

@@ -26,9 +26,10 @@ from copy import copy
 from gops.create_pkg.create_alg import create_approx_contrainer
 from gops.create_pkg.create_env_model import create_env_model
 from gops.create_pkg.create_env import create_env
+from gops.env.env_gen_ocp.pyth_base import Env, State
 from gops.utils.plot_evaluation import cm2inch
 from gops.utils.common_utils import get_args_from_json, mp4togif
-from gops.env.env_gen_ocp.pyth_base import State
+from gops.utils.gops_path import gops_path
 
 default_cfg = dict()
 default_cfg["fig_size"] = (12, 9)
@@ -90,7 +91,7 @@ class PolicyRunner:
         legend_list: list = None,
         use_opt: bool = False,
         load_opt_path: Optional[str] = None,
-        opt_args: dict = None,
+        opt_args: Optional[dict] = None,
         save_opt: bool = True,
         constrained_env: bool = False,
         is_tracking: bool = False,
@@ -101,7 +102,9 @@ class PolicyRunner:
         action_noise_type: str = None,
         action_noise_data: list = None,
     ):
-        self.log_policy_dir_list = log_policy_dir_list
+        self.log_policy_dir_list = [
+            os.path.join(gops_path, d) for d in log_policy_dir_list
+        ]
         self.trained_policy_iteration_list = trained_policy_iteration_list
         self.save_render = save_render
         self.args = None
@@ -112,11 +115,14 @@ class PolicyRunner:
             self.init_info = {}
         self.legend_list = legend_list
         self.use_opt = use_opt
-        self.load_opt_path = load_opt_path
-        self.opt_args = opt_args
-        if "use_MPC_for_general_env" not in self.opt_args.keys():
-            self.opt_args["use_MPC_for_general_env"] = False
-        self.save_opt = save_opt
+        if use_opt:
+            assert load_opt_path is not None or opt_args is not None
+            self.load_opt_path = load_opt_path
+            self.opt_args = opt_args
+            if isinstance(self.opt_args, dict) and \
+                "use_MPC_for_general_env" not in self.opt_args.keys():
+                self.opt_args["use_MPC_for_general_env"] = False
+            self.save_opt = save_opt
         self.constrained_env = constrained_env
         self.use_dist = use_dist
         self.is_tracking = is_tracking
@@ -181,10 +187,11 @@ class PolicyRunner:
         done = False
         info.update({"TimeLimit.truncated": False})
         while not (done or info["TimeLimit.truncated"]):
+            print("step:", step + 1)
             state_list.append(state.robot_state)
             obs_list.append(obs)
             if is_opt:
-                if isinstance(state, State):
+                if isinstance(env.unwrapped, Env):
                     action = controller(state)
                 else:
                     action = controller(obs, info)
@@ -196,23 +203,23 @@ class PolicyRunner:
             if self.constrained_env:
                 constrain_list.append(info["constraint"])
             if self.is_tracking:
-                state_num = len(info["ref"])
-                self.ref_state_num = sum(x is not None for x in info["ref"])
+                reference = get_reference_from_info(info)
+                state_num = len(reference)
+                self.ref_state_num = sum(x is not None for x in reference)
                 if step == 0:
                     for i in range(state_num):
-                        if info["ref"][i] is not None:
+                        if reference[i] is not None:
                             state_with_ref_error["state-{}".format(i)] = []
                             state_with_ref_error["ref-{}".format(i)] = []
                             state_with_ref_error["state-{}-error".format(i)] = []
 
+                robot_state = get_robot_state_from_info(info)
                 for i in range(state_num):
-                    if info["ref"][i] is not None:
-                        state_with_ref_error["state-{}".format(i)].append(
-                            info["state"][i]
-                        )
-                        state_with_ref_error["ref-{}".format(i)].append(info["ref"][i])
+                    if reference[i] is not None:
+                        state_with_ref_error["state-{}".format(i)].append(robot_state[i])
+                        state_with_ref_error["ref-{}".format(i)].append(reference[i])
                         state_with_ref_error["state-{}-error".format(i)].append(
-                            info["ref"][i] - info["state"][i]
+                            reference[i] - robot_state[i]
                         )
             next_obs, reward, done, info = env.step(action)
 
@@ -224,7 +231,6 @@ class PolicyRunner:
             obs = next_obs
             state = env.state
             step = step + 1
-            print("step:", step)
 
             if "TimeLimit.truncated" not in info.keys():
                 info["TimeLimit.truncated"] = False
@@ -881,41 +887,40 @@ class PolicyRunner:
                         env.has_optimal_controller
                     ), "The environment has no theoretical optimal controller."
                     opt_controller = env.control_policy
-                    legend = "OPT"
-
                 elif self.opt_args["opt_controller_type"] == "MPC":
                     if self.opt_args["use_MPC_for_general_env"] == True:
                         self.args_list[self.policy_num - 1]["env"] = env
                         from gops.sys_simulator.opt_controller_for_gen_env import OptController
                     else:
                         from gops.sys_simulator.opt_controller import OptController
-                    model = create_env_model(**self.args_list[self.policy_num - 1])
+                    model = create_env_model(**self.args_list[self.policy_num - 1], mask_at_done=False)
                     opt_args = self.opt_args.copy()
                     opt_args.pop("opt_controller_type")
                     opt_args.pop("use_MPC_for_general_env")
                     opt_controller = OptController(model, **opt_args,)
-                    legend = "MPC-" + str(self.opt_args["num_pred_step"])
-                    if (
-                        "use_terminal_cost" not in self.opt_args.keys()
-                        or self.opt_args["use_terminal_cost"] == False
-                    ):
-                        legend += " (w/o TC)"
-                    else:
-                        legend += " (w/ TC)"
-
                 else:
                     raise ValueError(
                         "The optimal controller type should be either 'OPT' or 'MPC'."
                     )
-
-                self.legend_list.append(legend)
-                self.error_dict = {}
 
                 eval_dict_opt, tracking_dict_opt = self.run_an_episode(
                     env, opt_controller, self.init_info, is_opt=True, render=False
                 )
                 print("Successfully run an optimal controller!")
                 print("===========================================================\n")
+
+            if self.opt_args["opt_controller_type"] == "OPT":
+                legend = "OPT"
+            elif self.opt_args["opt_controller_type"] == "MPC":
+                legend = "MPC-" + str(self.opt_args["num_pred_step"])
+                if (
+                    "use_terminal_cost" not in self.opt_args.keys()
+                    or self.opt_args["use_terminal_cost"] == False
+                ):
+                    legend += " (w/o TC)"
+                else:
+                    legend += " (w/ TC)"
+            self.legend_list.append(legend)
 
             if self.save_opt:
                 np.save(os.path.join(self.save_path, "eval_dict_opt.npy"), eval_dict_opt)
@@ -957,3 +962,19 @@ class PolicyRunner:
         self.__run_data()
         self.__save_mp4_as_gif()
         self.draw()
+
+
+def get_robot_state_from_info(info: dict) -> np.ndarray:
+    state = info["state"]
+    if isinstance(state, State):
+        return state.robot_state
+    elif isinstance(state, np.ndarray):
+        return state
+
+
+def get_reference_from_info(info: dict) -> np.ndarray:
+    state = info["state"]
+    if isinstance(state, State):
+        return state.context_state.reference[0]
+    elif isinstance(state, np.ndarray):
+        return info["ref"]

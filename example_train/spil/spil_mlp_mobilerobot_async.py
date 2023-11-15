@@ -48,7 +48,6 @@ if __name__ == "__main__":
     parser.add_argument("--constrained_dim", type=int, default=None)
     parser.add_argument("--action_high_limit", type=list, default=None)
     parser.add_argument("--action_low_limit", type=list, default=None)
-    parser.add_argument("--action_type", type=str, default="continu", help="Options: continu/discret")
     parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
     parser.add_argument("--is_adversary", type=bool, default=False, help="Adversary training")
 
@@ -89,9 +88,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
-    parser.add_argument(
-        "--policy_output_activation", type=str, default="tanh", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
-    )
 
     ################################################
     # 3. Parameters for RL algorithm
@@ -110,9 +106,6 @@ if __name__ == "__main__":
     trainer_type = parser.parse_known_args()[0].trainer
 
     # 4.1. Parameters for off_async_trainer
-    import ray
-
-    ray.init()
     parser.add_argument("--num_algs", type=int, default=2, help="number of algs")
     parser.add_argument("--num_samplers", type=int, default=1, help="number of samplers")
     parser.add_argument("--num_buffers", type=int, default=2, help="number of buffers")

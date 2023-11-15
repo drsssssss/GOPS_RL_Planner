@@ -37,7 +37,6 @@ if __name__ == "__main__":
     parser.add_argument("--seed", default=3328005365, help="seed")
     ################################################
     # 1. Parameters for environment
-    parser.add_argument("--action_type", type=str, default="continu")
     parser.add_argument("--reward_scale", type=float, default=1, help="reward scale factor")
     parser.add_argument("--repeat_num", type=int, default=None)
     parser.add_argument("--sum_reward", type=bool, default=False)
@@ -81,8 +80,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
-    parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
-
+    
     ################################################
     # 3. Parameters for RL algorithm
     parser.add_argument("--policy_learning_rate", type=float, default=1e-4)

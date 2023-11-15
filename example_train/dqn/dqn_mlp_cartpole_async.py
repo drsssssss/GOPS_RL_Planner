@@ -35,7 +35,6 @@ if __name__ == "__main__":
 
     ################################################
     # 1. Parameters for environment
-    parser.add_argument("--action_type", type=str, default="discret")
     parser.add_argument("--is_render", type=bool, default=False)
 
     ################################################
@@ -86,9 +85,6 @@ if __name__ == "__main__":
         default=None
     )
     # 4.1. Parameters for off_async_trainer
-    import ray
-
-    ray.init()
     parser.add_argument("--num_algs", type=int, default=1)
     parser.add_argument("--num_samplers", type=int, default=2)
     parser.add_argument("--num_buffers", type=int, default=1)

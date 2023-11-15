@@ -36,7 +36,6 @@ if __name__ == "__main__":
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
 
     # 1. Parameters for environment
-    parser.add_argument("--action_type", type=str, default="continu", help="Options: continu/discret")
     parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
     parser.add_argument("--is_adversary", type=bool, default=False, help="Adversary training")
 
@@ -76,8 +75,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
-    parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
-
+    
     ################################################
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-3)
@@ -96,9 +94,6 @@ if __name__ == "__main__":
     trainer_type = parser.parse_known_args()[0].trainer
 
     # 4.1. Parameters for off_async_trainer
-    import ray
-
-    ray.init()
     parser.add_argument("--num_algs", type=int, default=2)
     parser.add_argument("--num_samplers", type=int, default=1)
     parser.add_argument("--num_buffers", type=int, default=1)

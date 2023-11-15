@@ -52,8 +52,8 @@ def start_tensorboard(logdir, port=DEFAULT_TB_PORT):
     kill_port(port)
 
     sys_name = platform.system()
-    if sys_name == "Linux":
-        cmd_line = "gnome-terminal -- tensorboard --logdir {} --port {}".format(
+    if sys_name == "Linux" or sys_name == "Darwin":
+        cmd_line = "tensorboard --logdir {} --port {} &".format(
             logdir, port
         )
     elif sys_name == "Windows":
@@ -100,7 +100,7 @@ def get_pids_windows(port):
 def kill_pids_linux(pids):
     for pid in pids:
         try:
-            os.kill(int(pid), signal.SIGINT)
+            os.kill(int(pid), signal.SIGTERM)
         except:
             pass
 
@@ -115,7 +115,7 @@ def kill_pid_windows(pids):
 
 def kill_port(port=DEFAULT_TB_PORT):
     sys_name = platform.system()
-    if sys_name == "Linux":
+    if sys_name == "Linux" or sys_name == "Darwin":
         pids = get_pids_linux(port)
         kill_pids_linux(pids)
     elif sys_name == "Windows":
@@ -158,8 +158,11 @@ tb_tags = {
     "TAR of replay samples": "Evaluation/4. TAR-Replay samples",
     "Buffer RAM of RL iteration": "RAM/RAM [MB]-RL iter",
     "loss_actor": "Loss/Actor loss-RL iter",
+    "loss_actor_reward": "Loss/Actor reward loss-RL iter",
+    "loss_actor_constraint": "Loss/Actor constraint loss-RL iter",
     "loss_critic": "Loss/Critic loss-RL iter",
     "alg_time": "Time/Algorithm time [ms]-RL iter",
     "sampler_time": "Time/Sampler time [ms]-RL iter",
     "critic_avg_value": "Train/Critic avg value-RL iter",
+    "lips_value": "Lipschitz/Lipschitz value - RL iter",
 }
