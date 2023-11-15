@@ -239,6 +239,7 @@ class DSACT(AlgorithmBase):
         act2, log_prob_act2 = act2_dist.rsample()
 
         q1, q1_std, _ = self.__q_evaluate(obs, act, self.networks.q1)
+        _, q1_std_target, _ = self.__q_evaluate(obs, act, self.networks.q1_target)
         q2, q2_std, _ = self.__q_evaluate(obs, act, self.networks.q2)
         if self.mean_std1 is None:
             self.mean_std1 = torch.mean(q1_std.detach())

@@ -91,6 +91,14 @@ def get_apprfunc_dict(key: str, **kwargs):
         var["add_bias"] = kwargs[key + "_add_bias"]
     elif apprfunc_type == "GAUSS":
         var["num_kernel"] = kwargs[key + "_num_kernel"]
+    elif apprfunc_type == "Attention":
+        var["hidden_sizes"] = kwargs[key + "_hidden_sizes"]
+        var["hidden_activation"] = kwargs[key + "_hidden_activation"]
+        var["output_activation"] = kwargs[key + "_output_activation"]
+        var["attn_in_per_dim"] = kwargs["attn_in_per_dim"]     
+        var["attn_out_dim"] = kwargs["attn_out_dim"]
+        var["attn_begin"] = kwargs["attn_begin"]
+        var["attn_end"] = kwargs["attn_end"]
     elif apprfunc_type == "LipsNet":
         var["hidden_sizes"] = kwargs[key + "_hidden_sizes"]
         var["hidden_activation"] = kwargs[key + "_hidden_activation"]
@@ -119,7 +127,7 @@ def get_apprfunc_dict(key: str, **kwargs):
         if kwargs["action_type"] == "continu":
             if kwargs["policy_func_name"] == "StochaPolicy":  # todo: add TanhGauss
                 var["action_distribution_cls"] = GaussDistribution
-            elif kwargs["policy_func_name"] == "DetermPolicy" or "FiniteHorizonPolicy":
+            elif kwargs["policy_func_name"] == "DetermPolicy" or "FiniteHorizonPolicy" or "AttentionPolicy" or "AttentionFullPolicy":
                 var["action_distribution_cls"] = DiracDistribution
         else:
             if kwargs["policy_func_name"] == "StochaPolicyDis":
