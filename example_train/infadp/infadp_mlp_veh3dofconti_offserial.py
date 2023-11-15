@@ -38,7 +38,6 @@ if __name__ == "__main__":
     parser.add_argument("--pre_horizon", type=int, default=10)
 
     # 1. Parameters for environment
-    parser.add_argument("--action_type", type=str, default="continu")
     parser.add_argument("--is_render", type=bool, default=False)
     parser.add_argument("--is_adversary", type=bool, default=False)
     parser.add_argument("--is_constrained", type=bool, default=False)
@@ -76,8 +75,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="relu"
     )
-    parser.add_argument("--policy_output_activation", type=str, default="linear")
-
+    
     ################################################
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-3)

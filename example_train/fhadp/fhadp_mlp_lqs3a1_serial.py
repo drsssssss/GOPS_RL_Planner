@@ -43,7 +43,6 @@ if __name__ == "__main__":
     parser.add_argument("--reward_shift", type=float, default=0, help="reward shift factor")
     parser.add_argument("--obs_scale", type=float, default=[1, 2, 0.5])
     parser.add_argument("--obs_shift", type=float, default=[1, 1, 1])
-    parser.add_argument("--action_type", type=str, default="continu", help="Options: continu/discret")
     parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
     parser.add_argument("--is_adversary", type=bool, default=False, help="Adversary training")
     ################################################
@@ -71,8 +70,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="elu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
-    parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
-
+    
     ################################################
     # 3. Parameters for RL algorithm
     parser.add_argument("--policy_learning_rate", type=float, default=3e-4)

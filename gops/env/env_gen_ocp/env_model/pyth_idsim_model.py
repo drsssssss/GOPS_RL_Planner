@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional, Any, Union
-from gops.env.env_gen_ocp.env_model.pyth_base_model import RobotModel, ContextModel, EnvModel
-from gops.env.env_gen_ocp.pyth_idsim import idSimState, idSimContextState, idSimEnv, get_idsimcontext
+from gops.env.env_gen_ocp.env_model.pyth_base_model import RobotModel, EnvModel
+from gops.env.env_gen_ocp.pyth_idsim import idSimEnv, get_idsimcontext
+from gops.env.env_gen_ocp.pyth_base import State
 
 import numpy as np
 import torch
@@ -39,37 +40,37 @@ class idSimRobotModel(RobotModel):
         return robot_state
 
 
-class idSimContextModel(ContextModel):
-    def get_next_state(self, context_state: idSimContextState, action: torch.Tensor) -> idSimContextState:
-        next_context_state = copy.copy(context_state)
-        next_context_state.t = context_state.t + 1
-        return next_context_state
-
-
 class idSimEnvModel(EnvModel):
+    dt: Optional[float]
+    action_dim: int
+    obs_dim: int
+    robot_model: RobotModel
+
     def __init__(
         self,
+        *,
         env: idSimEnv,
         device: Union[torch.device, str, None] = None,
         **kwargs: Any,
     ):
         super().__init__(
-            obs_dim = env.observation_space.shape[0],
-            action_dim = env.action_space.shape[0],
+            obs_lower_bound = env.observation_space.low,
+            obs_upper_bound = env.observation_space.high,
             action_lower_bound = env.action_space.low,
             action_upper_bound = env.action_space.high,
             device = device,
-            dt = env.config.dt,
         )
         model_config = env.model_config
+        self.dt = env.config.dt
+        self.action_dim = env.action_space.shape[0]
+        self.obs_dim = env.observation_space.shape[0]
         self.idsim_model = IdSimModel(env, model_config)
         self.robot_model = idSimRobotModel(idsim_model = self.idsim_model)
-        self.context_model = idSimContextModel()
 
-    def get_obs(self, state: idSimState) -> torch.Tensor:
+    def get_obs(self, state: State) -> torch.Tensor:
         return self.idsim_model.observe(get_idsimcontext(state, mode = 'batch'))
         
-    def get_reward(self, state: idSimState, action: torch.Tensor, mode: str = "full_horizon") -> torch.Tensor:
+    def get_reward(self, state: State, action: torch.Tensor, mode: str = "full_horizon") -> torch.Tensor:
         next_state = self.get_next_state(state, action)
         if mode == "full_horizon":
             rewards = self.idsim_model.reward_full_horizon(
@@ -89,7 +90,7 @@ class idSimEnvModel(EnvModel):
             raise NotImplementedError
         return rewards[0]
 
-    def get_terminated(self, state: idSimState) -> torch.bool:
+    def get_terminated(self, state: State) -> torch.bool:
         # only support batched state
         return torch.zeros(state.robot_state.shape[0], dtype=torch.bool)
     
@@ -102,10 +103,6 @@ class idSimEnvModel(EnvModel):
         next_info = {}
         next_info["state"] = next_state
         return next_obs, reward, terminated, next_info
-    
-    @property
-    def StateClass(self) -> type:
-        return idSimState
 
 
 def env_model_creator(**kwargs):

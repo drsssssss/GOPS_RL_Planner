@@ -39,7 +39,6 @@ if __name__ == "__main__":
     ################################################
     # 1. Parameters for environment
     parser.add_argument("--reward_scale", type=float, default=0.2, help="reward scale factor")
-    parser.add_argument("--action_type", type=str, default="continu", help="Options: continu/discret")
     parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
     parser.add_argument("--is_adversary", type=bool, default=False, help="Adversary training")
 
@@ -82,7 +81,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
-    parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
     parser.add_argument("--policy_min_log_std", type=int, default=-5)
     parser.add_argument("--policy_max_log_std", type=int, default=1)
 
@@ -95,7 +93,7 @@ if __name__ == "__main__":
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--tau", type=float, default=0.001)
     parser.add_argument("--auto_alpha", type=bool, default=True)
-    parser.add_argument("--alpha", type=bool, default=0.2)
+    parser.add_argument("--alpha", type=float, default=0.2)
     parser.add_argument("--delay_update", type=int, default=2)
     parser.add_argument("--TD_bound", type=float, default=10)
     parser.add_argument("--bound", default=True)

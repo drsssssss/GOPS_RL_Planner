@@ -1,6 +1,6 @@
 import pathlib
 from dataclasses import dataclass
-from typing import Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, Union
 from copy import deepcopy
 from pathlib import Path
 import gym
@@ -21,34 +21,13 @@ from gops.env.env_gen_ocp.pyth_base import (ContextState, Env, State, stateType)
 
 @dataclass
 class idSimContextState(ContextState):
-    light_param: stateType
-    ref_index_param: stateType
-    real_t: stateType
-
-
-@dataclass
-class idSimState(State):
-    context_state: idSimContextState
-    CONTEXT_STATE_TYPE = idSimContextState
-
-    def get_zero_state(self, batch_size = 1) -> State:
-        # only used for batched state
-        return idSimState(
-            robot_state=np.zeros((batch_size, *self.robot_state.shape[1:]), dtype=np.float32),
-            context_state=idSimContextState(
-                reference=np.zeros((batch_size, *self.context_state.reference.shape[1:]), dtype=np.float32),
-                constraint=np.zeros((batch_size, *self.context_state.constraint.shape[1:]), dtype=np.float32),
-                t=np.zeros((batch_size, ), dtype=np.int64),
-                light_param=np.zeros((batch_size, *self.context_state.light_param.shape[1:]), dtype=np.float32),
-                ref_index_param=np.zeros((batch_size, ), dtype=np.int64),
-                real_t=np.zeros((batch_size, ), dtype=np.int64)
-            )
-        )
+    light_param: Optional[stateType] = None
+    ref_index_param: Optional[stateType] = None
+    real_t: Union[int, stateType] = 0
 
 
 class idSimEnv(CrossRoad, Env):
-    def __new__(cls: type[Self], env_config: Config, model_config: Dict[str, Any]) -> Self:
-
+    def __new__(cls, env_config: Config, model_config: Dict[str, Any]) -> Self:
         return super(idSimEnv, cls).__new__(cls, env_config)
     
     def __init__(self, env_config: Config, model_config: Dict[str, Any]):
@@ -57,9 +36,8 @@ class idSimEnv(CrossRoad, Env):
         self._state = None
         # get observation_space
         self.model = IdSimModel(self, model_config)
-        self.info_dict = {
-            "state": self.get_zero_state,
-        }
+        # obtain observation_space from idsim
+        self.reset()
         obs_dim = self._get_obs().shape[0]
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
     
@@ -80,7 +58,7 @@ class idSimEnv(CrossRoad, Env):
     
     def _get_obs(self) -> np.ndarray:
         """abandon this function, use obs from idsim instead"""
-        idsim_context = get_idsimcontext(idSimState.stack([idSimState.array2tensor(self._state)]), mode="batch")
+        idsim_context = get_idsimcontext(State.stack([self._state.array2tensor()]), mode="batch")
         model_obs = self.model.observe(idsim_context)
         return model_obs.numpy().squeeze(0)
 
@@ -94,7 +72,7 @@ class idSimEnv(CrossRoad, Env):
     
     def _get_state_from_idsim(self, ref_index_param=None) -> State:
         idsim_context = ModelContext.from_env(self, self.model_config, ref_index_param)
-        self._state = idSimState(
+        self._state = State(
             robot_state=torch.concat([
                 idsim_context.x.ego_state, 
                 idsim_context.x.last_last_action, 
@@ -109,25 +87,29 @@ class idSimEnv(CrossRoad, Env):
                 t = torch.tensor(idsim_context.i).int()
             )
         )
-        self._state = idSimState.tensor2array(self._state)
+        self._state = self._state.tensor2array()
 
     def get_state_from_idsim(self, ref_index_param=None) -> State:
         self._get_state_from_idsim(ref_index_param=ref_index_param)
         return self._state
     
-    @property
-    def get_zero_state(self) -> np.ndarray:
+    def get_zero_state(self) -> State[np.ndarray]:
         if self._state is None:
             self.reset()
-        _state = idSimState.stack([self._state])
-        return _state.get_zero_state()
-    
-    @property
-    def additional_info(self) -> Dict[str, Dict]:
-        return self.info_dict
-    
+        return State(
+            robot_state=np.zeros_like(self._state.robot_state, dtype=np.float32),
+            context_state=idSimContextState(
+                reference=np.zeros_like(self._state.context_state.reference, dtype=np.float32),
+                constraint=np.zeros_like(self._state.context_state.constraint, dtype=np.float32),
+                t=np.zeros_like(self._state.context_state.t, dtype=np.int64),
+                light_param=np.zeros_like(self._state.context_state.light_param, dtype=np.float32),
+                ref_index_param=np.zeros_like(self._state.context_state.ref_index_param, dtype=np.int64),
+                real_t=np.zeros_like(self._state.context_state.real_t, dtype=np.int64)
+            )
+        )
 
-def get_idsimcontext(state: idSimState, mode: str) -> ModelContext:
+
+def get_idsimcontext(state: State, mode: str) -> ModelContext:
     if mode == "full_horizon":
         context = ModelContext(
             x = ModelState(

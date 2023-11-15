@@ -40,7 +40,6 @@ if __name__ == "__main__":
     ################################################
     # 1. Parameters for environment
     parser.add_argument("--reward_scale", type=float, default=0.1, help="reward scale factor")
-    parser.add_argument("--action_type", type=str, default="continu", help="Options: continu/discret")
     parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
     parser.add_argument("--is_adversary", type=bool, default=False, help="Adversary training")
 
@@ -81,7 +80,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
-    parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
     parser.add_argument("--policy_min_log_std", type=int, default=-20)
     parser.add_argument("--policy_max_log_std", type=int, default=1)
 
@@ -106,9 +104,6 @@ if __name__ == "__main__":
     parser.add_argument("--ini_network_dir", type=str, default=None)
 
     # 4.1. Parameters for off_async_trainer
-    import ray
-
-    ray.init()
     parser.add_argument("--num_algs", type=int, default=1, help="number of algs")
     parser.add_argument("--num_samplers", type=int, default=2, help="number of samplers")
     parser.add_argument("--num_buffers", type=int, default=1, help="number of buffers")

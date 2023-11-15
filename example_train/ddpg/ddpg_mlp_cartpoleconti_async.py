@@ -36,7 +36,6 @@ if __name__ == "__main__":
 
     ################################################
     # 1. Parameters for environment
-    parser.add_argument("--action_type", type=str, default="continu")
     parser.add_argument("--is_render", type=bool, default=False)
     parser.add_argument("--is_adversary", type=bool, default=False)
     parser.add_argument("--reward_scale", type=list, default=0.1)
@@ -55,8 +54,7 @@ if __name__ == "__main__":
     parser.add_argument("--policy_act_distribution", type=str, default="default")
     parser.add_argument("--policy_hidden_sizes", type=list, default=[64, 64])
     parser.add_argument("--policy_hidden_activation", type=str, default="relu")
-    parser.add_argument("--policy_output_activation", type=str, default="linear")
-
+    
     ################################################
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=3e-4)
@@ -71,8 +69,6 @@ if __name__ == "__main__":
     trainer_type = parser.parse_known_args()[0].trainer
 
     # 4.1. Parameters for off_async_trainer
-    import ray
-    ray.init()
     parser.add_argument("--num_algs", type=int, default=2)
     parser.add_argument("--num_samplers", type=int, default=2)
     parser.add_argument("--num_buffers", type=int, default=1)

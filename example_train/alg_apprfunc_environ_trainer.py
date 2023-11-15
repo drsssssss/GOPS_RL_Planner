@@ -44,7 +44,6 @@ if __name__ == "__main__":
     # 1. Parameters for environment
     parser.add_argument("--reward_scale", type=float, default=1, help="reward scale factor")
     parser.add_argument("--reward_shift", type=float, default=0, help="reward shift factor")
-    parser.add_argument("--action_type", type=str, default="continu", help="Options: continu/discret")
     parser.add_argument("--is_render", type=bool, default=False, help="Draw training animation")
     parser.add_argument("--seed", default=3328005365, help="seeds of env & network initialization")
 
@@ -104,14 +103,12 @@ if __name__ == "__main__":
         parser.add_argument(
             "--policy_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
         )
-        parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
     # 2.2.2 CNN/CNN_SHARED
     if policy_func_type == "CNN" or policy_func_type == "CNN_SHARED":
         parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256, 128])
         parser.add_argument(
             "--policy_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
         )
-        parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
         parser.add_argument("--policy_conv_type", type=str, default="type_2", help="Options: type_1/type_2")
     # 2.2.3 Polynomial
     if policy_func_type == "POLY":
@@ -162,12 +159,11 @@ if __name__ == "__main__":
         parser.add_argument("--sample_interval", type=int, default=1)
     # 4.4. Parameters for off-policy async trainer
     if trainer_type == "off_async_trainer":
-        import ray
-        ray.init()
         parser.add_argument("--num_algs", type=int, default=2)
         parser.add_argument("--num_samplers", type=int, default=2)
         parser.add_argument("--num_buffers", type=int, default=1)
         # Note that num of algs+samplers+buffers <= num of computer cores
+        import multiprocessing
         cpu_core_num = multiprocessing.cpu_count()
         num_core_input = (
                 parser.parse_known_args()[0].num_algs
