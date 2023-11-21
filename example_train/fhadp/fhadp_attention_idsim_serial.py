@@ -130,6 +130,7 @@ if __name__ == "__main__":
     }
     parser.add_argument("--env_config", type=dict, default=env_config_param)
     parser.add_argument("--env_model_config", type=dict, default=model_config)
+    parser.add_argument("--use_env_in_model", type=bool, default=True)
     parser.add_argument("--max_episode_steps", type=int, default=500)
 
     parser.add_argument("--algorithm", type=str, default="FHADP", help="RL algorithm")
@@ -250,7 +251,6 @@ if __name__ == "__main__":
 
     start_tensorboard(args["save_folder"])
     # Step 1: create algorithm and approximate function
-    args["env"] = env
     alg = create_alg(**args)  # create appr_model in algo **vars(args)
     # Step 2: create sampler in trainer
     sampler = create_sampler(**args)
