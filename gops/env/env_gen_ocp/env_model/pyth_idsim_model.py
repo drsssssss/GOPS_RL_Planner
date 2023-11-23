@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from typing import Optional, Any, Union
 from gops.env.env_gen_ocp.env_model.pyth_base_model import RobotModel, EnvModel
-from gops.env.env_gen_ocp.pyth_idsim import idSimEnv, get_idsimcontext
+from gops.env.env_gen_ocp.pyth_idsim import get_idsimcontext
 from gops.env.env_gen_ocp.pyth_base import State
-
+from idsim_model.params import ModelConfig
+from idsim.config import Config
 import numpy as np
 import torch
-import copy
 
 from idsim_model.model_context import State as ModelState
 from idsim_model.model import IdSimModel
@@ -49,22 +49,28 @@ class idSimEnvModel(EnvModel):
     def __init__(
         self,
         *,
-        env: idSimEnv,
         device: Union[torch.device, str, None] = None,
         **kwargs: Any,
     ):
+        assert "env_config" in kwargs.keys(), "env_config must be specified"
+        env_config = kwargs["env_config"]
+        env_config = Config.from_partial_dict(env_config)
+
+        assert "env_model_config" in kwargs.keys(), "env_model_config must be specified"
+        model_config = kwargs["env_model_config"]
+        model_config = ModelConfig.from_partial_dict(model_config)
+
+        self.dt = env_config.dt
+        self.action_dim = 2
+        self.obs_dim = 1 # FIXME: this is a hack
+
         super().__init__(
-            obs_lower_bound = env.observation_space.low,
-            obs_upper_bound = env.observation_space.high,
-            action_lower_bound = env.action_space.low,
-            action_upper_bound = env.action_space.high,
+            action_lower_bound = env_config.action_lower_bound,
+            action_upper_bound = env_config.action_upper_bound,
             device = device,
         )
-        model_config = env.model_config
-        self.dt = env.config.dt
-        self.action_dim = env.action_space.shape[0]
-        self.obs_dim = env.observation_space.shape[0]
-        self.idsim_model = IdSimModel(env, model_config)
+
+        self.idsim_model = IdSimModel(env_config, model_config)
         self.robot_model = idSimRobotModel(idsim_model = self.idsim_model)
 
     def get_obs(self, state: State) -> torch.Tensor:
