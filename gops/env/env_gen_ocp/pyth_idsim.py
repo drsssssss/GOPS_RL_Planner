@@ -95,10 +95,8 @@ class idSimEnv(CrossRoad, Env):
         torch_state = self._state.array2tensor()
         idsim_context = get_idsimcontext(State.stack([torch_state]), mode="batch")
         action = torch.tensor(action)
-        next_idsim_state = self.model.dynamics(idsim_context, action)
-        next_idsim_context = idsim_context.advance(next_idsim_state)
         reward_details = self.model.reward_nn_state(
-            context=next_idsim_context,
+            context=idsim_context,
             last_last_action=torch_state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
             last_action=torch_state.robot_state[..., -2:].unsqueeze(0), # absolute action
             action=action.unsqueeze(0) # incremental action
