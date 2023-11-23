@@ -9,13 +9,12 @@
 #  Description: Create environments
 #  Update Date: 2020-11-10, Yuhang Zhang: add create environments code
 
-import importlib
 from dataclasses import dataclass, field
+import importlib
 import os
 from typing import Callable, Dict, Optional, Union
 
 import numpy as np
-from gops.create_pkg.create_env import create_env
 from gops.env.wrapper.action_repeat import ActionRepeatModel
 from gops.env.wrapper.clip_action import ClipActionModel
 from gops.env.wrapper.clip_observation import ClipObservationModel
@@ -95,9 +94,6 @@ def create_env_model(
 
     _kwargs["device"] = "cuda" if _kwargs["use_gpu"] else "cpu"
 
-    if "use_env_in_model" in _kwargs and _kwargs["use_env_in_model"]:
-        _kwargs["env"] = create_env(env_id, **kwargs)
-
     if callable(spec_.entry_point):
         env_model_creator = spec_.entry_point
     else:
@@ -132,10 +128,13 @@ def create_env_model(
     return env_model
 
 
-# regist env model
+# regist env and env model
 env_dir_list = [e for e in os.listdir(env_path) if e.startswith("env_")]
 
-for env_dir_name in env_dir_list:    
+for env_dir_name in env_dir_list:
+    env_dir_abs_path = os.path.join(env_path, env_dir_name)
+    file_list = os.listdir(env_dir_abs_path)
+
     env_model_path = os.path.join(env_path, env_dir_name, "env_model")
     if not os.path.exists(env_model_path):
         continue

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, Any, Union
+from gops.create_pkg.create_env import create_env
 from gops.env.env_gen_ocp.env_model.pyth_base_model import RobotModel, EnvModel
 from gops.env.env_gen_ocp.pyth_idsim import idSimEnv, get_idsimcontext
 from gops.env.env_gen_ocp.pyth_base import State
@@ -109,4 +110,5 @@ def env_model_creator(**kwargs):
     """
     make env model `pyth_idsim_model`
     """
+    kwargs["env"] = create_env(env_id = "pyth_idsim", **kwargs)
     return idSimEnvModel(**kwargs)

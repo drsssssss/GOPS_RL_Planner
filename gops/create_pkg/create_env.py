@@ -57,7 +57,7 @@ def register(
     registry[new_spec.env_id] = new_spec
 
 
-# regist envs
+# regist env
 env_dir_list = [e for e in os.listdir(env_path) if e.startswith("env_")]
 
 for env_dir_name in env_dir_list:

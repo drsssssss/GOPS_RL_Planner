@@ -2,6 +2,7 @@ from abc import abstractmethod, ABCMeta
 from dataclasses import dataclass, fields
 from typing import Dict, Generic, Optional, Sequence, Tuple, TypeVar, Union
 from copy import deepcopy
+from gym.utils.seeding import RandomNumberGenerator
 
 import gym
 from gym import spaces
@@ -72,8 +73,10 @@ class ContextState(Generic[stateType]):
             v = getattr(self, field.name)
             if field.name == "t":
                 value.append(0)
-            elif isinstance(v, (np.ndarray, torch.Tensor)):
+            elif isinstance(v, (np.ndarray, torch.Tensor)) and v.ndim > 2:
                 value.append(v[np.arange(v.shape[0]), self.t])
+            else:
+                value.append(v)
         return self.__class__(*value)
 
 
@@ -157,7 +160,8 @@ class Robot(metaclass=ABCMeta):
 
 class Context(metaclass=ABCMeta):
     state: ContextState[np.ndarray]
-    
+    np_random: Optional[RandomNumberGenerator] = RandomNumberGenerator
+
     @abstractmethod
     def reset(self) -> ContextState[np.ndarray]:
         ...
@@ -188,7 +192,7 @@ class Env(gym.Env, metaclass=ABCMeta):
     def _get_info(self) -> dict:
         info = {'state': deepcopy(self._state)}
         try:
-            info['cost'] = self._get_constraint()
+            info['constraint'] = self._get_constraint()
         except NotImplementedError:
             pass
         return info
@@ -235,6 +239,9 @@ class Env(gym.Env, metaclass=ABCMeta):
             "state": self.get_zero_state(),
         }
 
+    def seed(self, seed=None):
+        super().seed(seed)
+        self.context.np_random = self.np_random
 
 def batch(x: Union[np.ndarray, torch.Tensor], batch_size: int) -> Union[np.ndarray, torch.Tensor]:
     if isinstance(x, np.ndarray):
