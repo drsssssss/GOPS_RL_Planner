@@ -1,10 +1,9 @@
-import pathlib
 from dataclasses import dataclass
-from typing import Optional, Tuple, Dict, Any, Union
 from copy import deepcopy
 from pathlib import Path
-import gym
+from typing import Any, Dict, Generic, Optional, Tuple, Union
 
+import gym
 import numpy as np
 import torch
 from idsim.config import Config
@@ -16,15 +15,26 @@ from idsim_model.params import ModelConfig
 from typing_extensions import Self
 from idsim_model.model import IdSimModel
 
-from gops.env.env_gen_ocp.pyth_base import (ContextState, Env, State, stateType)
+from gops.env.env_gen_ocp.pyth_base import (Context, ContextState, Env, State, stateType)
 
 
 @dataclass
-class idSimContextState(ContextState):
+class idSimContextState(ContextState[stateType], Generic[stateType]):
     light_param: Optional[stateType] = None
     ref_index_param: Optional[stateType] = None
     real_t: Union[int, stateType] = 0
 
+
+class idSimContext(Context):
+    def reset(self) -> idSimContextState[np.ndarray]:
+        pass
+
+    def step(self) -> idSimContextState[np.ndarray]:
+        pass
+
+    def get_zero_state(self) -> idSimContextState[np.ndarray]:
+        pass
+    
 
 class idSimEnv(CrossRoad, Env):
     def __new__(cls, env_config: Config, model_config: Dict[str, Any]) -> Self:
@@ -40,6 +50,7 @@ class idSimEnv(CrossRoad, Env):
         self.reset()
         obs_dim = self._get_obs().shape[0]
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
+        self.context = idSimContext() # fake idsim context
     
     def reset(self) -> Tuple[np.ndarray, dict]:
         obs, info = super(idSimEnv, self).reset()
@@ -81,14 +92,15 @@ class idSimEnv(CrossRoad, Env):
         return model_obs.numpy().squeeze(0)
 
     def _get_reward(self, action: np.ndarray) -> float:
-        idsim_context = get_idsimcontext(State.stack([self._state.array2tensor]), mode="batch")
+        torch_state = self._state.array2tensor()
+        idsim_context = get_idsimcontext(State.stack([torch_state]), mode="batch")
         action = torch.tensor(action)
         next_idsim_state = self.model.dynamics(idsim_context, action)
         next_idsim_context = idsim_context.advance(next_idsim_state)
         reward_details = self.model.reward_nn_state(
             context=next_idsim_context,
-            last_last_action=self._state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
-            last_action=self._state.robot_state[..., -2:].unsqueeze(0), # absolute action
+            last_last_action=torch_state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
+            last_action=torch_state.robot_state[..., -2:].unsqueeze(0), # absolute action
             action=action.unsqueeze(0) # incremental action
         )
         return reward_details[0].item(), reward_details
