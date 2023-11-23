@@ -49,6 +49,25 @@ class idSimEnv(CrossRoad, Env):
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
         self._get_state_from_idsim()
+        reward, reward_details = self._get_reward(action)
+        reward_info = {
+            "reward_mix": reward_details[0].item(),
+            "tracking_reward_lon": reward_details[1].item(),
+            "tracking_reward_lat": reward_details[2].item(),
+            "tracking_reward_phi": reward_details[3].item(),
+            "tracking_reward_v": reward_details[4].item(),
+            "tracking_reward_vy": reward_details[5].item(),
+            "tracking_reward_yaw_rate": reward_details[6].item(),
+            "action_reward_acc": reward_details[7].item(),
+            "action_reward_steer": reward_details[8].item(),
+            "action_incremental_reward_acc": reward_details[9].item(),
+            "action_incremental_reward_steer": reward_details[10].item(),
+            "action_incremental_2nd_reward_acc": reward_details[11].item(),
+            "action_incremental_2nd_reward_steer": reward_details[12].item(),
+            "collision2v_reward": reward_details[13].item(),
+            "collision_flag": reward_details[14].sum().item()
+        }
+        info["reward_details"] = reward_info
         done = terminated or truncated
         return self._get_obs(), reward, done, self._get_info(info)
     
@@ -57,14 +76,22 @@ class idSimEnv(CrossRoad, Env):
         return info
     
     def _get_obs(self) -> np.ndarray:
-        """abandon this function, use obs from idsim instead"""
         idsim_context = get_idsimcontext(State.stack([self._state.array2tensor()]), mode="batch")
         model_obs = self.model.observe(idsim_context)
         return model_obs.numpy().squeeze(0)
 
     def _get_reward(self, action: np.ndarray) -> float:
-        """abandon this function, use reward from idsim instead"""
-        ...
+        idsim_context = get_idsimcontext(State.stack([self._state.array2tensor]), mode="batch")
+        action = torch.tensor(action)
+        next_idsim_state = self.model.dynamics(idsim_context, action)
+        next_idsim_context = idsim_context.advance(next_idsim_state)
+        reward_details = self.model.reward_nn_state(
+            context=next_idsim_context,
+            last_last_action=self._state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
+            last_action=self._state.robot_state[..., -2:].unsqueeze(0), # absolute action
+            action=action.unsqueeze(0) # incremental action
+        )
+        return reward_details[0].item(), reward_details
     
     def _get_terminated(self) -> bool:
         """abandon this function, use terminated from idsim instead"""
