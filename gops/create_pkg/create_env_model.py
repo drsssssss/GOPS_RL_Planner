@@ -127,14 +127,10 @@ def create_env_model(
 
     return env_model
 
-
-# regist env and env model
+# regist env model
 env_dir_list = [e for e in os.listdir(env_path) if e.startswith("env_")]
 
 for env_dir_name in env_dir_list:
-    env_dir_abs_path = os.path.join(env_path, env_dir_name)
-    file_list = os.listdir(env_dir_abs_path)
-
     env_model_path = os.path.join(env_path, env_dir_name, "env_model")
     if not os.path.exists(env_model_path):
         continue

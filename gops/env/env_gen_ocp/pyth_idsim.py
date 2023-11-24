@@ -2,20 +2,19 @@ from dataclasses import dataclass
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, Generic, Optional, Tuple, Union
+from typing_extensions import Self
 
 import gym
 import numpy as np
 import torch
+from gops.env.env_gen_ocp.pyth_base import (Context, ContextState, Env, State, stateType)
 from idsim.config import Config
 from idsim.envs.env import CrossRoad
+from idsim_model.model import IdSimModel
 from idsim_model.model_context import ModelContext, Parameter
 from idsim_model.model_context import State as ModelState
-from idsim_model.params import model_config as default_model_config
 from idsim_model.params import ModelConfig
-from typing_extensions import Self
-from idsim_model.model import IdSimModel
 
-from gops.env.env_gen_ocp.pyth_base import (Context, ContextState, Env, State, stateType)
 
 
 @dataclass
@@ -40,12 +39,12 @@ class idSimEnv(CrossRoad, Env):
     def __new__(cls, env_config: Config, model_config: Dict[str, Any]) -> Self:
         return super(idSimEnv, cls).__new__(cls, env_config)
     
-    def __init__(self, env_config: Config, model_config: Dict[str, Any]):
+    def __init__(self, env_config: Config, model_config: ModelConfig):
         super(idSimEnv, self).__init__(env_config)
         self.model_config = model_config
         self._state = None
         # get observation_space
-        self.model = IdSimModel(self, model_config)
+        self.model = IdSimModel(env_config, model_config)
         # obtain observation_space from idsim
         self.reset()
         obs_dim = self._get_obs().shape[0]
@@ -95,10 +94,8 @@ class idSimEnv(CrossRoad, Env):
         torch_state = self._state.array2tensor()
         idsim_context = get_idsimcontext(State.stack([torch_state]), mode="batch")
         action = torch.tensor(action)
-        next_idsim_state = self.model.dynamics(idsim_context, action)
-        next_idsim_context = idsim_context.advance(next_idsim_state)
         reward_details = self.model.reward_nn_state(
-            context=next_idsim_context,
+            context=idsim_context,
             last_last_action=torch_state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
             last_action=torch_state.robot_state[..., -2:].unsqueeze(0), # absolute action
             action=action.unsqueeze(0) # incremental action
@@ -191,14 +188,15 @@ def env_creator(**kwargs):
     """
     make env `pyth_idsim`
     """
+    assert "env_config" in kwargs.keys(), "env_config must be specified"
     env_config = deepcopy(kwargs["env_config"])
-    if 'scenario_root' in env_config:
-        env_config['scenario_root'] = Path(env_config['scenario_root'])
+    assert 'scenario_root' in env_config, "scenario_root must be specified in env_config"
+    env_config['scenario_root'] = Path(env_config['scenario_root'])
     env_config = Config.from_partial_dict(env_config)
-    if "env_model_config" in kwargs.keys():
-        model_config = kwargs["env_model_config"]
-    else:
-        model_config = default_model_config
+
+    assert "env_model_config" in kwargs.keys(), "env_model_config must be specified"
+    model_config = deepcopy(kwargs["env_model_config"])
     model_config = ModelConfig.from_partial_dict(model_config)
+
     env = idSimEnv(env_config, model_config)
     return env

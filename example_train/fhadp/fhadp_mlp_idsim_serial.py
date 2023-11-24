@@ -131,7 +131,6 @@ if __name__ == "__main__":
     }
     parser.add_argument("--env_config", type=dict, default=env_config_param)
     parser.add_argument("--env_model_config", type=dict, default=model_config)
-    parser.add_argument("--use_env_in_model", type=bool, default=True)
 
     parser.add_argument("--algorithm", type=str, default="FHADP", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")

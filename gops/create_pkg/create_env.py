@@ -79,7 +79,6 @@ for env_dir_name in env_dir_list:
             except:
                 RuntimeError(f"Register env {env_id} failed")
 
-
 def create_env(
     env_id: str,
     *,
