@@ -13,6 +13,7 @@
 import argparse
 import os
 import numpy as np
+import json
 
 from gops.create_pkg.create_alg import create_alg
 from gops.create_pkg.create_buffer import create_buffer
@@ -47,6 +48,7 @@ if __name__ == "__main__":
         "scenario_selector": '1',
         "extra_sumo_args": ("--start", "--delay", "200"),
         "warmup_time": 5.0,
+        "max_steps": 500,
         "ignore_traffic_lights": False,
         "incremental_action": True,
         "action_lower_bound": (-0.5, -0.03),
@@ -129,7 +131,6 @@ if __name__ == "__main__":
     }
     parser.add_argument("--env_config", type=dict, default=env_config_param)
     parser.add_argument("--env_model_config", type=dict, default=model_config)
-    parser.add_argument("--max_episode_steps", type=int, default=500)
 
     parser.add_argument("--algorithm", type=str, default="FHADP", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
@@ -174,7 +175,7 @@ if __name__ == "__main__":
         help="Options: default/TanhGaussDistribution/GaussDistribution",
     )
     policy_func_type = parser.parse_known_args()[0].policy_func_type
-    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256])
+    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256, 256])
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
@@ -183,8 +184,14 @@ if __name__ == "__main__":
     ################################################
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
-    parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
-
+    parser.add_argument("--policy_scheduler", type=json.loads, default={
+        "name": "LinearLR",
+        "params": {
+            "start_factor": 1.0,
+            "end_factor": 0.0,
+            "total_iters": 200000,
+            }
+    })
     ################################################
     # 4. Parameters for trainer
     parser.add_argument(
@@ -217,8 +224,12 @@ if __name__ == "__main__":
     # Batch size of sampler for buffer store
     parser.add_argument("--sample_batch_size", type=int, default=128)
     # Add noise to actions for better exploration
-    parser.add_argument("--noise_params", type=dict, default=None)
-
+    parser.add_argument(
+        "--noise_params",
+        type=dict,
+        default={"mean": np.array([0], dtype=np.float32), "std": np.array([0.0], dtype=np.float32),},
+    )
+    
     ################################################
     # 6. Parameters for evaluator
     parser.add_argument("--evaluator_name", type=str, default="evaluator")
