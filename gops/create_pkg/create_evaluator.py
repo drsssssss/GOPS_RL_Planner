@@ -41,7 +41,9 @@ def register(
 
 # regist evaluator
 from gops.trainer.evaluator import Evaluator
+from gops.trainer.idsim_train_evaluator import IdsimTrainEvaluator
 register(evaluator_name="evaluator", entry_point=Evaluator)
+register(evaluator_name="idsim_train_evaluator", entry_point=IdsimTrainEvaluator)
 
 
 def create_evaluator(evaluator_name: str, **kwargs) -> object:

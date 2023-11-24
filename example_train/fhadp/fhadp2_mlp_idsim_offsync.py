@@ -6,8 +6,8 @@
 #  Lab Leader: Prof. Shengbo Eben Li
 #  Email: lisb04@gmail.com
 #
-#  Description: example for fhadp2 + idsim + mlp + off_serial
-#  Update Date: 2022-9-21, Jiaxin Gao: create example
+#  Description: example for fhadp2 + idsim + mlp + off_sync
+#  Update Date: 2023-11-24, Guojian Zhan: create example
 
 
 import argparse
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
-    MAP_ROOT = 'YOUR_MAP_ROOT'
+    MAP_ROOT = ''
     pre_horizon = 30
     env_config_param = {
         "use_render": False,
@@ -195,12 +195,29 @@ if __name__ == "__main__":
     })
     ################################################
     # 4. Parameters for trainer
-    parser.add_argument(
-        "--trainer",
-        type=str,
-        default="off_serial_trainer",
-        help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer, off_sync_trainer",
-    )
+    import multiprocessing
+    parser.add_argument("--trainer", type=str, default="off_sync_idsim_trainer",
+                        help="off_async_trainer4toyota/off_sync_trainer/on_serial_trainer")
+    trainer_type = parser.parse_known_args()[0].trainer
+    # 4.3. Parameters for sync or async trainer
+    if (
+        trainer_type.startswith("off_sync")
+    ):
+        parser.add_argument("--num_algs", type=int, default=4)
+        parser.add_argument("--num_samplers", type=int, default=2)
+        parser.add_argument("--num_buffers", type=int, default=1)
+        cpu_core_num = multiprocessing.cpu_count()
+        num_core_input = (
+            parser.parse_known_args()[0].num_algs
+            + parser.parse_known_args()[0].num_samplers
+            + parser.parse_known_args()[0].num_buffers
+            + 2
+        )
+        if num_core_input > cpu_core_num:
+            raise ValueError("The number of core is {}, but you want {}!".format(cpu_core_num, num_core_input))
+        parser.add_argument("--alg_queue_max_size", type=int, default=1)
+
+    ################################################
     # Maximum iteration number
     parser.add_argument("--max_iteration", type=int, default=200000)
     trainer_type = parser.parse_known_args()[0].trainer
