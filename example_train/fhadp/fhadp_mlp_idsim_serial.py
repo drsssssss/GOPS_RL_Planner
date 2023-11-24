@@ -184,6 +184,7 @@ if __name__ == "__main__":
     ################################################
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
+    parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
     parser.add_argument("--policy_scheduler", type=json.loads, default={
         "name": "LinearLR",
         "params": {
@@ -232,7 +233,7 @@ if __name__ == "__main__":
     
     ################################################
     # 6. Parameters for evaluator
-    parser.add_argument("--evaluator_name", type=str, default="evaluator")
+    parser.add_argument("--evaluator_name", type=str, default="idsim_train_evaluator")
     parser.add_argument("--num_eval_episode", type=int, default=20)
     parser.add_argument("--eval_interval", type=int, default=1000)
     parser.add_argument("--eval_save", type=str, default=False, help="save evaluation data")
