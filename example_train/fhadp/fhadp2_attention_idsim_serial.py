@@ -13,6 +13,7 @@
 import argparse
 import os
 import numpy as np
+import json
 
 from gops.create_pkg.create_alg import create_alg
 from gops.create_pkg.create_buffer import create_buffer
@@ -47,6 +48,7 @@ if __name__ == "__main__":
         "scenario_selector": '1',
         "extra_sumo_args": ("--start", "--delay", "200"),
         "warmup_time": 5.0,
+        "max_steps": 500,
         "ignore_traffic_lights": False,
         "incremental_action": True,
         "action_lower_bound": (-0.5, -0.03),
@@ -70,7 +72,6 @@ if __name__ == "__main__":
         "obs_ref_interval": 0.8,
         "vehicle_spec": (1880.0, 1536.7, 1.13, 1.52, -128915.5, -85943.6, 20.0, 0.0),
         "singleton_mode": "reuse",
-        "seed": 1
     }
     model_config = {
         "N": pre_horizon,
@@ -130,7 +131,6 @@ if __name__ == "__main__":
     }
     parser.add_argument("--env_config", type=dict, default=env_config_param)
     parser.add_argument("--env_model_config", type=dict, default=model_config)
-    parser.add_argument("--max_episode_steps", type=int, default=500)
 
     parser.add_argument("--algorithm", type=str, default="FHADP2", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
@@ -192,13 +192,20 @@ if __name__ == "__main__":
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
     parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
-
+    parser.add_argument("--policy_scheduler", type=json.loads, default={
+        "name": "LinearLR",
+        "params": {
+            "start_factor": 1.0,
+            "end_factor": 0.0,
+            "total_iters": 200000,
+            }
+    })
     ################################################
     # 4. Parameters for trainer
     parser.add_argument(
         "--trainer",
         type=str,
-        default="off_serial_trainer",
+        default="off_serial_idsim_trainer",
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer, off_sync_trainer",
     )
     # Maximum iteration number
@@ -225,11 +232,15 @@ if __name__ == "__main__":
     # Batch size of sampler for buffer store
     parser.add_argument("--sample_batch_size", type=int, default=128)
     # Add noise to actions for better exploration
-    parser.add_argument("--noise_params", type=dict, default=None)
-
+    parser.add_argument(
+        "--noise_params",
+        type=dict,
+        default={"mean": np.array([0], dtype=np.float32), "std": np.array([0.0], dtype=np.float32),},
+    )
+    
     ################################################
     # 6. Parameters for evaluator
-    parser.add_argument("--evaluator_name", type=str, default="evaluator")
+    parser.add_argument("--evaluator_name", type=str, default="idsim_train_evaluator")
     parser.add_argument("--num_eval_episode", type=int, default=20)
     parser.add_argument("--eval_interval", type=int, default=1000)
     parser.add_argument("--eval_save", type=str, default=False, help="save evaluation data")
