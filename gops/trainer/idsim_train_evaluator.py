@@ -10,30 +10,8 @@ from typing import Dict, List
 import numpy as np
 import torch
 from gops.trainer.evaluator import Evaluator
+from gops.env.env_gen_ocp.resources.idsim_tags import idsim_tb_tags_dict
 
-idsim_tb_tags_dict = {
-            "done/arrival": "Evaluation/Arrival rate-RL iter",
-            "done/red_violation": "Evaluation/Red violation rate-RL iter",
-            "done/yellow_violation": "Evaluation/Yellow violation rate-RL iter",
-            "done/out_of_driving_area": "Evaluation/Out of driving area rate-RL iter",
-            "done/collision": "Evaluation/Collision rate-RL iter",
-            "done/max_steps": "Evaluation/Max steps rate-RL iter",
-            "reward_mix": 'Evaluation/total_reward',
-            "tracking_reward_lon": 'Evaluation/tracking_reward_lon',
-            "tracking_reward_lat": 'Evaluation/tracking_reward_lat',
-            "tracking_reward_phi": 'Evaluation/tracking_reward_phi',
-            "tracking_reward_v": 'Evaluation/tracking_reward_v',
-            "tracking_reward_vy": 'Evaluation/tracking_reward_vy',
-            "tracking_reward_yaw_rate": 'Evaluation/tracking_reward_yaw_rate',
-            "action_reward_acc": 'Evaluation/action_reward_acc',
-            "action_reward_steer": 'Evaluation/action_reward_steer',
-            "action_incremental_reward_acc": 'Evaluation/action_incremental_reward_acc',
-            "action_incremental_reward_steer": 'Evaluation/action_incremental_reward_steer',
-            "action_incremental_2nd_reward_acc": 'Evaluation/action_incremental_2nd_reward_acc',
-            "action_incremental_2nd_reward_steer": 'Evaluation/action_incremental_2nd_reward_steer',
-            "collision2v_reward": 'Evaluation/collision2v_reward',
-            "collision_flag": 'Evaluation/collision_flag'
-        }
 
 class EvalResult:
     def __init__(self):
