@@ -8,6 +8,7 @@ import gym
 import numpy as np
 import torch
 from gops.env.env_gen_ocp.pyth_base import (Context, ContextState, Env, State, stateType)
+from gops.env.env_gen_ocp.resources.idsim_tags import reward_tags
 from idsim.config import Config
 from idsim.envs.env import CrossRoad
 from idsim_model.model import IdSimModel
@@ -60,24 +61,9 @@ class idSimEnv(CrossRoad, Env):
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
         self._get_state_from_idsim()
         reward, reward_details = self._get_reward(action)
-        reward_info = {
-            "reward_mix": reward_details[0].item(),
-            "tracking_reward_lon": reward_details[1].item(),
-            "tracking_reward_lat": reward_details[2].item(),
-            "tracking_reward_phi": reward_details[3].item(),
-            "tracking_reward_v": reward_details[4].item(),
-            "tracking_reward_vy": reward_details[5].item(),
-            "tracking_reward_yaw_rate": reward_details[6].item(),
-            "action_reward_acc": reward_details[7].item(),
-            "action_reward_steer": reward_details[8].item(),
-            "action_incremental_reward_acc": reward_details[9].item(),
-            "action_incremental_reward_steer": reward_details[10].item(),
-            "action_incremental_2nd_reward_acc": reward_details[11].item(),
-            "action_incremental_2nd_reward_steer": reward_details[12].item(),
-            "collision2v_reward": reward_details[13].item(),
-            "collision_flag": reward_details[14].sum().item()
-        }
-        info["reward_details"] = reward_info
+        info["reward_details"] = dict(
+            zip(reward_tags, [i.item() for i in reward_details])
+        )
         done = terminated or truncated
         return self._get_obs(), reward, done, self._get_info(info)
     

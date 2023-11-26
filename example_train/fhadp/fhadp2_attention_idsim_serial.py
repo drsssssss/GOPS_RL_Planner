@@ -24,6 +24,8 @@ from gops.create_pkg.create_trainer import create_trainer
 from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
+from gops.env.env_gen_ocp.resources.idsim_config import env_config_param_crossroad as env_config_param,\
+    model_config_crossroad as model_config, pre_horizon
 
 os.environ["OMP_NUM_THREADS"] = "4"
 
@@ -34,101 +36,6 @@ if __name__ == "__main__":
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
-    MAP_ROOT = 'YOUR_MAP_ROOT'
-    pre_horizon = 30
-    env_config_param = {
-        "use_render": False,
-        "seed": 1,
-        "actuator": "ExternalActuator",
-        "scenario_reuse": 10,
-        "num_scenarios": 20, 
-        "detect_range": 60,
-        "choose_vehicle_retries": 10,
-        "scenario_root": MAP_ROOT,
-        "scenario_selector": '1',
-        "extra_sumo_args": ("--start", "--delay", "200"),
-        "warmup_time": 5.0,
-        "max_steps": 500,
-        "ignore_traffic_lights": False,
-        "incremental_action": True,
-        "action_lower_bound": (-0.5, -0.03),
-        "action_upper_bound": ( 0.2, 0.03),
-        "real_action_lower_bound": (
-            -3.0,
-            -0.45
-        ),
-        "real_action_upper_bound": (
-            0.8,
-            0.45
-        ),
-        "obs_num_surrounding_vehicles": {
-            "passenger": 5,
-            "bicycle": 0,
-            "pedestrian": 0,
-        },
-        "ref_v": 8.0,
-        "ref_length": 48.0,
-        "obs_num_ref_points": 2 * pre_horizon + 1,
-        "obs_ref_interval": 0.8,
-        "vehicle_spec": (1880.0, 1536.7, 1.13, 1.52, -128915.5, -85943.6, 20.0, 0.0),
-        "singleton_mode": "reuse",
-    }
-    model_config = {
-        "N": pre_horizon,
-        "full_horizon_sur_obs": False,
-        "ahead_lane_length_min": 6.0,
-        "ahead_lane_length_max": 30.0,
-        "v_discount_in_junction_straight": 0.75,
-        "v_discount_in_junction_left_turn": 0.5,
-        "v_discount_in_junction_right_turn": 0.375,
-        "num_ref_lines": 3,
-        "dec_before_junction": 0.8,
-        "ego_length": 5.0,
-        "ego_width": 1.8,
-        "safe_dist_incremental": 1.5,
-
-        "num_ref_points": pre_horizon + 1,
-        "ego_feat_dim": 7, # vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
-        "per_sur_state_dim": 6, # x, y, phi, speed, length, width
-        "per_sur_state_withinfo_dim": 7, # x, y, phi, speed, length, width, mask
-        "per_sur_feat_dim": 5, # x, y, cos(phi), sin(phi), speed
-        "per_ref_feat_dim": 5, # x, y, cos(phi), sin(phi), speed
-        "real_action_upper": (
-            (
-                0.8,
-                0.45
-            )
-        ),
-        "real_action_lower": (
-            (
-                -3.0,
-                -0.45
-            )
-        ),
-        "Q": (
-            0.0,
-            16.0,
-            750.0,
-            2.0,
-            2.0,
-            60.0
-        ),
-        "R0": (
-            0,
-            40
-        ),
-        "R1": (
-            5.0,
-            5.0
-        ),
-        "R2": (
-            5.0,
-            5.0
-        ),
-        "P": 2000.0,
-        "ref_v_lane": 8.0,
-        "filter_num": 5
-    }
     parser.add_argument("--env_config", type=dict, default=env_config_param)
     parser.add_argument("--env_model_config", type=dict, default=model_config)
 
@@ -182,9 +89,9 @@ if __name__ == "__main__":
         help="Options: default/TanhGaussDistribution/GaussDistribution",
     )
     policy_func_type = parser.parse_known_args()[0].policy_func_type
-    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256])
+    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256, 256])
     parser.add_argument(
-        "--policy_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
+        "--policy_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
     parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
 
@@ -262,6 +169,7 @@ if __name__ == "__main__":
     start_tensorboard(args["save_folder"])
     # Step 1: create algorithm and approximate function
     alg = create_alg(**args)  # create appr_model in algo **vars(args)
+    alg.set_parameters({"gamma": 0.99})
     # Step 2: create sampler in trainer
     sampler = create_sampler(**args)
     # Step 3: create buffer in trainer
