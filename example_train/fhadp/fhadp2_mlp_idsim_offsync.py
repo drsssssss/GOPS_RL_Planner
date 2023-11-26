@@ -180,7 +180,7 @@ if __name__ == "__main__":
     # Step 1: create algorithm and approximate function
     alg = create_alg(**args)  # create appr_model in algo **vars(args)
     for alg_id in alg:
-        alg_id.set_parameters.remote({"gamma": 0.99})
+        alg_id.set_parameters.remote({"gamma": 1.0 })
     sampler = create_sampler(**args)
     # Step 3: create buffer in trainer
     buffer = create_buffer(**args)
