@@ -169,7 +169,7 @@ if __name__ == "__main__":
     start_tensorboard(args["save_folder"])
     # Step 1: create algorithm and approximate function
     alg = create_alg(**args)  # create appr_model in algo **vars(args)
-    alg.set_parameters({"gamma": 0.99})
+    alg.set_parameters({"gamma": 1.0})
     # Step 2: create sampler in trainer
     sampler = create_sampler(**args)
     # Step 3: create buffer in trainer

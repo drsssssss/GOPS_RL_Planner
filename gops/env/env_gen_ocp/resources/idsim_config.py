@@ -1,5 +1,6 @@
 MAP_ROOT = 'YOUR_MAP_ROOT'
 pre_horizon = 30
+delta_t = 0.1
 
 env_config_param_base = {
     "use_render": False,
@@ -16,8 +17,8 @@ env_config_param_base = {
     "max_steps": 500,
     "ignore_traffic_lights": False,
     "incremental_action": True,
-    "action_lower_bound": (-4.0, -0.25),
-    "action_upper_bound": (2.5, 0.25),
+    "action_lower_bound": (-4.0 * delta_t, -0.25 * delta_t),
+    "action_upper_bound": (2.5 * delta_t, 0.25 * delta_t),
     "real_action_lower_bound": (
         -3.0,
         -0.571
@@ -99,7 +100,7 @@ model_config_base = {
     # C_vx_min, C_vx_max, C_vy_min, C_vy_max #TODO: check rationality
     "C_v": (100., 100., 100., 100.),
 
-    "gamma": 0.99,  # should equal to discount factor of algorithm
+    "gamma": 1.0,  # should equal to discount factor of algorithm
     "lambda_c": 0.99,  # discount of lat penalty
     "lambda_p": 0.99,  # discount of lon penalty
     "C_lat": 3.0,
@@ -120,8 +121,8 @@ model_config_crossroad = model_config_base
 
 env_config_param_multilane = env_config_param_base.update(
     {
-        "action_lower_bound": (-4.0, -0.065),
-        "action_upper_bound": (2.5, 0.065),
+        "action_lower_bound": (-4.0 * delta_t, -0.065 * delta_t),
+        "action_upper_bound": (2.5 * delta_t, 0.065 * delta_t),
         "real_action_lower_bound": (
             -3.0,
             -0.065
@@ -141,6 +142,18 @@ model_config_multilane = model_config_base.update(
         "real_action_upper": (
             0.8,
             0.065
+        ),
+        "Q": (
+            0.2,
+            0.2,
+            500.0,
+            0.5,
+            2.0,
+            2000.0,
+        ),
+        "R": (
+            1.0,
+            500.0,
         )
     }
 )
