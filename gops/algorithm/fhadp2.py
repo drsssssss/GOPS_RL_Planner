@@ -23,21 +23,39 @@ import warnings
 from gops.create_pkg.create_apprfunc import create_apprfunc
 from gops.create_pkg.create_env_model import create_env_model
 from gops.utils.common_utils import get_apprfunc_dict
+from gops.utils.gops_typing import DataDict, InfoDict
 from gops.utils.tensorboard_setup import tb_tags
 from gops.algorithm.base import AlgorithmBase, ApprBase
 
 
 class ApproxContainer(ApprBase):
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        *,
+        policy_learning_rate: float,
+        value_learning_rate: float,
+        **kwargs,
+    ):
         """Approximate function container for FHADP."""
         """Contains one policy network."""
         super().__init__(**kwargs)
         policy_args = get_apprfunc_dict("policy", **kwargs)
+        v_args = get_apprfunc_dict("value", **kwargs)
 
         self.policy = create_apprfunc(**policy_args)
+        self.v = create_apprfunc(**v_args)
         self.policy_optimizer = Adam(
-            self.policy.parameters(), lr=kwargs["policy_learning_rate"]
+            self.policy.parameters(), lr=policy_learning_rate
         )
+        self.v_optimizer = Adam(
+            self.v.parameters(), lr=value_learning_rate
+        )
+
+        self.optimizer_dict = {
+            "policy": self.policy_optimizer,
+            "v": self.v_optimizer,
+        }
+        self.init_scheduler(**kwargs)
 
     def create_action_distributions(self, logits):
         """create action distribution"""
@@ -49,7 +67,7 @@ class FHADP2(AlgorithmBase):
 
     Paper: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=4124940
 
-    :param int forward_step: envmodel forward step.
+    :param int pre_horizon: envmodel forward step.
     :param float gamma: discount factor.
     """
 
@@ -57,48 +75,51 @@ class FHADP2(AlgorithmBase):
         super().__init__(index, **kwargs)
         self.networks = ApproxContainer(**kwargs)
         self.envmodel = create_env_model(**kwargs)
-        self.forward_step = kwargs["pre_horizon"]
+        self.pre_horizon = kwargs["pre_horizon"]
         self.gamma = 1.0
         self.tb_info = dict()
 
     @property
     def adjustable_parameters(self):
-        para_tuple = ("forward_step", "gamma")
+        para_tuple = ("pre_horizon", "gamma")
         return para_tuple
 
-    def local_update(self, data, iteration: int):
-        self.__compute_gradient(data)
+    def _local_update(self, data: DataDict, iteration: int) -> InfoDict:
+        self._compute_gradient(data)
         self.networks.policy_optimizer.step()
+        self.networks.v_optimizer.step()
         return self.tb_info
 
-    def get_remote_update_info(self, data: dict, iteration: int) -> Tuple[dict, dict]:
-        self.__compute_gradient(data)
+    def get_remote_update_info(self, data: DataDict, iteration: int) -> Tuple[InfoDict, DataDict]:
+        self._compute_gradient(data)
         policy_grad = [p._grad for p in self.networks.policy.parameters()]
+        v_grad = [p._grad for p in self.networks.v.parameters()]
         update_info = dict()
-        update_info["grad"] = policy_grad
+        update_info["policy_grad"] = policy_grad
+        update_info["v_grad"] = v_grad
         return self.tb_info, update_info
 
-    def remote_update(self, update_info: dict):
-        for p, grad in zip(self.networks.policy.parameters(), update_info["grad"]):
+    def _remote_update(self, update_info: DataDict):
+        for p, grad in zip(self.networks.policy.parameters(), update_info["policy_grad"]):
+            p.grad = grad
+        for p, grad in zip(self.networks.v.parameters(), update_info["v_grad"]):
             p.grad = grad
         self.networks.policy_optimizer.step()
+        self.networks.v_optimizer.step()
 
-    def __compute_gradient(self, data):
+    def _compute_gradient(self, data: DataDict):
         start_time = time.time()
         self.networks.policy.zero_grad()
-        loss_policy = self.__compute_loss_policy(deepcopy(data))
-
+        loss_policy, loss_info = self._compute_loss_policy(deepcopy(data))
         loss_policy.backward()
-
-        self.tb_info[tb_tags["loss_actor"]] = loss_policy.item()
-
+        loss_v, loss_info_v = self._compute_loss_v(deepcopy(data))
+        loss_v.backward()
         end_time = time.time()
-
+        self.tb_info.update(loss_info)
+        self.tb_info.update(loss_info_v)
         self.tb_info[tb_tags["alg_time"]] = (end_time - start_time) * 1000  # ms
 
-        return
-
-    def __compute_loss_policy(self, data):
+    def _compute_loss_policy(self, data):
         o, a, r, o2, d = (
             data["obs"],
             data["act"],
@@ -109,7 +130,7 @@ class FHADP2(AlgorithmBase):
         info_init = data
         v_pi = 0
         a = self.networks.policy.forward_all_policy(o)
-        for step in range(self.forward_step):
+        for step in range(self.pre_horizon):
             if step == 0:
                 o2, r, d, info = self.envmodel.forward(o, a[:, 0, :], d, info_init)
                 v_pi = r
@@ -117,9 +138,27 @@ class FHADP2(AlgorithmBase):
                 o = o2
                 o2, r, d, info = self.envmodel.forward(o, a[:, step, :], d, info)
                 v_pi += r * (self.gamma**step)
+        loss_policy = -v_pi.mean()
+        loss_info = {
+            tb_tags["loss_actor"]: loss_policy.item()
+        }
+        return loss_policy, loss_info
 
-        return -(v_pi).mean()
-
-
-if __name__ == "__main__":
-    print("11111")
+    def _compute_loss_v(self, data: DataDict) -> Tuple[torch.Tensor, InfoDict]:
+        o, d = data["obs"], data["done"]
+        info_init = data
+        v_pi = 0
+        a = self.networks.policy.forward_all_policy(o)
+        for step in range(self.pre_horizon):
+            if step == 0:
+                o2, r, d, info = self.envmodel.forward(o, a[:, 0, :], d, info_init)
+                v_pi = r
+            else:
+                o = o2
+                o2, r, d, info = self.envmodel.forward(o, a[:, step, :], d, info)
+                v_pi += r * (self.gamma**step)
+        loss_v = ((self.networks.v(o) - v_pi) ** 2).mean()
+        loss_info = {
+            tb_tags["loss_critic"]: loss_v.item()
+        }
+        return loss_v, loss_info

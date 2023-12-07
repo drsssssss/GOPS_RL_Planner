@@ -34,19 +34,27 @@ class ApproxContainer(ApprBase):
         self,
         *,
         policy_learning_rate: float,
+        value_learning_rate: float,
         **kwargs,
     ):
         """Approximate function container for FHADP."""
         """Contains one policy network."""
         super().__init__(**kwargs)
         policy_args = get_apprfunc_dict("policy", **kwargs)
+        v_args = get_apprfunc_dict("value", **kwargs)
 
         self.policy = create_apprfunc(**policy_args)
+        self.v = create_apprfunc(**v_args)
         self.policy_optimizer = Adam(
             self.policy.parameters(), lr=policy_learning_rate
         )
+        self.v_optimizer = Adam(
+            self.v.parameters(), lr=value_learning_rate
+        )
+
         self.optimizer_dict = {
             "policy": self.policy_optimizer,
+            "v": self.v_optimizer,
         }
         self.init_scheduler(**kwargs)
 
@@ -87,27 +95,36 @@ class FHADP(AlgorithmBase):
     def _local_update(self, data: DataDict, iteration: int) -> InfoDict:
         self._compute_gradient(data)
         self.networks.policy_optimizer.step()
+        self.networks.v_optimizer.step()
         return self.tb_info
 
     def get_remote_update_info(self, data: DataDict, iteration: int) -> Tuple[InfoDict, DataDict]:
         self._compute_gradient(data)
         policy_grad = [p._grad for p in self.networks.policy.parameters()]
+        v_grad = [p._grad for p in self.networks.v.parameters()]
         update_info = dict()
-        update_info["grad"] = policy_grad
+        update_info["policy_grad"] = policy_grad
+        update_info["v_grad"] = v_grad
         return self.tb_info, update_info
 
     def _remote_update(self, update_info: DataDict):
-        for p, grad in zip(self.networks.policy.parameters(), update_info["grad"]):
+        for p, grad in zip(self.networks.policy.parameters(), update_info["policy_grad"]):
+            p.grad = grad
+        for p, grad in zip(self.networks.v.parameters(), update_info["v_grad"]):
             p.grad = grad
         self.networks.policy_optimizer.step()
+        self.networks.v_optimizer.step()
 
     def _compute_gradient(self, data: DataDict):
         start_time = time.time()
         self.networks.policy.zero_grad()
         loss_policy, loss_info = self._compute_loss_policy(deepcopy(data))
         loss_policy.backward()
+        loss_v, loss_info_v = self._compute_loss_v(deepcopy(data))
+        loss_v.backward()
         end_time = time.time()
         self.tb_info.update(loss_info)
+        self.tb_info.update(loss_info_v)
         self.tb_info[tb_tags["alg_time"]] = (end_time - start_time) * 1000  # ms
 
     def _compute_loss_policy(self, data: DataDict) -> Tuple[torch.Tensor, InfoDict]:
@@ -123,3 +140,17 @@ class FHADP(AlgorithmBase):
             tb_tags["loss_actor"]: loss_policy.item()
         }
         return loss_policy, loss_info
+
+    def _compute_loss_v(self, data: DataDict) -> Tuple[torch.Tensor, InfoDict]:
+        o, d = data["obs"], data["done"]
+        info = data
+        v_pi = 0
+        for step in range(self.pre_horizon):
+            a = self.networks.policy(o, step + 1)
+            o, r, d, info = self.envmodel.forward(o, a, d, info)
+            v_pi += r * (self.gamma ** step)
+        loss_v = ((self.networks.v(o) - v_pi) ** 2).mean()
+        loss_info = {
+            tb_tags["loss_critic"]: loss_v.item()
+        }
+        return loss_v, loss_info
