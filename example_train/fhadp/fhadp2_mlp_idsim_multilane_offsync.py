@@ -6,8 +6,8 @@
 #  Lab Leader: Prof. Shengbo Eben Li
 #  Email: lisb04@gmail.com
 #
-#  Description: example for fhadp2 + idsim + mlp + off_serial
-#  Update Date: 2022-9-21, Jiaxin Gao: create  example
+#  Description: example for fhadp2 + idsim + mlp + off_sync
+#  Update Date: 2023-11-24, Guojian Zhan: create example
 
 
 import argparse
@@ -24,8 +24,7 @@ from gops.create_pkg.create_trainer import create_trainer
 from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
-from gops.env.env_gen_ocp.resources.idsim_config import env_config_param_crossroad as env_config_param,\
-    model_config_crossroad as model_config, pre_horizon
+from gops.env.env_gen_ocp.resources.idsim_config import get_idsim_env_config, get_idsim_model_config, pre_horizon
 
 os.environ["OMP_NUM_THREADS"] = "4"
 
@@ -36,10 +35,12 @@ if __name__ == "__main__":
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
-    parser.add_argument("--env_config", type=dict, default=env_config_param)
-    parser.add_argument("--env_model_config", type=dict, default=model_config)
+    parser.add_argument("--env_scenario", type=str, default="multilane", help="crossroad / multilane")
+    env_scenario = parser.parse_known_args()[0].env_scenario
+    parser.add_argument("--env_config", type=dict, default=get_idsim_env_config(env_scenario))
+    parser.add_argument("--env_model_config", type=dict, default=get_idsim_model_config(env_scenario))
 
-    parser.add_argument("--algorithm", type=str, default="FHADP", help="RL algorithm")
+    parser.add_argument("--algorithm", type=str, default="FHADP2", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
     parser.add_argument("--seed", default=2099945076, help="seed")
     parser.add_argument("--pre_horizon", type=int, default=pre_horizon)
@@ -69,18 +70,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_func_name",
         type=str,
-        default="AttentionPolicy",
-        help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy/AttentionPolicy",
+        default="FiniteHorizonFullPolicy",
+        help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy",
     )
-
-    parser.add_argument("--attn_in_per_dim",type=int,default=8)
-    parser.add_argument("--attn_out_dim",type=int,default=20)
-
-    parser.add_argument("--attn_begin",type=int,default=162)
-    parser.add_argument("--attn_end",type=int,default=201)
-
     parser.add_argument(
-        "--policy_func_type", type=str, default="Attention", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS/Attention"
+        "--policy_func_type", type=str, default="MLP", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS"
     )
     parser.add_argument(
         "--policy_act_distribution",
@@ -109,12 +103,29 @@ if __name__ == "__main__":
     })
     ################################################
     # 4. Parameters for trainer
-    parser.add_argument(
-        "--trainer",
-        type=str,
-        default="off_serial_idsim_trainer",
-        help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer, off_sync_trainer",
-    )
+    import multiprocessing
+    parser.add_argument("--trainer", type=str, default="off_sync_idsim_trainer",
+                        help="off_async_trainer4toyota/off_sync_trainer/on_serial_trainer")
+    trainer_type = parser.parse_known_args()[0].trainer
+    # 4.3. Parameters for sync or async trainer
+    if (
+        trainer_type.startswith("off_sync")
+    ):
+        parser.add_argument("--num_algs", type=int, default=4)
+        parser.add_argument("--num_samplers", type=int, default=2)
+        parser.add_argument("--num_buffers", type=int, default=1)
+        cpu_core_num = multiprocessing.cpu_count()
+        num_core_input = (
+            parser.parse_known_args()[0].num_algs
+            + parser.parse_known_args()[0].num_samplers
+            + parser.parse_known_args()[0].num_buffers
+            + 2
+        )
+        if num_core_input > cpu_core_num:
+            raise ValueError("The number of core is {}, but you want {}!".format(cpu_core_num, num_core_input))
+        parser.add_argument("--alg_queue_max_size", type=int, default=1)
+
+    ################################################
     # Maximum iteration number
     parser.add_argument("--max_iteration", type=int, default=200000)
     trainer_type = parser.parse_known_args()[0].trainer
@@ -169,8 +180,8 @@ if __name__ == "__main__":
     start_tensorboard(args["save_folder"])
     # Step 1: create algorithm and approximate function
     alg = create_alg(**args)  # create appr_model in algo **vars(args)
-    alg.set_parameters({"gamma": 1.0})
-    # Step 2: create sampler in trainer
+    for alg_id in alg:
+        alg_id.set_parameters.remote({"gamma": 1.0 })
     sampler = create_sampler(**args)
     # Step 3: create buffer in trainer
     buffer = create_buffer(**args)

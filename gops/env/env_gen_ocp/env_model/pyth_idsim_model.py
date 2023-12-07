@@ -56,6 +56,9 @@ class idSimEnvModel(EnvModel):
         env_config = kwargs["env_config"]
         env_config = Config.from_partial_dict(env_config)
 
+        assert "env_scenario" in kwargs.keys(), "env_scenario must be specified"
+        self.env_scenario = kwargs["env_scenario"]
+
         assert "env_model_config" in kwargs.keys(), "env_model_config must be specified"
         model_config = kwargs["env_model_config"]
         model_config = ModelConfig.from_partial_dict(model_config)
@@ -74,20 +77,20 @@ class idSimEnvModel(EnvModel):
         self.robot_model = idSimRobotModel(idsim_model = self.idsim_model)
 
     def get_obs(self, state: State) -> torch.Tensor:
-        return self.idsim_model.observe(get_idsimcontext(state, mode = 'batch'))
+        return self.idsim_model.observe(get_idsimcontext(state, mode = 'batch', scenario=self.env_scenario))
         
     def get_reward(self, state: State, action: torch.Tensor, mode: str = "full_horizon") -> torch.Tensor:
         next_state = self.get_next_state(state, action)
         if mode == "full_horizon":
             rewards = self.idsim_model.reward_full_horizon(
-                context_full = get_idsimcontext(next_state, mode = mode),
+                context_full = get_idsimcontext(next_state, mode = mode, scenario=self.env_scenario),
                 last_last_action_full = state.robot_state[..., -4:-2], # absolute action
                 last_action_full = state.robot_state[..., -2:], # absolute action
                 action_full = action # incremental action
             )
         elif mode == "batch":
             rewards = self.idsim_model.reward_nn_state(
-                context = get_idsimcontext(next_state, mode = mode),
+                context = get_idsimcontext(next_state, mode = mode, scenario=self.env_scenario),
                 last_last_action = state.robot_state[..., -4:-2], # absolute action
                 last_action = state.robot_state[..., -2:], # absolute action
                 action = action # incremental action

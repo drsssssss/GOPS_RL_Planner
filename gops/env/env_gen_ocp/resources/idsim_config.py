@@ -1,3 +1,5 @@
+from typing import Dict
+
 MAP_ROOT = 'YOUR_MAP_ROOT'
 pre_horizon = 30
 delta_t = 0.1
@@ -19,14 +21,8 @@ env_config_param_base = {
     "incremental_action": True,
     "action_lower_bound": (-4.0 * delta_t, -0.25 * delta_t),
     "action_upper_bound": (2.5 * delta_t, 0.25 * delta_t),
-    "real_action_lower_bound": (
-        -3.0,
-        -0.571
-    ),
-    "real_action_upper_bound": (
-        0.8,
-        0.571
-    ),
+    "real_action_lower_bound": (-3.0, -0.571),
+    "real_action_upper_bound": (0.8, 0.571),
     "obs_num_surrounding_vehicles": {
         "passenger": 5,
         "bicycle": 0,
@@ -60,18 +56,8 @@ model_config_base = {
     "per_sur_state_withinfo_dim": 7,  # x, y, phi, speed, length, width, mask
     "per_sur_feat_dim": 5,  # x, y, cos(phi), sin(phi), speed
     "per_ref_feat_dim": 5,  # x, y, cos(phi), sin(phi), speed
-    "real_action_upper": (
-        (
-            0.8,
-            0.571
-        )
-    ),
-    "real_action_lower": (
-        (
-            -3.0,
-            -0.571
-        )
-    ),
+    "real_action_upper": (0.8, 0.571),
+    "real_action_lower": (-3.0, -0.571),
     "steer_rate_2_min": -0.2,
     "steer_rate_2_max": 0.2,
 
@@ -114,46 +100,49 @@ model_config_base = {
     "filter_num": 5
 }
 
-
 env_config_param_crossroad = env_config_param_base
 model_config_crossroad = model_config_base
 
+env_config_param_multilane = {
+    **env_config_param_base,
+    "action_lower_bound": (-4.0 * delta_t, -0.065 * delta_t),
+    "action_upper_bound": (2.5 * delta_t, 0.065 * delta_t),
+    "real_action_lower_bound": (-3.0, -0.065),
+    "real_action_upper_bound": (0.8, 0.065),
+}
 
-env_config_param_multilane = env_config_param_base.update(
-    {
-        "action_lower_bound": (-4.0 * delta_t, -0.065 * delta_t),
-        "action_upper_bound": (2.5 * delta_t, 0.065 * delta_t),
-        "real_action_lower_bound": (
-            -3.0,
-            -0.065
-        ),
-        "real_action_upper_bound": (
-            0.8,
-            0.065
-        )
-    }
-)
-model_config_multilane = model_config_base.update(
-    {
-        "real_action_lower": (
-            -3.0,
-            -0.065
-        ),
-        "real_action_upper": (
-            0.8,
-            0.065
-        ),
-        "Q": (
-            0.2,
-            0.2,
-            500.0,
-            0.5,
-            2.0,
-            2000.0,
-        ),
-        "R": (
-            1.0,
-            500.0,
-        )
-    }
-)
+model_config_multilane = {
+    **model_config_base,
+    "real_action_lower": (-3.0, -0.065),
+    "real_action_upper": (0.8, 0.065),
+    "Q": (
+        0.2,
+        0.2,
+        500.0,
+        0.5,
+        2.0,
+        2000.0,
+    ),
+    "R": (
+        1.0,
+        500.0,
+    )
+}
+
+
+def get_idsim_env_config(scenario="crossroad") -> Dict:
+    if scenario == "crossroad":
+        return env_config_param_crossroad
+    elif scenario == "multilane":
+        return env_config_param_multilane
+    else:
+        raise NotImplementedError
+
+
+def get_idsim_model_config(scenario="crossroad") -> Dict:
+    if scenario == "crossroad":
+        return model_config_crossroad
+    elif scenario == "multilane":
+        return model_config_multilane
+    else:
+        raise NotImplementedError

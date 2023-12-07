@@ -12,7 +12,9 @@ from gops.env.env_gen_ocp.resources.idsim_tags import reward_tags
 from idsim.config import Config
 from idsim.envs.env import CrossRoad
 from idsim_model.model import IdSimModel
-from idsim_model.model_context import ModelContext, Parameter
+from idsim_model.model_context import Parameter, BaseContext
+from idsim_model.crossroad.context import CrossRoadContext
+from idsim_model.multilane.context import MultiLaneContext
 from idsim_model.model_context import State as ModelState
 from idsim_model.params import ModelConfig
 
@@ -37,12 +39,14 @@ class idSimContext(Context):
     
 
 class idSimEnv(CrossRoad, Env):
-    def __new__(cls, env_config: Config, model_config: Dict[str, Any]) -> Self:
+    def __new__(cls, env_config: Config, model_config: Dict[str, Any], scenario: str) -> Self:
         return super(idSimEnv, cls).__new__(cls, env_config)
     
-    def __init__(self, env_config: Config, model_config: ModelConfig):
+    def __init__(self, env_config: Config, model_config: ModelConfig, scenario: str):
         super(idSimEnv, self).__init__(env_config)
         self.model_config = model_config
+        self.scenario = scenario
+
         self._state = None
         # get observation_space
         self.model = IdSimModel(env_config, model_config)
@@ -72,13 +76,14 @@ class idSimEnv(CrossRoad, Env):
         return info
     
     def _get_obs(self) -> np.ndarray:
-        idsim_context = get_idsimcontext(State.stack([self._state.array2tensor()]), mode="batch")
+        idsim_context = get_idsimcontext(
+            State.stack([self._state.array2tensor()]), mode="batch", scenario=self.scenario)
         model_obs = self.model.observe(idsim_context)
         return model_obs.numpy().squeeze(0)
 
     def _get_reward(self, action: np.ndarray) -> float:
         torch_state = self._state.array2tensor()
-        idsim_context = get_idsimcontext(State.stack([torch_state]), mode="batch")
+        idsim_context = get_idsimcontext(State.stack([torch_state]), mode="batch", scenario=self.scenario)
         action = torch.tensor(action)
         reward_details = self.model.reward_nn_state(
             context=idsim_context,
@@ -93,7 +98,13 @@ class idSimEnv(CrossRoad, Env):
         ...
     
     def _get_state_from_idsim(self, ref_index_param=None) -> State:
-        idsim_context = ModelContext.from_env(self, self.model_config, ref_index_param)
+        if self.scenario == "crossroad":
+            idsim_context = CrossRoadContext.from_env(self, self.model_config, ref_index_param)
+        elif self.scenario == "multilane":
+            idsim_context = MultiLaneContext.from_env(self, self.model_config, ref_index_param)
+        else:
+            raise NotImplementedError
+
         self._state = State(
             robot_state=torch.concat([
                 idsim_context.x.ego_state, 
@@ -111,9 +122,9 @@ class idSimEnv(CrossRoad, Env):
         )
         self._state = self._state.tensor2array()
 
-    def get_state_from_idsim(self, ref_index_param=None) -> State:
-        self._get_state_from_idsim(ref_index_param=ref_index_param)
-        return self._state
+    # def get_state_from_idsim(self, ref_index_param=None) -> State:
+    #     self._get_state_from_idsim(ref_index_param=ref_index_param)
+    #     return self._state
     
     def get_zero_state(self) -> State[np.ndarray]:
         if self._state is None:
@@ -131,9 +142,15 @@ class idSimEnv(CrossRoad, Env):
         )
 
 
-def get_idsimcontext(state: State, mode: str) -> ModelContext:
+def get_idsimcontext(state: State, mode: str, scenario: str) -> BaseContext:
+    if scenario == "crossroad":
+        Context = CrossRoadContext
+    elif scenario == "multilane":
+        Context = MultiLaneContext
+    else:
+        raise NotImplementedError
     if mode == "full_horizon":
-        context = ModelContext(
+        context = Context(
             x = ModelState(
                 ego_state = state.robot_state[..., :-4].unsqueeze(0),
                 last_last_action = state.robot_state[..., -4:-2].unsqueeze(0),
@@ -150,7 +167,7 @@ def get_idsimcontext(state: State, mode: str) -> ModelContext:
         )
     elif mode == "batch":
         assert state.context_state.t.unique().shape[0] == 1, "batch mode only support same t"
-        context = ModelContext(
+        context = Context(
             x = ModelState(
                 ego_state = state.robot_state[..., :-4],
                 last_last_action = state.robot_state[..., -4:-2],
@@ -176,6 +193,10 @@ def env_creator(**kwargs):
     """
     assert "env_config" in kwargs.keys(), "env_config must be specified"
     env_config = deepcopy(kwargs["env_config"])
+
+    assert "env_scenario" in kwargs.keys(), "env_scenario must be specified"
+    env_scenario = kwargs["env_scenario"]
+
     assert 'scenario_root' in env_config, "scenario_root must be specified in env_config"
     env_config['scenario_root'] = Path(env_config['scenario_root'])
     env_config = Config.from_partial_dict(env_config)
@@ -184,5 +205,5 @@ def env_creator(**kwargs):
     model_config = deepcopy(kwargs["env_model_config"])
     model_config = ModelConfig.from_partial_dict(model_config)
 
-    env = idSimEnv(env_config, model_config)
+    env = idSimEnv(env_config, model_config, env_scenario)
     return env
