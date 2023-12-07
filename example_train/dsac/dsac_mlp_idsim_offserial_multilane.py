@@ -22,8 +22,7 @@ from gops.create_pkg.create_trainer import create_trainer
 from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
-from gops.env.env_gen_ocp.resources.idsim_config import env_config_param_crossroad as env_config_param,\
-    model_config_crossroad as model_config, pre_horizon
+from gops.env.env_gen_ocp.resources.idsim_config import get_idsim_env_config, get_idsim_model_config, pre_horizon
 
 os.environ["OMP_NUM_THREADS"] = "4"
 
@@ -34,8 +33,11 @@ if __name__ == "__main__":
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
-    parser.add_argument("--env_config", type=dict, default=env_config_param)
-    parser.add_argument("--env_model_config", type=dict, default=model_config)
+    parser.add_argument("--env_scenario", type=str, default="multilane", help="crossroad / multilane")
+    env_scenario = parser.parse_known_args()[0].env_scenario
+    parser.add_argument("--env_config", type=dict, default=get_idsim_env_config(env_scenario))
+    parser.add_argument("--env_model_config", type=dict, default=get_idsim_model_config(env_scenario))
+
     parser.add_argument("--algorithm", type=str, default="DSAC", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
     parser.add_argument("--seed", default=1, help="seed")
@@ -115,7 +117,7 @@ if __name__ == "__main__":
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
     # Maximum iteration number
-    parser.add_argument("--max_iteration", type=int, default=2000000)
+    parser.add_argument("--max_iteration", type=int, default=300000)
     parser.add_argument(
         "--ini_network_dir",
         type=str,
@@ -148,7 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("--evaluator_name", type=str, default="idsim_train_evaluator")
     parser.add_argument("--num_eval_episode", type=int, default=20)
     parser.add_argument("--eval_interval", type=int, default=2000)
-    parser.add_argument("--eval_save", type=str, default=True, help="save evaluation data")
+    parser.add_argument("--eval_save", type=str, default=False, help="save evaluation data")
 
     ################################################
     # 7. Data savings
@@ -156,7 +158,7 @@ if __name__ == "__main__":
     # Save value/policy every N updates
     parser.add_argument("--apprfunc_save_interval", type=int, default=10000)
     # Save key info every N updates
-    parser.add_argument("--log_save_interval", type=int, default=100)
+    parser.add_argument("--log_save_interval", type=int, default=1000)
 
     ################################################
     # Get parameter dictionary

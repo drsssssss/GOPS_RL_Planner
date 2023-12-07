@@ -55,6 +55,7 @@ class idSimEnv(CrossRoad, Env):
         obs_dim = self._get_obs().shape[0]
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
         self.context = idSimContext() # fake idsim context
+        self.set_scenario(scenario)
     
     def reset(self) -> Tuple[np.ndarray, dict]:
         obs, info = super(idSimEnv, self).reset()
