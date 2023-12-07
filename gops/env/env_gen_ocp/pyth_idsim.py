@@ -60,7 +60,7 @@ class idSimEnv(CrossRoad, Env):
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
         self._get_state_from_idsim()
-        reward, reward_details = self._get_reward(action)
+        reward_from_model, reward_details = self._get_reward(action)
         info["reward_details"] = dict(
             zip(reward_tags, [i.item() for i in reward_details])
         )
