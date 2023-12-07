@@ -24,8 +24,7 @@ from gops.create_pkg.create_trainer import create_trainer
 from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
-from gops.env.env_gen_ocp.resources.idsim_config import env_config_param_crossroad as env_config_param,\
-    model_config_crossroad as model_config, pre_horizon
+from gops.env.env_gen_ocp.resources.idsim_config import get_idsim_env_config, get_idsim_model_config, pre_horizon
 
 os.environ["OMP_NUM_THREADS"] = "4"
 
@@ -36,10 +35,12 @@ if __name__ == "__main__":
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
-    parser.add_argument("--env_config", type=dict, default=env_config_param)
-    parser.add_argument("--env_model_config", type=dict, default=model_config)
+    parser.add_argument("--env_scenario", type=str, default="multilane", help="crossroad / multilane")
+    env_scenario = parser.parse_known_args()[0].env_scenario
+    parser.add_argument("--env_config", type=dict, default=get_idsim_env_config(env_scenario))
+    parser.add_argument("--env_model_config", type=dict, default=get_idsim_model_config(env_scenario))
 
-    parser.add_argument("--algorithm", type=str, default="FHADP2", help="RL algorithm")
+    parser.add_argument("--algorithm", type=str, default="FHADP", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
     parser.add_argument("--seed", default=2099945076, help="seed")
     parser.add_argument("--pre_horizon", type=int, default=pre_horizon)
@@ -69,7 +70,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_func_name",
         type=str,
-        default="FiniteHorizonFullPolicy",
+        default="FiniteHorizonPolicy",
         help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy",
     )
     parser.add_argument(
@@ -98,7 +99,7 @@ if __name__ == "__main__":
             "start_factor": 1.0,
             "end_factor": 0.0,
             "total_iters": 200000,
-            }
+        }
     })
     ################################################
     # 4. Parameters for trainer
@@ -135,9 +136,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--noise_params",
         type=dict,
-        default={"mean": np.array([0], dtype=np.float32), "std": np.array([0.0], dtype=np.float32),},
+        default={"mean": np.array([0], dtype=np.float32), "std": np.array([0.0], dtype=np.float32), },
     )
-    
+
     ################################################
     # 6. Parameters for evaluator
     parser.add_argument("--evaluator_name", type=str, default="idsim_train_evaluator")
