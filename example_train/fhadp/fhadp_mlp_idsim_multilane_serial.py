@@ -99,7 +99,7 @@ if __name__ == "__main__":
             "start_factor": 1.0,
             "end_factor": 0.0,
             "total_iters": 200000,
-            }
+        }
     })
     ################################################
     # 4. Parameters for trainer
@@ -110,7 +110,7 @@ if __name__ == "__main__":
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer, off_sync_trainer",
     )
     # Maximum iteration number
-    parser.add_argument("--max_iteration", type=int, default=2000)
+    parser.add_argument("--max_iteration", type=int, default=200000)
     trainer_type = parser.parse_known_args()[0].trainer
     parser.add_argument("--ini_network_dir", type=str, default=None)
 
@@ -119,7 +119,7 @@ if __name__ == "__main__":
         "--buffer_name", type=str, default="replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
     )
     # Size of collected samples before training
-    parser.add_argument("--buffer_warm_size", type=int, default=int(1e0))
+    parser.add_argument("--buffer_warm_size", type=int, default=int(1e3))
     # Max size of reply buffer
     parser.add_argument("--buffer_max_size", type=int, default=int(1e5))
     # Batch size of replay samples from buffer
@@ -136,9 +136,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--noise_params",
         type=dict,
-        default={"mean": np.array([0], dtype=np.float32), "std": np.array([0.0], dtype=np.float32),},
+        default={"mean": np.array([0], dtype=np.float32), "std": np.array([0.0], dtype=np.float32), },
     )
-    
+
     ################################################
     # 6. Parameters for evaluator
     parser.add_argument("--evaluator_name", type=str, default="idsim_train_evaluator")
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     # Save value/policy every N updates
     parser.add_argument("--apprfunc_save_interval", type=int, default=10000)
     # Save key info every N updates
-    parser.add_argument("--log_save_interval", type=int, default=10)
+    parser.add_argument("--log_save_interval", type=int, default=1000)
 
     ################################################
     # Get parameter dictionary
