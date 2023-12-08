@@ -35,7 +35,6 @@ env_config_param_base = {
     "obs_ref_interval": 0.8,
     "vehicle_spec": (1880.0, 1536.7, 1.13, 1.52, -128915.5, -85943.6, 20.0, 0.0),
     "singleton_mode": "reuse",
-    "use_multiple_path_for_multilane": True,
 }
 
 model_config_base = {

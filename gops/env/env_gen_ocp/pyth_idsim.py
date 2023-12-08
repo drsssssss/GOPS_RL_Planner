@@ -51,9 +51,6 @@ class idSimEnv(CrossRoad, Env):
         # get observation_space
         self.model = IdSimModel(env_config, model_config)
         # obtain observation_space from idsim
-        self.use_random_ref_param = env_config.use_multiple_path_for_multilane
-        self.random_ref_param_index = np.random.choice(
-            np.arange(self.model_config.num_ref_lines)) if self.use_random_ref_param else 0
         self.reset()
         obs_dim = self._get_obs().shape[0]
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
@@ -62,14 +59,12 @@ class idSimEnv(CrossRoad, Env):
     
     def reset(self) -> Tuple[np.ndarray, dict]:
         obs, info = super(idSimEnv, self).reset()
-        self.random_ref_param_index = np.random.choice(
-            np.arange(self.model_config.num_ref_lines)) if self.use_random_ref_param else 0
-        self._get_state_from_idsim(ref_index_param=self.random_ref_param_index)
+        self._get_state_from_idsim()
         return self._get_obs(), self._get_info(info)
     
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
-        self._get_state_from_idsim(ref_index_param=self.random_ref_param_index)
+        self._get_state_from_idsim()
         reward_from_model, reward_details = self._get_reward(action)
         info["reward_details"] = dict(
             zip(reward_tags, [i.item() for i in reward_details])
