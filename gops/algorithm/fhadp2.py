@@ -153,11 +153,12 @@ class FHADP2(AlgorithmBase):
             if step == 0:
                 o2, r, d, info = self.envmodel.forward(o, a[:, 0, :], d, info_init)
                 v_pi = r
+                value_nn = self.networks.v(o)
             else:
                 o = o2
                 o2, r, d, info = self.envmodel.forward(o, a[:, step, :], d, info)
                 v_pi += r * (self.gamma**step)
-        loss_v = ((self.networks.v(o) - v_pi.detach()) ** 2).mean()
+        loss_v = ((value_nn - v_pi.detach()) ** 2).mean()
         loss_info = {
             tb_tags["loss_critic"]: loss_v.item()
         }
