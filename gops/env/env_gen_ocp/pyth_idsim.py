@@ -55,6 +55,7 @@ class idSimEnv(CrossRoad, Env):
         obs_dim = self._get_obs().shape[0]
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
         self.context = idSimContext() # fake idsim context
+        self.set_scenario(scenario)
     
     def reset(self) -> Tuple[np.ndarray, dict]:
         obs, info = super(idSimEnv, self).reset()
@@ -64,7 +65,7 @@ class idSimEnv(CrossRoad, Env):
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
         self._get_state_from_idsim()
-        reward, reward_details = self._get_reward(action)
+        reward_from_model, reward_details = self._get_reward(action)
         info["reward_details"] = dict(
             zip(reward_tags, [i.item() for i in reward_details])
         )
