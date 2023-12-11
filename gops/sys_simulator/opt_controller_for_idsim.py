@@ -13,10 +13,8 @@ import zmq
 import numpy as np
 
 from gops.env.env_gen_ocp.resources.idsim_mpc import MPCInput, MPCOutput, ReferencePath, SurroundingVehicle, EgoState, PreviousAction, StatePoint
-from gops.env.env_gen_ocp.pyth_idsim import idSimEnv
 from gops.env.env_gen_ocp.resources.idsim_config import get_idsim_env_config, get_idsim_model_config, pre_horizon, delta_t
 from idsim.config import Config
-from idsim_model.params import ModelConfig
 
 
 class OptController4idSim:
@@ -114,15 +112,14 @@ class OptController4idSim:
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
     from gops.create_pkg.create_env import create_env
 
-    seed = 3
     scenario_selector = "1"
     scenario = "crossroad"
     env_config = get_idsim_env_config(scenario)
-    env_config.update({"seed": seed, "scenario_selector": scenario_selector})
+    env_config.update({"scenario_selector": scenario_selector})
     model_config = get_idsim_model_config(scenario)
+
     controller = OptController4idSim(scenario, Config.from_partial_dict(env_config))
 
     env = create_env(
@@ -132,47 +129,10 @@ if __name__ == "__main__":
         env_scenario=scenario
     )
     obs, info = env.reset()
-    states = []
-    references = []
-    actions = []
     horizon = 400
     for i in range(horizon):
         x = env.state
-        states.append(x.robot_state)
-        reference = env.state.context_state.reference
-        ref_index = env.state.context_state.ref_index_param
-        references.append(reference[ref_index, 0, :])
-        actions.append(x.robot_state[8:10])
         u = controller(x)
         next_obs, reward, done, info = env.step(u)
         if done:
             break
-        print(reward)
-    states = np.array(states)
-    references = np.array(references)
-    actions = np.array(actions)
-    plt.figure()
-    plt.subplot(311)
-    plt.plot(np.arange(i + 1), states[:, 0], label="x")
-    plt.plot(np.arange(i + 1), references[:, 0], label="ref_x")
-    plt.legend()
-    plt.subplot(312)
-    plt.plot(np.arange(i + 1), states[:, 1], label="y")
-    plt.plot(np.arange(i + 1), references[:, 1], label="ref_y")
-    plt.legend()
-    plt.subplot(313)
-    plt.plot(np.arange(i + 1), states[:, 4], label="phi")
-    plt.plot(np.arange(i + 1), references[:, 2], label="ref_phi")
-    plt.legend()
-    plt.savefig(f"/home/zhengzhilong/code/gops/gops/sys_simulator/{scenario}_state.png")
-    plt.close()
-    
-    plt.figure()
-    plt.subplot(211)
-    plt.plot(np.arange(i + 1), actions[:, 0], label="acc")
-    plt.legend()
-    plt.subplot(212)
-    plt.plot(np.arange(i + 1), actions[:, 1], label="steer")
-    plt.legend()
-    plt.savefig(f"/home/zhengzhilong/code/gops/gops/sys_simulator/{scenario}_action.png")
-    plt.close()
