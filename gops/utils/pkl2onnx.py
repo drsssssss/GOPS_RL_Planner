@@ -74,11 +74,20 @@ class _InferenceHelper(nn.Module):
         mode = act_dist.mode()
         return mode.squeeze(0)
 
+class _InferenceHelper_FHADP(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, obs: torch.Tensor):
+        return self.model(obs, torch.ones(1))
+
 def deterministic_policy_export_onnx_model(networks, input_dim, policy_dir):
 
     example = torch.rand(1, input_dim)  # network input dim
     output_onnx_model = policy_dir
-    torch.onnx.export(networks.policy, example, output_onnx_model, input_names=['input', "input1"],
+    model = _InferenceHelper_FHADP(networks.policy)
+    torch.onnx.export(model, example, output_onnx_model, input_names=['input', "input1"],
                       output_names=['output'], opset_version=11)
 
 def deterministic_stochastic_export_onnx_model(networks, input_dim, policy_dir):
@@ -93,7 +102,7 @@ def deterministic_stochastic_export_onnx_model(networks, input_dim, policy_dir):
 if __name__=='__main__':
 
     # Load trained policy
-    log_policy_dir = "../../results/FHADP/230223-220506"
+    log_policy_dir = "../../results/pyth_idsim/FHADP_231202-110135"
     args = __load_args(log_policy_dir)
     alg_name = args["algorithm"]
     alg_file_name = alg_name.lower()
@@ -102,14 +111,14 @@ if __name__=='__main__':
     networks = ApproxContainer(**args)
 
     # Load trained policy
-    log_path = log_policy_dir + "/apprfunc/apprfunc_{}.pkl".format(44000)  # network position
+    log_path = log_policy_dir + "/apprfunc/apprfunc_{}.pkl".format(200000)  # network position
     networks.load_state_dict(torch.load(log_path))
     networks.eval()
 
     # create onnx model
     ### example of deterministic policy FHADP algorithm
-    input_dim = 90
-    policy_dir = '../../transform_onnx_network/network_fhadp_0224_avoid_left.onnx'
+    input_dim = 202
+    policy_dir = '../../transform_onnx_network/idsim.onnx'
     deterministic_policy_export_onnx_model(networks, input_dim, policy_dir)
 
     # ### example of stochastic policy sac algorithm
@@ -119,9 +128,9 @@ if __name__=='__main__':
 
     # load onnx model for test
     ### example of deterministic policy FHADP algorithm
-    ort_session = ort.InferenceSession("../../transform_onnx_network/network_fhadp_0224_avoid_left.onnx")
-    example1 = np.random.randn(1, 90).astype(np.float32)
-    inputs = {ort_session.get_inputs()[0].name: example1, ort_session.get_inputs()[1].name: np.ones(1).astype(np.int64)}
+    ort_session = ort.InferenceSession("../../transform_onnx_network/idsim.onnx")
+    example1 = np.random.randn(1, 202).astype(np.float32)
+    inputs = {ort_session.get_inputs()[0].name: example1}
     outputs = ort_session.run(None, inputs)
     print(outputs[0])
     action = networks.policy(torch.tensor(example1))
