@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+message StatePoint {
+    double x = 1;  // x-coordinate in meters (m)
+    double y = 2;  // y-coordinate in meters (m)
+    double phi = 3;  // Orientation angle in radians (rad)
+    double speed = 4;  // Speed in m/s
+}
+
+message EgoState {
+    double x = 1;  // x-coordinate in meters (m)
+    double y = 2;  // y-coordinate in meters (m)
+    double phi = 3;  // Orientation angle in radians (rad)
+    double v_long = 4;  // Speed in m/s
+    double v_lat = 5;  // Speed in m/s
+    double omega = 6;  // Angular velocity in rad/s
+}
+
+message PreviousAction {
+    double front_wheel_angle = 1;  // Angle in radians (rad), left is positive
+    double acceleration = 2;       // Acceleration in m/s^2
+}
+
+message ReferencePath {
+    repeated StatePoint path_points = 1;  // Series of points, each in meters (m)
+}
+
+message SurroundingVehicle {
+    repeated StatePoint predicted_trajectory = 1;  // Predicted positions for N+1 points
+    double length = 2;   // Length in meters (m)
+    double width = 3;    // Width in meters (m)
+    // Add other relevant fields like velocity (in m/s), orientation (in rad), etc.
+}
+
+message MPCInput {
+    EgoState ego_state = 1;
+    PreviousAction previous_action = 2;
+    ReferencePath reference_path = 3;
+    repeated SurroundingVehicle surrounding_vehicles = 4;
+    double time_step = 5;
+    int32 horizon = 6;
+    string mode = 7;
+    double max_acceleration = 8;
+    double max_deceleration = 9;
+    double max_acc_incre_rate = 10;
+    double max_acc_decre_rate = 11;
+    double max_steer_angle = 12;
+    double max_steer_angle_rate = 13;
+    // Specify the value of K (number of vehicles) and N (prediction time domain)
+}
+
+message Point {
+    double x = 1;  // x-coordinate in meters (m)
+    double y = 2;  // y-coordinate in meters (m)
+    double phi = 3;  // Orientation angle in radians (rad)
+}
+
+message OutPutAction {
+    double front_wheel_angle = 1;  // Angle in radians (rad), left is positive
+    double acceleration = 2;       // Acceleration in m/s^2
+}
+
+message PredPath {
+    repeated Point path_points = 1;  // Series of points, each in meters (m)
+    double reference_speed = 2;      // Speed in m/s
+}
+
+message MPCOutput {
+    OutPutAction action = 1;
+    repeated OutPutAction actions = 2;
+    PredPath path = 3;
+}
