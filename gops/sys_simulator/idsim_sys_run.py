@@ -1,6 +1,6 @@
 import argparse
 import datetime
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import torch
 import numpy as np
@@ -42,6 +42,7 @@ class IdsimTestEvaluator(Evaluator):
             "num_eval_episode": num_eval_episode,
             "is_render": is_render
         })
+        args['env_config']['use_multiple_path_for_multilane'] = False
         args["env_config"]["use_render"] = is_render
         super().__init__(index=0, **args)
 
@@ -74,6 +75,8 @@ class IdsimTestEvaluator(Evaluator):
             "reward_action_acc":self.config['R'][0],
             "reward_action_steer":self.config['R'][1],
 
+            "reward_cost_acc_rate_1":self.config.get('C_acc_rate_1', 0.0),
+            "reward_cost_steer_rate_1":self.config.get('C_steer_rate_1', 0.0),
             "reward_cost_steer_rate_2_min":self.config['C_steer_rate_2'][0],
             "reward_cost_steer_rate_2_max":self.config['C_steer_rate_2'][1],
 
@@ -144,6 +147,8 @@ class IdsimTestEvaluator(Evaluator):
             'r_list': [x[2] for x in eval_result.obs_list],
             'acc_list': [x[5] for x in eval_result.obs_list],
             'steer_list': [x[6] for x in eval_result.obs_list],
+            "y_ref_list": [x[7 + 31] for x in eval_result.obs_list],
+            "phi_ref_list": [np.arccos(x[7 + 31 + 31]) for x in eval_result.obs_list],
             'step_list': eval_result.step_list,
         }
 
@@ -164,7 +169,7 @@ class IdsimTestEvaluator(Evaluator):
 
         return eval_dict, reward_dict, idsim_tb_eval_dict
 
-    def run_n_episodes(self, n, iteration) -> List[tuple[Dict]]:
+    def run_n_episodes(self, n, iteration) -> List[Tuple[Dict]]:
         data_list = []
         for _ in range(n):
             data_list.append(self.run_an_episode(iteration, self.render))
@@ -185,50 +190,65 @@ class IdsimTestEvaluator(Evaluator):
 
 
     def plot_evaluation(self, episode_index, eval_dict, reward_dict, idsim_tb_eval_dict):
-        color1 = '#0077B6'
-        color2 = '#FF5733'
-        color3 = '#800080'
+        print(f'Plotting...{episode_index}')
+        steps = len(eval_dict['step_list']) // 100 + 1
+        # steps = 1
 
-        fig1, axes1 = plt.subplots()
-        axes1.plot(eval_dict['step_list'], eval_dict['vx_list'], '.-', label='vx', color=color1)
-        axes1.plot(eval_dict['step_list'], eval_dict['vy_list'], '.-', label='vy', color=color3)
-        axes1.legend(loc='upper left')
-        axes1.set_ylabel(r'$vx/vy$', color=color1)
-        axes1.tick_params(axis='y', colors=color1)
-        axes1.grid()
-        axes1.set_xlim(0, eval_dict['step_list'][-1])
-        ax1 = axes1.twinx()
-        ax1.plot(eval_dict['step_list'], eval_dict['r_list'], '.-', label='yaw rate', color=color2)
-        ax1.set_ylabel(r'yaw rate', color=color2)
-        ax1.tick_params(axis='y', colors=color2)
-        fig1.savefig(os.path.join(self.save_path, f'ep_{episode_index}_state.png'), bbox_inches='tight')
-        plt.close(fig1)
+        fig, axes = plt.subplots(2, 2, figsize=(16, 8))
 
-        
-        mpl.rcParams['agg.path.chunksize'] = 10000
-        fig2, axes2 = plt.subplots()
+        # ego vx, vy, yaw rate
+        ax1:Axes = axes[0][0]
+        ax1.plot(eval_dict['step_list'][::steps], eval_dict['vx_list'][::steps], '.-', label='vx', color='b')
+        ax1.set_ylabel('$v_x$', color='b')
+        ax1.tick_params('y', colors='b')
+        ax2 = ax1.twinx()
+        ax2.plot(eval_dict['step_list'][::steps], eval_dict['vy_list'][::steps], '.-', label='vy', color='r')
+        ax2.set_ylabel('$v_y$', color='r')
+        ax2.tick_params('y', colors='r')
+        ax3 = ax1.twinx()
+        ax3.spines['right'].set_position(('outward', 60))  # Move the last y-axis spine over to the right by 60 points
+        ax3.plot(eval_dict['step_list'][::steps], eval_dict['r_list'][::steps], '.-', label='yaw rate', color='g')
+        ax3.set_ylabel('yaw rate', color='g')
+        ax3.tick_params('y', colors='g')
+        ax1.set_title('Vehicle Speeds and Yaw Rate')
+        ax1.set_xlabel('Time')
 
+        # reference delta y and delta phi
+        ax1:Axes = axes[0][1]
+        ax1.plot(eval_dict['step_list'][::steps], eval_dict['y_ref_list'][::steps], '.-', label='lateral error')
+        ax1.set_ylabel('$y-y_{ref}$', color='b')
+        ax1.tick_params('y', colors='b')
+        ax2 = ax1.twinx()
+        ax2.plot(eval_dict['step_list'][::steps], eval_dict['phi_ref_list'][::steps], '.-', label='relative orientation', color='r')
+        ax2.set_ylabel('$\phi-\phi_{ref}$', color='r')
+        ax2.tick_params('y', colors='r')
+        ax2.set_title('Errors with Reference Trajectory')
+        ax1.set_xlabel('Time')
+
+        # all the non-zero reward
+        ax1:Axes = axes[1][0]
         for k, v in reward_dict.items():
-            axes2.plot(eval_dict['step_list'], v, label=k)
-        axes2.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        axes2.set_ylabel(r'reward', color=color1)
-        axes2.tick_params(axis='y', colors=color1)
-        axes2.grid()
-        fig2.savefig(os.path.join(self.save_path, f'ep_{episode_index}_reward.png'), bbox_inches='tight')
-        plt.close(fig2)
-        
-        fig3, axes3 = plt.subplots()
-        axes3.plot(eval_dict['step_list'], eval_dict['acc_list'], label='acc', color=color1)
-        axes3.set_ylabel(r'acc', color=color1)
-        axes3.set_xlabel('step')
-        axes3.tick_params(axis='y', colors=color1)
-        axes3.grid()
-        axes3.set_xlim(0, eval_dict['step_list'][-1])
+            if np.abs(np.mean(v)) > 1e-6:
+                ax1.plot(eval_dict['step_list'][::steps], v[::steps], '.-', label=k)
+        ax1.set_ylabel('Reward')
+        ax1.set_title('Rewards')
+        ax1.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        ax1.set_xlabel('Time')
 
-        ax3: Axes = axes3.twinx()
-        ax3.plot(eval_dict['step_list'], eval_dict['steer_list'], label='steer', color=color2)
-        ax3.plot(eval_dict['step_list'], [*[0] * len(eval_dict['step_list'])], ':k')
-        ax3.set_ylabel(r'steer', color=color2)
-        ax3.tick_params(axis='y', colors=color2)
-        fig3.savefig(os.path.join(self.save_path, f'ep_{episode_index}_action.png'), bbox_inches='tight')
-        plt.close(fig3)
+        # real acc, real steer angle
+        ax1:Axes = axes[1][1]
+        ax1.plot(eval_dict['step_list'][::steps], eval_dict['acc_list'][::steps], '.-', label='acceleration', color='b')
+        ax1.set_ylabel('acceleration', color='b')
+        ax1.tick_params('y', colors='b')
+        ax2 = ax1.twinx()
+        ax2.plot(eval_dict['step_list'][::steps], eval_dict['steer_list'][::steps], '.-', label='steering angle', color='r')
+        ax2.set_ylabel('steering angle', color='r')
+        ax2.tick_params('y', colors='r')
+        ax1.set_xlabel('Time')
+        ax1.set_title('Actual Acceleration and Steering Angle')
+
+        # 显示图表
+        plt.tight_layout()
+        fig.savefig(os.path.join(self.save_path, f'ep_{episode_index}.png'), bbox_inches='tight')
+        plt.close(fig)
+        plt.show()
