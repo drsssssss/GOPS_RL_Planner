@@ -41,9 +41,6 @@ def export_model(model: nn.Module, example_obs: torch.Tensor, path: str):
         torch.onnx.export(inference_helper, example_obs, path, input_names=['input'], output_names=['output'],
                           opset_version=11)
 
-        # inference_helper = torch.jit.trace(inference_helper, example_obs)
-        # torch.jit.save(inference_helper, path)
-
 
 @contextlib.contextmanager
 def _module_inference(module: nn.Module):
@@ -86,6 +83,20 @@ def deterministic_policy_export_onnx_model(networks, input_dim, policy_dir):
 
     example = torch.rand(1, input_dim)  # network input dim
     output_onnx_model = policy_dir
+    torch.onnx.export(networks.policy, example, output_onnx_model, input_names=['input'],
+                      output_names=['output'], opset_version=11)
+    
+def deterministic_value_export_onnx_model(networks, input_dim, policy_dir):
+
+    example = torch.rand(1, input_dim)  # network input dim
+    output_onnx_model = policy_dir
+    torch.onnx.export(networks.v, example, output_onnx_model, input_names=['input'],
+                      output_names=['output'], opset_version=11)
+    
+def fhadp_policy_export_onnx_model(networks, input_dim, policy_dir):
+
+    example = torch.rand(1, input_dim)  # network input dim
+    output_onnx_model = policy_dir
     model = _InferenceHelper_FHADP(networks.policy)
     torch.onnx.export(model, example, output_onnx_model, input_names=['input', "input1"],
                       output_names=['output'], opset_version=11)
@@ -102,24 +113,29 @@ def deterministic_stochastic_export_onnx_model(networks, input_dim, policy_dir):
 if __name__=='__main__':
 
     # Load trained policy
-    log_policy_dir = "../../results/pyth_idsim/FHADP_231202-110135"
+    log_policy_dir = "../../results/pyth_idsim/FHADP2_231209-162345-only-tracking"
     args = __load_args(log_policy_dir)
     alg_name = args["algorithm"]
+    print('alg_name = ', alg_name)
     alg_file_name = alg_name.lower()
     file = __import__(alg_file_name)
     ApproxContainer = getattr(file, "ApproxContainer")
     networks = ApproxContainer(**args)
 
     # Load trained policy
-    log_path = log_policy_dir + "/apprfunc/apprfunc_{}.pkl".format(200000)  # network position
+    log_path = log_policy_dir + "/apprfunc/apprfunc_{}.pkl".format(40000)  # network position
     networks.load_state_dict(torch.load(log_path))
     networks.eval()
 
     # create onnx model
     ### example of deterministic policy FHADP algorithm
-    input_dim = 202
-    policy_dir = '../../transform_onnx_network/idsim.onnx'
-    deterministic_policy_export_onnx_model(networks, input_dim, policy_dir)
+    policy_input_dim = 202
+    value_input_dim = 202
+    policy_dir = '../../transform_onnx_network/idsim_policy.onnx'
+    value_dir = '../../transform_onnx_network/idsim_value.onnx'
+    deterministic_policy_export_onnx_model(networks, policy_input_dim, policy_dir)
+    deterministic_value_export_onnx_model(networks, value_input_dim, value_dir)
+
 
     # ### example of stochastic policy sac algorithm
     # input_dim = 50
@@ -128,13 +144,21 @@ if __name__=='__main__':
 
     # load onnx model for test
     ### example of deterministic policy FHADP algorithm
-    ort_session = ort.InferenceSession("../../transform_onnx_network/idsim.onnx")
-    example1 = np.random.randn(1, 202).astype(np.float32)
-    inputs = {ort_session.get_inputs()[0].name: example1}
-    outputs = ort_session.run(None, inputs)
-    print(outputs[0])
-    action = networks.policy(torch.tensor(example1))
+    ort_session_policy = ort.InferenceSession("../../transform_onnx_network/idsim_policy.onnx")
+    example_policy = np.random.randn(1, 202).astype(np.float32)
+    inputs_policy = {ort_session_policy.get_inputs()[0].name: example_policy}
+    outputs_policy = ort_session_policy.run(None, inputs_policy)
+    print(outputs_policy[0])
+    action = networks.policy(torch.tensor(example_policy))
     print(action)
+
+    ort_session_value = ort.InferenceSession("../../transform_onnx_network/idsim_value.onnx")
+    example_value = np.random.randn(1, 202).astype(np.float32)
+    inputs_value = {ort_session_value.get_inputs()[0].name: example_value}
+    outputs_value = ort_session_value.run(None, inputs_value)
+    print(outputs_value[0])
+    value = networks.v(torch.tensor(example_value))
+    print(value)
 
     # ### example of stochastic policy sac algorithm
     # ort_session = ort.InferenceSession("../../transform_onnx_network/network_sac_ziqing.onnx")
