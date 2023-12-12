@@ -79,11 +79,30 @@ class _InferenceHelper_FHADP(nn.Module):
     def forward(self, obs: torch.Tensor):
         return self.model(obs, torch.ones(1))
 
+class _InferenceHelper_FHADP2(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, obs: torch.Tensor):
+        assert obs.ndim == 1
+        obs = obs.unsqueeze(0)
+        act = self.model(obs)
+        assert act.ndim == 2  # [Horizon, Action_dim]
+        return act[0]
+    
 def deterministic_policy_export_onnx_model(networks, input_dim, policy_dir):
 
     example = torch.rand(1, input_dim)  # network input dim
     output_onnx_model = policy_dir
     torch.onnx.export(networks.policy, example, output_onnx_model, input_names=['input'],
+                      output_names=['output'], opset_version=11)
+
+def fhadp2_policy_export_onnx_model(networks, input_dim, policy_dir):
+
+    example = torch.rand(input_dim)  # network input dim
+    output_onnx_model = policy_dir
+    torch.onnx.export(_InferenceHelper_FHADP2(networks.policy), example, output_onnx_model, input_names=['input'],
                       output_names=['output'], opset_version=11)
     
 def deterministic_value_export_onnx_model(networks, input_dim, policy_dir):
@@ -116,7 +135,6 @@ if __name__=='__main__':
     log_policy_dir = "../../results/pyth_idsim/FHADP2_231209-162345-only-tracking"
     args = __load_args(log_policy_dir)
     alg_name = args["algorithm"]
-    print('alg_name = ', alg_name)
     alg_file_name = alg_name.lower()
     file = __import__(alg_file_name)
     ApproxContainer = getattr(file, "ApproxContainer")
@@ -133,7 +151,7 @@ if __name__=='__main__':
     value_input_dim = 202
     policy_dir = '../../transform_onnx_network/idsim_policy.onnx'
     value_dir = '../../transform_onnx_network/idsim_value.onnx'
-    deterministic_policy_export_onnx_model(networks, policy_input_dim, policy_dir)
+    fhadp2_policy_export_onnx_model(networks, policy_input_dim, policy_dir)
     deterministic_value_export_onnx_model(networks, value_input_dim, value_dir)
 
 
@@ -145,12 +163,12 @@ if __name__=='__main__':
     # load onnx model for test
     ### example of deterministic policy FHADP algorithm
     ort_session_policy = ort.InferenceSession("../../transform_onnx_network/idsim_policy.onnx")
-    example_policy = np.random.randn(1, 202).astype(np.float32)
+    example_policy = np.random.randn(202).astype(np.float32)
     inputs_policy = {ort_session_policy.get_inputs()[0].name: example_policy}
     outputs_policy = ort_session_policy.run(None, inputs_policy)
     print(outputs_policy[0])
-    action = networks.policy(torch.tensor(example_policy))
-    print(action)
+    action = networks.policy(torch.tensor(example_policy).unsqueeze(0))
+    print(action[0])
 
     ort_session_value = ort.InferenceSession("../../transform_onnx_network/idsim_value.onnx")
     example_value = np.random.randn(1, 202).astype(np.float32)
