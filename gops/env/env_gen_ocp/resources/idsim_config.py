@@ -99,7 +99,7 @@ model_config_base = {
         1.0  # surr is in front of ego
     ),
     "C_road": 300.0,
-    "ref_v_lane": 8.0,
+    "ref_v_lane": 12.0,
     "filter_num": 5
 }
 
