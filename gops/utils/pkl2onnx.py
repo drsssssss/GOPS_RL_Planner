@@ -78,6 +78,15 @@ class _InferenceHelper_FHADP(nn.Module):
 
     def forward(self, obs: torch.Tensor):
         return self.model(obs, torch.ones(1))
+    
+class _InferenceHelper_Mean(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, obs: torch.Tensor):
+        mean, _ = self.model(obs)
+        return mean
 
 class _InferenceHelper_FHADP2(nn.Module):
     def __init__(self, model):
@@ -120,12 +129,35 @@ def fhadp_policy_export_onnx_model(networks, input_dim, policy_dir):
     torch.onnx.export(model, example, output_onnx_model, input_names=['input', "input1"],
                       output_names=['output'], opset_version=11)
 
-def deterministic_stochastic_export_onnx_model(networks, input_dim, policy_dir):
+def stochastic_export_policy_onnx_model(networks, input_dim, policy_dir):
 
     example = torch.rand(1, input_dim)  # network input dim
     output_onnx_model = policy_dir
     model = networks.policy
     export_model(model, example, output_onnx_model)
+
+def stochastic_export_value_onnx_model(networks, input_dim, policy_dir):
+
+    example = torch.rand(1, input_dim)  # network input dim
+    output_onnx_model = policy_dir
+    model = networks.v
+    export_model(model, example, output_onnx_model)
+
+def stochastic_policy_export_mean_onnx_model(networks, input_dim, policy_dir):
+
+    example = torch.rand(1, input_dim)  # network input dim
+    output_onnx_model = policy_dir
+    model = _InferenceHelper_Mean(networks.policy)
+    torch.onnx.export(model, example, output_onnx_model, input_names=['input'], output_names=['output'],
+                          opset_version=11)
+
+def stochastic_value_export_mean_onnx_model(networks, input_dim, policy_dir):
+
+    example = torch.rand(1, input_dim)  # network input dim
+    output_onnx_model = policy_dir
+    model = _InferenceHelper_Mean(networks.v)
+    torch.onnx.export(model, example, output_onnx_model, input_names=['input'], output_names=['output'],
+                          opset_version=11)
 
 
 
