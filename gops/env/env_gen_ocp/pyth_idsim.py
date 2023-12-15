@@ -50,9 +50,7 @@ class idSimEnv(CrossRoad, Env):
         self._state = None
         # get observation_space
         self.model = IdSimModel(env_config, model_config)
-        # obtain observation_space from idsim
-        self.reset()
-        obs_dim = self._get_obs().shape[0]
+        obs_dim = self.model.obs_dim
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
         self.context = idSimContext() # fake idsim context
         self.set_scenario(scenario)
