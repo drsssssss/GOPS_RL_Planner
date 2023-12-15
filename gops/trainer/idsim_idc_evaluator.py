@@ -78,7 +78,7 @@ class EvalResult:
         ## done
         self.done_info: Dict[str, int] = {}
         ## rewards
-        self.reward_info: Dict[str, float] = {k: [] for k in reward_tags}
+        self.reward_info: Dict[str, List[float]] = {k: [] for k in reward_tags}
 
 class IdsimIDCEvaluator(Evaluator):
     def __init__(self, index=0, **kwargs):
@@ -103,20 +103,9 @@ class IdsimIDCEvaluator(Evaluator):
         self.eval_save = self.kwargs.get("eval_save", True)
         self.save_folder = self.kwargs["save_folder"]
 
-        # network
-        # alg_name = kwargs["algorithm"]
-        # alg_file_name = alg_name.lower()
-        # file = __import__(alg_file_name)
-        # ApproxContainer = getattr(file, "ApproxContainer")
-        # self.networks = ApproxContainer(**self.kwargs)
-        # self.networks = create_approx_contrainer(**kwargs)
         if kwargs["ini_network_dir"] is not None:
             self.networks.load_state_dict(
                 torch.load(self.kwargs["ini_network_dir"]))
-        # self.attn = "attn_func_name" in self.kwargs.keys(
-        # ) and self.kwargs["attn_func_name"] is not None
-        # self.use_value_net = "value_func_name" in self.kwargs.keys(
-        # ) and self.kwargs["value_func_name"] is not None
     
     def idc_decision(self,
                      idc_env_info: Tuple[int, List[str], List[List[float]], List[List[float]]],
@@ -358,6 +347,15 @@ class IdsimIDCEvaluator(Evaluator):
             next_obs, reward, done, next_info = self.env.step(action)
             eval_result.obs_list.append(obs)
             eval_result.action_list.append(action)
+
+            eval_result.ego_state_list.append(
+                idsim_context.x.ego_state.squeeze().numpy())
+            eval_result.reference_list.append(
+                idsim_context.p.ref_param.squeeze().numpy())
+            eval_result.surr_state_list.append(
+                idsim_context.p.sur_param.squeeze().numpy())
+            eval_result.time_stamp_list.append(idsim_context.t.item())
+            eval_result.selected_path_index_list.append(selected_path_index)
             for k, v in eval_result.reward_info.items():
                 eval_result.reward_info[k].append(next_info['reward_details'][k])
             obs = next_obs
