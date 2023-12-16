@@ -91,11 +91,40 @@ class _InferenceHelper_FHADP2(nn.Module):
         assert act.ndim == 2  # [Horizon, Action_dim]
         return act[0]
     
+class _InferenceHelper_Policy_DSAC(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, obs: torch.Tensor):
+        logits = self.model(obs)
+        mean ,_ = torch.chunk(logits,2,-1)
+        mean = torch.tanh(mean)
+        return mean
+    
+class _InferenceHelper_Q_DSAC(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, obs: torch.Tensor, act: torch.Tensor):
+        logits = self.model(obs,act)
+        mean ,_ = torch.chunk(logits,2,-1)
+        return mean
+    
 def deterministic_policy_export_onnx_model(networks, input_dim, policy_dir):
 
     example = torch.rand(1, input_dim)  # network input dim
     output_onnx_model = policy_dir
     torch.onnx.export(networks.policy, example, output_onnx_model, input_names=['input'],
+                      output_names=['output'], opset_version=11)
+
+def fhadp_policy_export_onnx_model(networks, input_dim, policy_dir):
+
+    example = torch.rand(1, input_dim)  # network input dim
+    output_onnx_model = policy_dir
+    model = _InferenceHelper_FHADP(networks.policy)
+    torch.onnx.export(model, example, output_onnx_model, input_names=['input', "input1"],
                       output_names=['output'], opset_version=11)
 
 def fhadp2_policy_export_onnx_model(networks, input_dim, policy_dir):
@@ -112,20 +141,37 @@ def deterministic_value_export_onnx_model(networks, input_dim, policy_dir):
     torch.onnx.export(networks.v, example, output_onnx_model, input_names=['input'],
                       output_names=['output'], opset_version=11)
     
-def fhadp_policy_export_onnx_model(networks, input_dim, policy_dir):
-
-    example = torch.rand(1, input_dim)  # network input dim
-    output_onnx_model = policy_dir
-    model = _InferenceHelper_FHADP(networks.policy)
-    torch.onnx.export(model, example, output_onnx_model, input_names=['input', "input1"],
-                      output_names=['output'], opset_version=11)
-
-def deterministic_stochastic_export_onnx_model(networks, input_dim, policy_dir):
+def stochastic_export_policy_onnx_model(networks, input_dim, policy_dir):
 
     example = torch.rand(1, input_dim)  # network input dim
     output_onnx_model = policy_dir
     model = networks.policy
     export_model(model, example, output_onnx_model)
+
+def stochastic_export_value_onnx_model(networks, input_dim, policy_dir):
+
+    example = torch.rand(1, input_dim)  # network input dim
+    output_onnx_model = policy_dir
+    model = networks.v
+    export_model(model, example, output_onnx_model)
+
+def DSAC_policy_export_onnx_model(networks, input_dim, policy_dir):
+
+    example = torch.rand(1, input_dim)  # network input dim
+    output_onnx_model = policy_dir
+    model = _InferenceHelper_Policy_DSAC(networks.policy)
+    torch.onnx.export(model, example, output_onnx_model, input_names=['input'], output_names=['output'],
+                          opset_version=11)
+
+def DSAC_Q_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir):
+
+    example_obs = torch.rand(1, input_dim_obs)  # network input dim
+    
+    example_act = torch.rand(1, input_dim_act)  # network input dim
+    output_onnx_model = policy_dir
+    model = _InferenceHelper_Q_DSAC(networks.q1)
+    torch.onnx.export(model, (example_obs,example_act), output_onnx_model, input_names=['input1','input2'], output_names=['output'],
+                          opset_version=11)
 
 
 
