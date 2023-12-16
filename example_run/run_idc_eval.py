@@ -25,6 +25,7 @@ if __name__ == "__main__":
     args['eval_save'] = True
     args['IDC_MODE'] = False
     args['record_loss'] = True
+    args["PATH_SELECTION_EVIDENCE"] = 'loss' # 'loss' or 'value'
     args['env_config']['max_steps'] = 2000
     args['env_config']['num_scenarios'] = num_scenarios = 4
     args['env_config']['scenario_reuse'] = scenario_reuse = 5
