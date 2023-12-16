@@ -29,12 +29,14 @@ env_config_param_base = {
         "bicycle": 0,
         "pedestrian": 0,
     },
-    "ref_v": 8.0,
+    "ref_v": 12.0,
     "ref_length": 48.0,
     "obs_num_ref_points": 2 * pre_horizon + 1,
     "obs_ref_interval": 0.8,
     "vehicle_spec": (1880.0, 1536.7, 1.13, 1.52, -128915.5, -85943.6, 20.0, 0.0),
     "singleton_mode": "reuse",
+    "use_multiple_path_for_multilane": True,
+    "no_done_at_collision": False,
 }
 
 model_config_base = {
@@ -82,10 +84,10 @@ model_config_base = {
         20.0,
     ),
 
-    # C_steer_rate_2_min, C_steer_rate_2_max #TODO: check rationality
-    "C_steer_rate_2": (100, 100),
-    # C_vx_min, C_vx_max, C_vy_min, C_vy_max #TODO: check rationality
-    "C_v": (100., 100., 100., 100.),
+    "C_acc_rate_1": 0.0,
+    "C_steer_rate_1": 10.0,
+    "C_steer_rate_2": (10.0, 10.0), # C_steer_rate_2_min, C_steer_rate_2_max
+    "C_v": (100., 100., 100., 100.), # C_vx_min, C_vx_max, C_vy_min, C_vy_max
 
     "gamma": 1.0,  # should equal to discount factor of algorithm
     "lambda_c": 0.99,  # discount of lat penalty
@@ -97,7 +99,7 @@ model_config_base = {
         1.0  # surr is in front of ego
     ),
     "C_road": 300.0,
-    "ref_v_lane": 8.0,
+    "ref_v_lane": 12.0,
     "filter_num": 5
 }
 
