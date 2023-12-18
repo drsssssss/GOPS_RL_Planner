@@ -42,8 +42,11 @@ class IdsimTestEvaluator(Evaluator):
             "num_eval_episode": num_eval_episode,
             "is_render": is_render
         })
-        args['env_config']['use_multiple_path_for_multilane'] = False
+        # args['env_config']['use_multiple_path_for_multilane'] = False
+
+        args["env_config"]["reference_selector"] = 1
         args["env_config"]["use_render"] = is_render
+        args['env_config']["scenario_root"] = r"D:\Develop\\map\idsim-multilane-v10"
         super().__init__(index=0, **args)
 
         # load network
@@ -54,9 +57,8 @@ class IdsimTestEvaluator(Evaluator):
         path = os.path.join(os.path.dirname(__file__), "..", "..", "figures")
         path = os.path.abspath(path)
         self.save_path = os.path.join(
-            path,
-            args["env_id"] + "-" + args["algorithm"] + "-" + args["env_scenario"],
-            datetime.datetime.now().strftime("%y%m%d-%H%M%S"),
+            log_policy_dir,
+            "simulation-" + datetime.datetime.now().strftime("%y%m%d-%H%M%S")+ "-iter-" + trained_policy_iteration,
         )
         os.makedirs(self.save_path, exist_ok=True)
 
@@ -146,9 +148,9 @@ class IdsimTestEvaluator(Evaluator):
             'vy_list': [x[1] for x in eval_result.obs_list],
             'r_list': [x[2] for x in eval_result.obs_list],
             'acc_list': [x[5] for x in eval_result.obs_list],
-            'steer_list': [x[6] for x in eval_result.obs_list],
+            'steer_list': [x[6] * 180 / np.pi for x in eval_result.obs_list],
             "y_ref_list": [x[7 + 31] for x in eval_result.obs_list],
-            "phi_ref_list": [np.arccos(x[7 + 31 + 31]) for x in eval_result.obs_list],
+            "phi_ref_list": [np.arccos(x[7 + 31 + 31]) * 180 / np.pi for x in eval_result.obs_list],
             'step_list': eval_result.step_list,
         }
 
@@ -220,7 +222,7 @@ class IdsimTestEvaluator(Evaluator):
         ax1.tick_params('y', colors='b')
         ax2 = ax1.twinx()
         ax2.plot(eval_dict['step_list'][::steps], eval_dict['phi_ref_list'][::steps], '.-', label='relative orientation', color='r')
-        ax2.set_ylabel('$\phi-\phi_{ref}$', color='r')
+        ax2.set_ylabel('$\phi-\phi_{ref}$(degree)', color='r')
         ax2.tick_params('y', colors='r')
         ax2.set_title('Errors with Reference Trajectory')
         ax1.set_xlabel('Time')
@@ -242,7 +244,7 @@ class IdsimTestEvaluator(Evaluator):
         ax1.tick_params('y', colors='b')
         ax2 = ax1.twinx()
         ax2.plot(eval_dict['step_list'][::steps], eval_dict['steer_list'][::steps], '.-', label='steering angle', color='r')
-        ax2.set_ylabel('steering angle', color='r')
+        ax2.set_ylabel('steering angle (degree)', color='r')
         ax2.tick_params('y', colors='r')
         ax1.set_xlabel('Time')
         ax1.set_title('Actual Acceleration and Steering Angle')

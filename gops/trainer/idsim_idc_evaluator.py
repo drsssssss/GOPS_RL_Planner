@@ -58,7 +58,7 @@ class EvalResult:
         self.ego_id: str = None
         self.ego_route: Tuple = None
         self.time_stamp_list: List[float] = []
-        self.ego_state_list: List[np.ndarray] = []
+        self.ego_state_list: List[np.ndarray] = [] # x, y, vx, vy, phi, r
         self.reference_list: List[np.ndarray] = []
         self.surr_state_list: List[np.ndarray] = []
         self.surrounding_vehicles: List[SurroundingVehicle] = []
@@ -70,6 +70,7 @@ class EvalResult:
         self.reward_list: List[float] = []
         ## IDC
         self.selected_path_index_list: List[int] = []
+        self.optimal_path_index_list: List[int] = []
         self.paths_value_list: List[List[float]] = []
         self.ref_allowable: List[List[float]] = []
         self.lane_change_step: List[int] = []
@@ -131,8 +132,8 @@ class IdsimIDCEvaluator(Evaluator):
         for ref_index in allowable_ref_index_list:
             value, context, obs, action, reward_tuple = self.eval_ref_by_index(
                 ref_index)
-            if ref_index == selected_path_index:
-                value += 100.
+            # if ref_index == selected_path_index:
+            #     value += 100.
             collision_flag = reward_tuple[-1]
             collision = collision_flag.sum().item() > 0
             allowable_ref_value.append(value)
@@ -250,7 +251,7 @@ class IdsimIDCEvaluator(Evaluator):
                 value = rewards[0].item()
             else:
                 rewards = None
-                value = self.networks.value(model_obs).item()
+                value = self.networks.v(model_obs).item()
         return value, idsim_context, model_obs, action, rewards
 
     def run_an_episode(self, iteration, render=False, batch=0, episode=0):
@@ -330,6 +331,7 @@ class IdsimIDCEvaluator(Evaluator):
             next_obs, reward, done, next_info = self.env.step(action)
             eval_result.obs_list.append(obs)
             eval_result.action_list.append(action)
+            eval_result.action_real_list.append(next_info['state'].robot_state[..., -2:])
 
             eval_result.ego_state_list.append(
                 idsim_context.x.ego_state.squeeze().numpy())

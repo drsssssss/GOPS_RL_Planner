@@ -7,10 +7,10 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 
 evaluator = IdsimTestEvaluator(
-    log_policy_dir = "../results/pyth_idsim/DSAC_231207-201908",
-    trained_policy_iteration = "290000",
+    log_policy_dir = r"D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231212-091300-v12",
+    trained_policy_iteration = "20000",
     num_eval_episode = 10,
-    is_render=False
+    is_render=True
 )
 
 evaluator.run()

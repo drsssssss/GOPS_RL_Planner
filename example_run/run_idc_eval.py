@@ -1,6 +1,7 @@
 import os
 import datetime
 import pathlib
+import json
 from gops.trainer.idsim_idc_evaluator import IdsimIDCEvaluator, get_args_from_json
 from idsim.utils.fs import TEMP_ROOT
 
@@ -10,8 +11,10 @@ import torch
 torch.set_num_threads(1)
 
 if __name__ == "__main__":
-    ini_network_root = R""
-    nn_index = 20000
+    # ini_network_root = r"D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231212-091300-v12"
+    ini_network_root = r"D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231212-163916-v15"
+    # ini_network_root = r"D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231218-091038"
+    nn_index = 0
     config_path = os.path.join(ini_network_root, "config.json")
     args = get_args_from_json(config_path, {})
     args["ini_network_root"] = ini_network_root
@@ -21,15 +24,18 @@ if __name__ == "__main__":
             datetime.datetime.now().strftime("%y%m%d-%H%M%S") + "IDCevaluation",
         )
     os.makedirs(save_folder, exist_ok=True)
+    # save args to save_folder
+    with open(os.path.join(save_folder, "config.json"), "w") as f:
+        json.dump(args, f, indent=4)
     args['save_folder'] = save_folder
     args['eval_save'] = True
-    args['IDC_MODE'] = False
+    args['IDC_MODE'] = True
     args['record_loss'] = True
     args["PATH_SELECTION_EVIDENCE"] = 'loss' # 'loss' or 'value'
     args['env_config']['max_steps'] = 2000
     args['env_config']['num_scenarios'] = num_scenarios = 4
     args['env_config']['scenario_reuse'] = scenario_reuse = 5
-    scenario_root = pathlib.Path('/home/toyota/code/gops_for_idsim/idsim-multilane-v10')
+    scenario_root = pathlib.Path(r'D:\Develop\map\idsim-multilane-v10')
     args['env_config']['scenario_root'] = scenario_root
     args['env_config']['use_logging'] = True
     args['env_config']['singleton_mode'] = 'invalidate' 
