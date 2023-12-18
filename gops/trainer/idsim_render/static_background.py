@@ -3,9 +3,9 @@ import pickle
 from idscene.network.network import SumoNetwork
 from idscene.scenario import ScenarioData
 import matplotlib.pyplot as plt
-from utils import get_polygon_points, get_yellow_line
+from gops.trainer.idsim_render.utils import get_polygon_points, get_yellow_line
 from shapely.geometry import LineString, CAP_STYLE, JOIN_STYLE
-from render_params import theme_color_dict, veh_lane_list, cyl_lane_list, lane_linewidth, \
+from gops.trainer.idsim_render.render_params import theme_color_dict, veh_lane_list, cyl_lane_list, lane_linewidth, \
     zebra_length, zebra_width, zebra_interval, lane_width
 
 

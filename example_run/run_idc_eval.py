@@ -14,7 +14,7 @@ if __name__ == "__main__":
     # ini_network_root = r"D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231212-091300-v12"
     ini_network_root = r"D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231212-163916-v15"
     # ini_network_root = r"D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231218-091038"
-    nn_index = 0
+    nn_index = 20000
     config_path = os.path.join(ini_network_root, "config.json")
     args = get_args_from_json(config_path, {})
     args["ini_network_root"] = ini_network_root

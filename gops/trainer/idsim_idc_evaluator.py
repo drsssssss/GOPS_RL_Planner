@@ -6,7 +6,7 @@
 #  Description: Evaluator for IDSim when test
 #  Update Date: 2023-12-14, Guojian Zhan: create this file
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, NamedTuple
 import json
 import numpy as np
 import torch
@@ -50,6 +50,10 @@ def get_allowable_ref_list(cur_index, lane_list):
             return [cur_index - 1, cur_index]
         else:
             return [cur_index - 1, cur_index, cur_index + 1]
+
+class IDCConfig(NamedTuple):
+    lane_change_cooldown: int = 30
+    lane_change_channeling: int = 10
 
 class EvalResult:
     def __init__(self):
@@ -99,6 +103,7 @@ class IdsimIDCEvaluator(Evaluator):
         self.IDC_MODE = self.kwargs.get("IDC_MODE", False)
         if self.IDC_MODE:
             self.PATH_SELECTION_EVIDENCE = self.kwargs["PATH_SELECTION_EVIDENCE"]
+            self.idc_config = IDCConfig()
         self.eval_PODAR = self.kwargs.get("eval_PODAR", False)
         self.num_eval_episode = self.kwargs["num_eval_episode"]
         self.eval_save = self.kwargs.get("eval_save", True)
@@ -132,8 +137,9 @@ class IdsimIDCEvaluator(Evaluator):
         for ref_index in allowable_ref_index_list:
             value, context, obs, action, reward_tuple = self.eval_ref_by_index(
                 ref_index)
-            # if ref_index == selected_path_index:
-            #     value += 100.
+            if ref_index == selected_path_index:
+                # TODO: add value
+                value += 100.
             collision_flag = reward_tuple[-1]
             collision = collision_flag.sum().item() > 0
             allowable_ref_value.append(value)

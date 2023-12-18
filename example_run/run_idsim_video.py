@@ -4,9 +4,9 @@ import numpy as np
 import pathlib
 import pickle
 import os
-from animation_crossroad import AnimationCross
-from animation_multilane import AnimationLane
-from static_background import static_view
+from gops.trainer.idsim_render.animation_crossroad import AnimationCross
+from gops.trainer.idsim_render.animation_multilane import AnimationLane
+from gops.trainer.idsim_render.static_background import static_view
 import matplotlib.pyplot as plt
 import pickle
 import os
@@ -17,22 +17,18 @@ import os
 # 3. Edit scene_id_list
 # ---------------------------------------
 
-# 获取当前的Path变量
+# add ffmpeg path to system path
 current_path = os.environ.get('Path')
-
-# 添加新的路径
 new_path = r'D:\Software\TinySoftware\ffmpeg-2023-12-14-git-5256b2fbe6-full_build\bin'
-
-# 更新Path变量
 os.environ['Path'] = current_path + os.pathsep + new_path
 
-Animation = AnimationLane
-# Animation = AnimationCross
+# Animation = AnimationLane
+Animation = AnimationCross
 
 # log_path_root = pathlib.Path("test/230711-172542IDCevaluation")
 # log_path_root = pathlib.Path(r'D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231212-091300-v12\231217-165404IDCevaluation')
-log_path_root = pathlib.Path(r'/results/pyth_idsim/FHADP2_231212-163916-v15/231218-084731IDCevaluation')
-# log_path_root = pathlib.Path(r'D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231218-091038\231218-091144IDCevaluation')
+# log_path_root = pathlib.Path(r'D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231212-163916-v15\231218-184942IDCevaluation')
+log_path_root = pathlib.Path(r'D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231218-091038\231218-153832IDCevaluation')
 
 # scene_id_list = ['000', '001', '002', '003']
 scene_id_list = ['000']
@@ -62,7 +58,6 @@ for scene_id in scene_id_list:
         episode_path = log_path / episode
         with open(episode_path, 'rb') as f:
             episode_data = pickle.load(f)
-            # episode_data.map_path = pathlib.Path(r'D:\Develop\map\idsim-multilane-v10') / str(i)
             episode_data.save_folder = log_path_root
 
         animation.generate_animation(episode_data, save_path, i, mode='debug')
