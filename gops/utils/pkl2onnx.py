@@ -170,7 +170,6 @@ def DSAC_policy_export_onnx_model(networks, input_dim, policy_dir):
 def DSAC_Q1_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir):
 
     example_obs_act = torch.rand(1, input_dim_obs+input_dim_act)  # network input dim
-    
     output_onnx_model = policy_dir
     model = _InferenceHelper_Q_DSAC(networks.q,input_dim_act)
     torch.onnx.export(model, example_obs_act, output_onnx_model, input_names=['input'], output_names=['output'],
@@ -178,12 +177,10 @@ def DSAC_Q1_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir)
 
 def DSAC_Q2_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir):
 
-    example_obs = torch.rand(1, input_dim_obs)  # network input dim
-    
-    example_act = torch.rand(1, input_dim_act)  # network input dim
+    example_obs_act = torch.rand(1, input_dim_obs+input_dim_act)  # network input dim
     output_onnx_model = policy_dir
-    model = _InferenceHelper_Q_DSAC(networks.q2)
-    torch.onnx.export(model, (example_obs,example_act), output_onnx_model, input_names=['input1','input2'], output_names=['output'],
+    model = _InferenceHelper_Q_DSAC(networks.q2,input_dim_act)
+    torch.onnx.export(model, example_obs_act, output_onnx_model, input_names=['input'], output_names=['output'],
                           opset_version=11)
 
 
