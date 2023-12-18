@@ -103,11 +103,15 @@ class _InferenceHelper_Policy_DSAC(nn.Module):
         return mean
     
 class _InferenceHelper_Q_DSAC(nn.Module):
-    def __init__(self, model):
+    def __init__(self, model, act_dim):
         super().__init__()
         self.model = model
+        self.act_dim = act_dim
 
-    def forward(self, obs: torch.Tensor, act: torch.Tensor):
+
+    def forward(self, obs_act: torch.Tensor):
+        obs  = obs_act[:,0:-act_dim]
+        act = obs_act[:,-act_dim:]
         logits = self.model(obs,act)
         mean ,_ = torch.chunk(logits,2,-1)
         return mean
@@ -165,12 +169,11 @@ def DSAC_policy_export_onnx_model(networks, input_dim, policy_dir):
 
 def DSAC_Q1_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir):
 
-    example_obs = torch.rand(1, input_dim_obs)  # network input dim
+    example_obs_act = torch.rand(1, input_dim_obs+input_dim_act)  # network input dim
     
-    example_act = torch.rand(1, input_dim_act)  # network input dim
     output_onnx_model = policy_dir
-    model = _InferenceHelper_Q_DSAC(networks.q1)
-    torch.onnx.export(model, (example_obs,example_act), output_onnx_model, input_names=['input1','input2'], output_names=['output'],
+    model = _InferenceHelper_Q_DSAC(networks.q,input_dim_act)
+    torch.onnx.export(model, example_obs_act, output_onnx_model, input_names=['input'], output_names=['output'],
                           opset_version=11)
 
 def DSAC_Q2_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir):
@@ -188,7 +191,7 @@ def DSAC_Q2_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir)
 if __name__=='__main__':
 
     # Load trained policy
-    log_policy_dir = "D:/项目材料/GOPS/gops-idsim\DSAC_231216-160828\DSAC_231216-160828"
+    log_policy_dir = "/home/gaojiaxin/gops/results/pyth_idsim/DSAC_231216-160828"
     args = __load_args(log_policy_dir)
     alg_name = args["algorithm"]
     alg_file_name = alg_name.lower()
@@ -212,14 +215,12 @@ if __name__=='__main__':
     # DSAC
     obs_dim = 170
     act_dim = 2
-    stochastic_policy_export_mean_onnx_model(networks, obs_dim, policy_dir)
-    stochastic_value_export_mean_onnx_model(networks, obs_dim,act_dim, value_dir)
     policy_dir = '../../transform_onnx_network/idsim_policy.onnx'
     Q1_dir = '../../transform_onnx_network/idsim_DSAC_Q1.onnx'
     Q2_dir = '../../transform_onnx_network/idsim_DSAC_Q2.onnx'
-    DSAC_policy_export_onnx_model(networks, input_dim, policy_dir)
-    DSAC_Q1_export_onnx_model(networks, input_dim, act_dim, value_dir)
-    DSAC_Q2_export_onnx_model(networks, input_dim, act_dim, value_dir)
+    DSAC_policy_export_onnx_model(networks, obs_dim, policy_dir)
+    DSAC_Q1_export_onnx_model(networks, obs_dim, act_dim, Q1_dir)
+    # DSAC_Q2_export_onnx_model(networks, obs_dim, act_dim, act_dim)
 
 
 
@@ -268,10 +269,9 @@ if __name__=='__main__':
     print(action)
 
     ort_session_value = ort.InferenceSession(Q1_dir)
-    example_obs = np.random.randn(1, obs_dim).astype(np.float32)
-    example_act = np.random.randn(1, act_dim).astype(np.float32)
-    inputs_value = {ort_session_value.get_inputs()[0].name: example_obs,ort_session_value.get_inputs()[1].name: example_act} 
+    example_obs_act = np.random.randn(1, obs_dim+act_dim).astype(np.float32)
+    inputs_value = {ort_session_value.get_inputs()[0].name: example_obs_act,} 
     outputs_value = ort_session_value.run(None, inputs_value)
     print(outputs_value[0])
-    value = networks.q1(torch.tensor(example_obs),torch.tensor(example_act))
+    value = networks.q(torch.tensor(example_obs_act)[:,:-act_dim],torch.tensor(example_obs_act)[:,-act_dim:])
     print(value)
