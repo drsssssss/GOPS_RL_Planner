@@ -1,13 +1,9 @@
 import json
-
 import numpy as np
 import pathlib
-import pickle
 import os
 from gops.trainer.idsim_render.animation_crossroad import AnimationCross
 from gops.trainer.idsim_render.animation_multilane import AnimationLane
-from gops.trainer.idsim_render.static_background import static_view
-import matplotlib.pyplot as plt
 import pickle
 import os
 
@@ -22,13 +18,13 @@ current_path = os.environ.get('Path')
 new_path = r'D:\Software\TinySoftware\ffmpeg-2023-12-14-git-5256b2fbe6-full_build\bin'
 os.environ['Path'] = current_path + os.pathsep + new_path
 
-# Animation = AnimationLane
-Animation = AnimationCross
+Animation = AnimationLane
+# Animation = AnimationCross
 
 # log_path_root = pathlib.Path("test/230711-172542IDCevaluation")
 # log_path_root = pathlib.Path(r'D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231212-091300-v12\231217-165404IDCevaluation')
-# log_path_root = pathlib.Path(r'D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231212-163916-v15\231218-184942IDCevaluation')
-log_path_root = pathlib.Path(r'D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231218-091038\231218-153832IDCevaluation')
+log_path_root = pathlib.Path(r'D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231212-163916-v15\231218-184942IDCevaluation')
+# log_path_root = pathlib.Path(r'D:\Develop\gops-develop\results\pyth_idsim\FHADP2_231218-091038\231218-153832IDCevaluation')
 
 # scene_id_list = ['000', '001', '002', '003']
 scene_id_list = ['000']

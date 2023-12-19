@@ -46,12 +46,6 @@ class AnimationCross(AnimationBase):
         ax.plot(px, py, color=line_color, linewidth=1,
                 ls='--', alpha=0.5, zorder=101)
 
-    # def create_veh(self, ax: plt.Axes, xy:Tuple[float, float], phi:float, length:float, width:float, facecolor:str = sur_face_color) -> Rt:
-    #     vehPatch = ax.add_patch(Rt([0, 0], length, width, angle=0., \
-    #         facecolor=facecolor, edgecolor=None, zorder=103))
-    #     update_veh(vehPatch, xy, phi, length, width)
-    #     return vehPatch
-
     def put_text_on_ax(self, text):
         fontsize_coefficient = 1.3
         self.text_counter += 1
@@ -70,7 +64,7 @@ class AnimationCross(AnimationBase):
     def clear_text(self):
         self.text_counter = 0
 
-    def generate_animation(self, episode_data: EvalResult, save_video_path: str, episode_index: int, fps=10, mode='debug'):
+    def generate_animation(self, episode_data: EvalResult, save_video_path: str, episode_index: int, fps=20, mode='debug'):
         metadata = dict(title='Demo', artist='Guojian Zhan', comment='idsim')
         writer = FFMpegWriter(fps=fps, metadata=metadata)
 

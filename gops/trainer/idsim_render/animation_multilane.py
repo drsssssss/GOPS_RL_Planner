@@ -58,7 +58,7 @@ class AnimationLane(AnimationBase):
         episode_data: EvalResult,
         save_path: Path,
         episode_index: int,
-        fps=10,
+        fps=20,
         mode='debug',
     ):
         metadata = dict(title='Demo', artist='Guojian Zhan', comment='idsim')
@@ -67,18 +67,20 @@ class AnimationLane(AnimationBase):
         os.makedirs(save_video_path, exist_ok=True)
 
         # ------------------ initialization -------------------
+        # clear all list
         self.clear_all_list()
 
+        # create figure
         fig: Figure = plt.figure(figsize=(20, 10))
         gs = gridspec.GridSpec(4, 2)
 
-        print(f'Plotting traffic...')
+        print(f'Initializing traffic...')
         ax = self.plot_traffic(episode_data, fig, gs)
 
         print(f'Plotting figures...')
         eval_dict = self.plot_figures(episode_data, fig, gs)
 
-        # create ego veh
+        # create ego vehicle
         ego_veh = create_veh(ax, (0, 0), 0, VEH_LENGTH,
                              VEH_WIDTH, facecolor=EGO_COLOR_WITH_ALPHA, edgecolor=EGO_COLOR)
 
@@ -89,13 +91,6 @@ class AnimationLane(AnimationBase):
         value = np.array(value) if value else None
         min_value = np.min(value) if value is not None else 0.0
         max_value = np.max(value) if value is not None else 0.0
-
-        self.ref_artist_list = []
-        self.scale_artist_list = []
-        self.background_artist_list = []
-        self.speed_dashboard_artist_list = []
-        self.action_bar_artist_list = []
-        self.value_bar_artist_list = []
 
         # ---------------------- update-----------------------
         for step in range(len(episode_data.time_stamp_list)):
