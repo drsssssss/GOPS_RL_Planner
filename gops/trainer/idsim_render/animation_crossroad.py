@@ -2,7 +2,7 @@
 import os
 import pickle
 import numpy as np
-from typing import List, Tuple, Dict
+from typing import Dict
 from itertools import chain
 import matplotlib.pyplot as plt
 from matplotlib.animation import FFMpegWriter
@@ -11,18 +11,16 @@ from matplotlib.patches import Circle
 from shapely.geometry import LineString
 
 from gops.trainer.idsim_idc_evaluator import EvalResult
-from gops.trainer.idsim_render.animation_base import AnimationBase, create_veh, remove_veh, update_veh, veh2vis, rad_to_deg
+from gops.trainer.idsim_render.animation_base import AnimationBase, create_veh, update_veh, veh2vis, rad_to_deg
 from gops.trainer.idsim_render.color import EGO_COLOR_WITH_ALPHA, EGO_COLOR
 
-from gops.trainer.idsim_render.process_fcd import FCDLog
-from gops.trainer.idsim_render.static_background import static_view
+from gops.trainer.idsim_render.crossroad.static_background import static_view
 from gops.trainer.idsim_render.utils import get_line_points
 
 from idscene.scenario import ScenarioData
 from idscene.utils.geometry_utils import get_line_inclination
-from gops.trainer.idsim_render.render_params import veh_length, veh_width, cyl_length, cyl_width, \
-    ped_length, ped_width, traffic_light_length, traffic_light_width, \
-    sur_face_color, ego_face_color, ref_color_list
+from gops.trainer.idsim_render.render_params import veh_length, veh_width, traffic_light_length, traffic_light_width, \
+    ego_face_color, ref_color_list
 
 
 def get_traffic_light_index(current_time: float, durations: np.ndarray) -> int:
@@ -241,13 +239,14 @@ class AnimationCross(AnimationBase):
                 self.put_text_on_ax(f'action: {ego_action_str}')
 
                 ## loss
+                # cur_obs = episode_data.obs_list[step]
                 # self.put_text_on_ax(f'loss pi: {episode_data.loss_policy_list[step]:.4f}')
                 # self.put_text_on_ax(f'loss lon: {episode_data.loss_lon_list[step]:.4f}')
                 # self.put_text_on_ax(f'loss lat: {episode_data.loss_lat_list[step]:.4f}')
                 # self.put_text_on_ax(f'loss phi: {episode_data.loss_phi_list[step]:.4f}')
-                # self.put_text_on_ax(f'loss vx: {episode_data.loss_vel_list[step]:.4f}')
-                # self.put_text_on_ax(f'loss vy: {episode_data.loss_vel_lat_list[step]:.4f}')
-                # self.put_text_on_ax(f'loss yaw rate: {episode_data.loss_yaw_rate_list[step]:.4f}')
+                # self.put_text_on_ax(f'loss vx: {cur_obs[0]:.4f}')
+                # self.put_text_on_ax(f'loss vy: {cur_obs[1]:.4f}')
+                # self.put_text_on_ax(f'loss yaw rate: {cur_obs[2]:.4f}')
                 # self.put_text_on_ax(f'loss acc: {episode_data.loss_acc_list[step]:.4f}')
                 # self.put_text_on_ax(f'loss steer: {episode_data.loss_steer_list[step]:.4f}')
                 # self.put_text_on_ax(f'loss acc 1: {episode_data.loss_acc_incremental_list[step]:.4f}')

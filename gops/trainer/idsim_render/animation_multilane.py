@@ -31,7 +31,26 @@ VEH_WIDTH = 1.8
 class AnimationLane(AnimationBase):
     def __init__(self, theme_style, fcd_file, config) -> None:
         super().__init__(theme_style, fcd_file, config)
+        self.ax1_1, self.ax1_2, self.ax1_3 = None, None, None
+        self.ax2_1, self.ax2_2 = None, None
+        self.ax3_1 = None
+        self.ax4_1, self.ax4_2 = None, None
+        self.ref_artist_list = []
+        self.scale_artist_list = []
+        self.background_artist_list = []
+        self.speed_dashboard_artist_list = []
+        self.action_bar_artist_list = []
+        self.value_bar_artist_list = []
         self.task_name = "multilane"
+
+    def clear_all_list(self):
+        super().clear_all_list()
+        self.ref_artist_list = []
+        self.scale_artist_list = []
+        self.background_artist_list = []
+        self.speed_dashboard_artist_list = []
+        self.action_bar_artist_list = []
+        self.value_bar_artist_list = []
 
 
     def generate_animation(
@@ -48,45 +67,16 @@ class AnimationLane(AnimationBase):
         os.makedirs(save_video_path, exist_ok=True)
 
         # ------------------ initialization -------------------
+        self.clear_all_list()
+
         fig: Figure = plt.figure(figsize=(20, 10))
         gs = gridspec.GridSpec(4, 2)
-        ax = fig.add_subplot(gs[:, 0])  # traffic scene plot
-        fig.tight_layout(rect=[0, 0.05, 0.85, 0.95])
-        fig.subplots_adjust(wspace=0.1, hspace=0.4)
 
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_aspect('equal')
+        print(f'Plotting traffic...')
+        ax = self.plot_traffic(episode_data, fig, gs)
 
-        # plot lane lines
-        map_path = episode_data.map_path
-        map_data_path = f'{map_path}/scene.pkl'
-        with open(map_data_path, 'rb') as f:
-            scenario_data: ScenarioData = pickle.load(f)
-            network = scenario_data.network
-        plot_lane_lines(ax, network, zorder=0)
-
-        print(f'Plotting figures...{episode_index}')
-        eval_dict = {
-            'vx_list': [x[0,0].item() for x in episode_data.obs_list],
-            'vy_list': [x[0,1].item() for x in episode_data.obs_list],
-            'r_list': [x[0,2].item() for x in episode_data.obs_list],
-            'acc_list': [x[0,5].item() for x in episode_data.obs_list],
-            'steer_list': [x[0,6].item() * 180 / np.pi for x in episode_data.obs_list],
-            "y_ref_list": [x[0,7 + 31].item() for x in episode_data.obs_list],
-            "phi_ref_list": [np.arccos(x[0,7 + 31 + 31].item()) * 180 / np.pi for x in episode_data.obs_list],
-            'step_list': episode_data.time_stamp_list,
-        }
-        del episode_data.reward_info['collision_flag']
-
-        # ego vx, vy, yaw rate
-        self.ax1_1, self.ax1_2, self.ax1_3 = plot_vx_vy_r(eval_dict, fig, gs)
-        # reference delta y and delta phi
-        self.ax2_1, self.ax2_2 = plot_y_ref_phi_ref(eval_dict, fig, gs)
-        # all the non-zero reward
-        self.ax3_1 = plot_reward(episode_data, eval_dict, fig, gs)
-        # real acc, real steer angle
-        self.ax4_1, self.ax4_2 = plot_action(eval_dict, fig, gs)
+        print(f'Plotting figures...')
+        eval_dict = self.plot_figures(episode_data, fig, gs)
 
         # create ego veh
         ego_veh = create_veh(ax, (0, 0), 0, VEH_LENGTH,
@@ -100,12 +90,12 @@ class AnimationLane(AnimationBase):
         min_value = np.min(value) if value is not None else 0.0
         max_value = np.max(value) if value is not None else 0.0
 
-        ref_artist_list = []
-        scale_artist_list = []
-        background_artist_list = []
-        speed_dashboard_artist_list = []
-        action_bar_artist_list = []
-        value_bar_artist_list = []
+        self.ref_artist_list = []
+        self.scale_artist_list = []
+        self.background_artist_list = []
+        self.speed_dashboard_artist_list = []
+        self.action_bar_artist_list = []
+        self.value_bar_artist_list = []
 
         # ---------------------- update-----------------------
         for step in range(len(episode_data.time_stamp_list)):
@@ -115,56 +105,17 @@ class AnimationLane(AnimationBase):
             cur_time = round(cur_time * 10) / 10
 
             # # ---------------- set limit of figure ------------------
-            index_min = max(0, step - 100)
-            index_max = min(len(episode_data.time_stamp_list) - 1, step + 100)
-            x_lim_min = episode_data.time_stamp_list[index_min]
-            x_lim_max = episode_data.time_stamp_list[index_max]
-            self.adjust_lim(episode_data, eval_dict, index_max, index_min, x_lim_max, x_lim_min)
+            self.adjust_lim(episode_data, eval_dict, step)
 
             # # ---------------- update ego veh------------------
             ego_x, ego_y, _, _, ego_phi, _ = episode_data.ego_state_list[step]
             update_veh(ego_veh, (ego_x, ego_y), ego_phi, VEH_LENGTH, VEH_WIDTH)
 
             # # ---------------- update ego ref------------------
-            for ref in ref_artist_list:
-                ref.remove()
-            ref_artist_list = []
-            selected_path_index = episode_data.selected_path_index_list[step]
-            for i in range(len(episode_data.reference_list[step])):
-                ref = episode_data.reference_list[step][i][:self.REF_POINT_NUM]
-                ref_x, ref_y = ref[:, 0], ref[:, 1]
-                ref_artist_list.append(ax.add_line(Line2D(
-                    ref_x, ref_y, color=EGO_COLOR if i == selected_path_index else EGO_COLOR_WITH_ALPHA,
-                    linewidth=self.REF_LINEWIDTH, zorder=0
-                )))
+            self.update_ego_ref(ax, episode_data, step)
 
             # # ---------------- update sur participants------------------
-            # p [2N+1, num_veh, feature_dim]
-            # feature [x, y, phi, speed, length, width, mask]
-            # for p in surr_list:
-            #     remove_veh(p)
-            # surr_list = []
-            # surr_states = episode_data.surr_state_list[step][0]
-            # for p in surr_states:
-            #     x, y, phi, speed, length, width, mask = p
-            #     if mask == 1:
-            #         surr_list.append(create_veh(ax, (x,y), phi, length, width, facecolor='white', edgecolor=SUR_COLOR))
-
             self.update_sur_participants(ax, cur_time, episode_data, step)
-
-            # # plot surr reference
-            # for sr in surr_ref_artist_list:
-            #     sr.remove()
-            # surr_ref_artist_list = []
-            # surr_param = episode_data.surr_state_list[step][:REF_POINT_NUM]
-            # surr_num = surr_states.shape[0]
-            # for i in range(surr_num):
-            #     mask = surr_states[i][-1]
-            #     if mask == 1:
-            #         surr_ref_artist_list.append(ax.add_line(Line2D(
-            #             surr_param[:, i, 0], surr_param[:, i, 1],
-            #             color=SUR_COLOR, linewidth=REF_LINEWIDTH, alpha=REF_ALPHA, zorder=0
-            #         )))
 
             # set center
             screen_width, screen_height = 100, 125
@@ -176,9 +127,9 @@ class AnimationLane(AnimationBase):
                         center_y + screen_height / 2)
 
             # plot scale
-            for scale in scale_artist_list:
+            for scale in self.scale_artist_list:
                 scale.remove()
-            scale_artist_list = plot_scale(
+            self.scale_artist_list = plot_scale(
                 ax=ax,
                 xy=(center_x - screen_width / 2 + 3,
                     ego_y - screen_width / 2 + 2),
@@ -187,9 +138,9 @@ class AnimationLane(AnimationBase):
 
             # plot background of speed dashboard and action bar
             margin = 5
-            for background in background_artist_list:
+            for background in self.background_artist_list:
                 background.remove()
-            background_artist_list = [ax.add_patch(Rt(
+            self.background_artist_list = [ax.add_patch(Rt(
                 (center_x - screen_width / 2 - margin,
                  center_y - screen_height / 2 - margin),
                 screen_width + 2 *
@@ -199,9 +150,9 @@ class AnimationLane(AnimationBase):
 
             # plot speed dashboard
             speed = episode_data.ego_state_list[step][2] * 3.6
-            for artist in speed_dashboard_artist_list:
+            for artist in self.speed_dashboard_artist_list:
                 artist.remove()
-            speed_dashboard_artist_list = plot_speed_dashboard(
+            self.speed_dashboard_artist_list = plot_speed_dashboard(
                 ax=ax,
                 xy=(center_x - 33, center_y - screen_height / 2 + 10),
                 speed=speed,
@@ -211,9 +162,9 @@ class AnimationLane(AnimationBase):
             # plot action bar
             action = episode_data.action_real_list[step]
             action[1] = -action[1]  # steer, turn right is positive
-            for artist in action_bar_artist_list:
+            for artist in self.action_bar_artist_list:
                 artist.remove()
-            action_bar_artist_list = plot_action_bar(
+            self.action_bar_artist_list = plot_action_bar(
                 ax=ax,
                 xy=(center_x - 12, center_y - screen_height / 2 + 5),
                 action=action,
@@ -225,9 +176,9 @@ class AnimationLane(AnimationBase):
             # plot value bar
             value = episode_data.paths_value_list[step]
             ref_allowable = episode_data.ref_allowable[step]
-            for artist in value_bar_artist_list:
+            for artist in self.value_bar_artist_list:
                 artist.remove()
-            value_bar_artist_list = plot_value_bar(
+            self.value_bar_artist_list = plot_value_bar(
                 ax=ax,
                 xy=(center_x + 28, center_y - screen_height / 2 + 6),
                 value=value,
@@ -244,7 +195,24 @@ class AnimationLane(AnimationBase):
         plt.close(fig)
         print('video export success!')
 
-    def adjust_lim(self, episode_data, eval_dict, index_max, index_min, x_lim_max, x_lim_min):
+    def update_ego_ref(self, ax, episode_data, step):
+        for ref in self.ref_artist_list:
+            ref.remove()
+        self.ref_artist_list = []
+        selected_path_index = episode_data.selected_path_index_list[step]
+        for i in range(len(episode_data.reference_list[step])):
+            ref = episode_data.reference_list[step][i][:self.REF_POINT_NUM]
+            ref_x, ref_y = ref[:, 0], ref[:, 1]
+            self.ref_artist_list.append(ax.add_line(Line2D(
+                ref_x, ref_y, color=EGO_COLOR if i == selected_path_index else EGO_COLOR_WITH_ALPHA,
+                linewidth=self.REF_LINEWIDTH, zorder=101
+            )))
+
+    def adjust_lim(self, episode_data, eval_dict, step):
+        index_min = max(0, step - 100)
+        index_max = min(len(episode_data.time_stamp_list) - 1, step + 100)
+        x_lim_min = episode_data.time_stamp_list[index_min]
+        x_lim_max = episode_data.time_stamp_list[index_max]
         self.ax1_1.set_xlim(x_lim_min, x_lim_max)
         self.ax1_1.set_ylim(min(eval_dict['vx_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['vx_list'][index_min:index_max]) * 1.05)
@@ -252,20 +220,56 @@ class AnimationLane(AnimationBase):
                             max(eval_dict['vy_list'][index_min:index_max]) * 1.05)
         self.ax1_3.set_ylim(min(eval_dict['r_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['r_list'][index_min:index_max]) * 1.05)
-
         self.ax2_1.set_xlim(x_lim_min, x_lim_max)
         self.ax2_1.set_ylim(min(eval_dict['y_ref_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['y_ref_list'][index_min:index_max]) * 1.05)
         self.ax2_2.set_ylim(min(eval_dict['phi_ref_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['phi_ref_list'][index_min:index_max]) * 1.05)
-
         self.ax3_1.set_xlim(x_lim_min, x_lim_max)
         self.ax3_1.set_ylim(min(episode_data.reward_info['reward'][index_min:index_max]) * 0.95, 0)
-
         self.ax4_1.set_xlim(x_lim_min, x_lim_max)
         self.ax4_1.set_ylim(min(eval_dict['acc_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['acc_list'][index_min:index_max]) * 1.05)
         self.ax4_2.set_ylim(min(eval_dict['steer_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['steer_list'][index_min:index_max]) * 1.05)
+
+    def plot_figures(self, episode_data, fig, gs):
+        eval_dict = {
+            'vx_list': [x[0, 0].item() for x in episode_data.obs_list],
+            'vy_list': [x[0, 1].item() for x in episode_data.obs_list],
+            'r_list': [x[0, 2].item() for x in episode_data.obs_list],
+            'acc_list': [x[0, 5].item() for x in episode_data.obs_list],
+            'steer_list': [x[0, 6].item() * 180 / np.pi for x in episode_data.obs_list],
+            "y_ref_list": [x[0, 7 + 31].item() for x in episode_data.obs_list],
+            "phi_ref_list": [np.arccos(x[0, 7 + 31 + 31].item()) * 180 / np.pi for x in episode_data.obs_list],
+            'step_list': episode_data.time_stamp_list,
+        }
+        del episode_data.reward_info['collision_flag']
+        # ego vx, vy, yaw rate
+        self.ax1_1, self.ax1_2, self.ax1_3 = plot_vx_vy_r(eval_dict, fig, gs)
+        # reference delta y and delta phi
+        self.ax2_1, self.ax2_2 = plot_y_ref_phi_ref(eval_dict, fig, gs)
+        # all the non-zero reward
+        self.ax3_1 = plot_reward(episode_data, eval_dict, fig, gs)
+        # real acc, real steer angle
+        self.ax4_1, self.ax4_2 = plot_action(eval_dict, fig, gs)
+        return eval_dict
+
+    def plot_traffic(self, episode_data, fig, gs):
+        ax = fig.add_subplot(gs[:, 0])  # traffic scene plot
+        fig.tight_layout(rect=[0, 0.05, 0.85, 0.95])
+        fig.subplots_adjust(wspace=0.1, hspace=0.4)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_aspect('equal')
+        # plot lane lines
+        map_path = episode_data.map_path
+        map_data_path = f'{map_path}/scene.pkl'
+        with open(map_data_path, 'rb') as f:
+            scenario_data: ScenarioData = pickle.load(f)
+            network = scenario_data.network
+        plot_lane_lines(ax, network, zorder=0)
+        return ax
+
 
 

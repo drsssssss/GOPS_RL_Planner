@@ -3,6 +3,7 @@ import pickle
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from gops.trainer.idsim_idc_evaluator import EvalResult
 from gops.trainer.idsim_render.color import SUR_COLOR, SUR_COLOR_WITH_ALPHA, SUR_FOCUS_COLOR, SUR_FOCUS_COLOR_WITH_ALPHA
 from gops.trainer.idsim_render.process_fcd import FCDLog
 from gops.trainer.idsim_render.render_params import veh_length, veh_width, cyl_length, cyl_width, \
@@ -42,7 +43,7 @@ def create_veh(
     zorder=1,
 ) -> Rt:
     vehPatch = ax.add_patch(Rt(
-        [0, 0], length, width, angle=0., facecolor=facecolor, edgecolor=edgecolor, zorder=zorder, linewidth=1
+        (0, 0), length, width, angle=0., facecolor=facecolor, edgecolor=edgecolor, zorder=zorder, linewidth=1
     ))
     update_veh(vehPatch, xy, phi, length, width)
     return vehPatch
@@ -74,6 +75,30 @@ class AnimationBase:
 
         self.REF_POINT_NUM = 31
         self.REF_LINEWIDTH = 2.0
+
+    def plot_traffic(self, episode_data, fig, gs):
+        pass
+
+    def plot_figures(self, episode_data, fig, gs):
+        pass
+
+    def generate_animation(self,
+                           episode_data: EvalResult,
+                           save_path: Path,
+                           episode_index: int,
+                           fps=10,
+                           mode='debug'
+                           ):
+        pass
+
+    def clear_all_list(self):
+        self.last_veh_id_list = []
+        self.last_cyl_id_list = []
+        self.last_ped_id_list = []
+        self.surr_dict = {}
+        self.surr_head_dict = {}
+        self.surr_focus_list = []
+        self.surr_focus_ref_list = []
 
     def update_sur_participants(self, ax, cur_time, episode_data, step):
         participants = self.fcd_log.at(cur_time).vehicles
@@ -115,7 +140,7 @@ class AnimationBase:
             if surr.id in to_add:
                 self.surr_dict[surr.id] = create_veh(
                     ax, (x, y), phi, length, width,
-                    facecolor=SUR_COLOR_WITH_ALPHA, edgecolor=SUR_COLOR, zorder=100
+                    facecolor=SUR_COLOR_WITH_ALPHA, edgecolor=SUR_COLOR, zorder=200
                 )
                 self.surr_head_dict[surr.id] = ax.plot(
                     [x, x+length*0.8*np.cos(phi)], [y, y+length*0.8*np.sin(phi)],
@@ -150,8 +175,8 @@ class AnimationBase:
         for i in range(surr_states.shape[0]):
             x, y, phi, speed, length, width, mask = surr_states[i]
             if mask == 1:
-                self.surr_focus_list.append(create_veh(ax, (x,y), phi, length, width, facecolor=SUR_FOCUS_COLOR_WITH_ALPHA, edgecolor=SUR_FOCUS_COLOR, zorder=100))
+                self.surr_focus_list.append(create_veh(ax, (x,y), phi, length, width, facecolor=SUR_FOCUS_COLOR_WITH_ALPHA, edgecolor=SUR_FOCUS_COLOR, zorder=201))
                 self.surr_focus_ref_list.append(ax.add_line(Line2D(
                         surr_param[:, i, 0], surr_param[:, i, 1],
-                        color=SUR_FOCUS_COLOR_WITH_ALPHA, linewidth=self.REF_LINEWIDTH, zorder=0
+                        color=SUR_FOCUS_COLOR_WITH_ALPHA, linewidth=self.REF_LINEWIDTH, zorder=201
                     )))

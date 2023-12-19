@@ -76,7 +76,7 @@ class EvalResult:
         self.selected_path_index_list: List[int] = []
         self.optimal_path_index_list: List[int] = []
         self.paths_value_list: List[List[float]] = []
-        self.ref_allowable: List[List[float]] = []
+        self.ref_allowable: List[List[bool]] = []
         self.lane_change_step: List[int] = []
         self.lc_cd: List[int] = []
         self.lc_cl: List[int] = []
