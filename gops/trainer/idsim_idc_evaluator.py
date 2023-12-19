@@ -78,7 +78,7 @@ class EvalResult:
         ## done
         self.done_info: Dict[str, int] = {}
         ## rewards
-        self.reward_info: Dict[str, float] = {k: [] for k in reward_tags}
+        self.reward_info: Dict[str, List[float]] = {k: [] for k in reward_tags}
 
 class IdsimIDCEvaluator(Evaluator):
     def __init__(self, index=0, **kwargs):
@@ -103,20 +103,9 @@ class IdsimIDCEvaluator(Evaluator):
         self.eval_save = self.kwargs.get("eval_save", True)
         self.save_folder = self.kwargs["save_folder"]
 
-        # network
-        # alg_name = kwargs["algorithm"]
-        # alg_file_name = alg_name.lower()
-        # file = __import__(alg_file_name)
-        # ApproxContainer = getattr(file, "ApproxContainer")
-        # self.networks = ApproxContainer(**self.kwargs)
-        # self.networks = create_approx_contrainer(**kwargs)
         if kwargs["ini_network_dir"] is not None:
             self.networks.load_state_dict(
                 torch.load(self.kwargs["ini_network_dir"]))
-        # self.attn = "attn_func_name" in self.kwargs.keys(
-        # ) and self.kwargs["attn_func_name"] is not None
-        # self.use_value_net = "value_func_name" in self.kwargs.keys(
-        # ) and self.kwargs["value_func_name"] is not None
     
     def idc_decision(self,
                      idc_env_info: Tuple[int, List[str], List[List[float]], List[List[float]]],
@@ -126,7 +115,7 @@ class IdsimIDCEvaluator(Evaluator):
                      lc_cd: int,
                      lc_cl: int,
                      eval_result: EvalResult):
-        cur_index, lane_list, reference_list, reference_info_list = idc_env_info
+        cur_index, lane_list = idc_env_info
 
         paths_value_list = [0] * len(lane_list)
         ref_allowable = [False] * len(lane_list)
@@ -137,7 +126,6 @@ class IdsimIDCEvaluator(Evaluator):
         allowable_ref_safe = []
         # cal value and safe for allowable ref
         allowable_context_list = []
-        allowable_context_full_list = []
         allowable_obs_list = []
         allowable_action_list = []
         for ref_index in allowable_ref_index_list:
@@ -151,7 +139,7 @@ class IdsimIDCEvaluator(Evaluator):
             allowable_ref_safe.append(not collision)
             allowable_context_list.append(context)
             allowable_obs_list.append(obs)
-            allowable_action_list.append(action[:, :2])
+            allowable_action_list.append(action[:2])
         # find optimal path: safe and max value, default selected path
         optimal_path_index = selected_path_index
         optimal_path_in_allowable = allowable_ref_index_list.index(optimal_path_index)
@@ -210,8 +198,6 @@ class IdsimIDCEvaluator(Evaluator):
 
         context = allowable_context_list[allowable_ref_index_list.index(
             new_selected_path_index)]
-        context_full = allowable_context_full_list[allowable_ref_index_list.index(
-            new_selected_path_index)]
         obs = allowable_obs_list[allowable_ref_index_list.index(
             new_selected_path_index)]
         action = allowable_action_list[allowable_ref_index_list.index(
@@ -249,22 +235,23 @@ class IdsimIDCEvaluator(Evaluator):
                 t = torch.tensor(idsim_context.i).int()
             )
         )
+        idsim_context = stack_samples([idsim_context])
         model_obs = self.env.model.observe(idsim_context)
         with torch.no_grad():
             if self.PATH_SELECTION_EVIDENCE == "loss":
-                action = self.networks.policy(model_obs)
+                action = self.networks.policy(model_obs)[0]
                 next_state = self.envmodel.get_next_state(state, action)
                 rewards = self.envmodel.idsim_model.reward_nn_state(
-                    context = get_idsimcontext(next_state, mode="batch", scenario=self.env_scenario),
-                    last_last_action = state.robot_state[..., -4:-2], # absolute action
-                    last_action = state.robot_state[..., -2:], # absolute action
-                    action = action # incremental action
+                    context=get_idsimcontext(State.stack([next_state]), mode="batch", scenario=self.env.scenario),
+                    last_last_action=next_state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
+                    last_action=next_state.robot_state[..., -2:].unsqueeze(0), # absolute action
+                    action=action.unsqueeze(0) # incremental action
                 )
                 value = rewards[0].item()
             else:
-                reward_tuple = None
+                rewards = None
                 value = self.networks.value(model_obs).item()
-        return value, idsim_context, model_obs, action, reward_tuple
+        return value, idsim_context, model_obs, action, rewards
 
     def run_an_episode(self, iteration, render=False, batch=0, episode=0):
         if self.print_iteration != iteration:
@@ -333,21 +320,6 @@ class IdsimIDCEvaluator(Evaluator):
                 idsim_context = CrossRoadContext.from_env(self.env, self.env.model_config, selected_path_index)
             elif self.env.scenario == "multilane":
                 idsim_context = MultiLaneContext.from_env(self.env, self.env.model_config, selected_path_index)
-            state = State(
-                robot_state=torch.concat([
-                    idsim_context.x.ego_state, 
-                    idsim_context.x.last_last_action, 
-                    idsim_context.x.last_action],
-                dim=-1),
-                context_state=idSimContextState(
-                    reference=idsim_context.p.ref_param, 
-                    constraint=idsim_context.p.sur_param,
-                    light_param=idsim_context.p.light_param, 
-                    ref_index_param=idsim_context.p.ref_index_param,
-                    real_t = torch.tensor(idsim_context.t).int(),
-                    t = torch.tensor(idsim_context.i).int()
-                )
-            )
             idsim_context = stack_samples([idsim_context])
             obs = self.env.model.observe(idsim_context)
 
@@ -358,6 +330,15 @@ class IdsimIDCEvaluator(Evaluator):
             next_obs, reward, done, next_info = self.env.step(action)
             eval_result.obs_list.append(obs)
             eval_result.action_list.append(action)
+
+            eval_result.ego_state_list.append(
+                idsim_context.x.ego_state.squeeze().numpy())
+            eval_result.reference_list.append(
+                idsim_context.p.ref_param.squeeze().numpy())
+            eval_result.surr_state_list.append(
+                idsim_context.p.sur_param.squeeze().numpy())
+            eval_result.time_stamp_list.append(idsim_context.t.item())
+            eval_result.selected_path_index_list.append(selected_path_index)
             for k, v in eval_result.reward_info.items():
                 eval_result.reward_info[k].append(next_info['reward_details'][k])
             obs = next_obs
