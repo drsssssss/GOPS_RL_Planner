@@ -1,6 +1,6 @@
 import argparse
 import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import numpy as np
@@ -31,7 +31,8 @@ class IdsimTestEvaluator(Evaluator):
         log_policy_dir: str,
         trained_policy_iteration: str,
         num_eval_episode: int,
-        is_render: bool
+        is_render: bool = False,
+        env_seed: Optional[int] = None,
     ):
         log_policy_dir = os.path.join(gops_path, log_policy_dir)
         self.trained_policy_iteration = trained_policy_iteration
@@ -40,10 +41,12 @@ class IdsimTestEvaluator(Evaluator):
         args = self.__load_args(log_policy_dir)
         args.update({
             "num_eval_episode": num_eval_episode,
-            "is_render": is_render
+            "is_render": is_render,
         })
         args['env_config']['use_multiple_path_for_multilane'] = False
         args["env_config"]["use_render"] = is_render
+        if env_seed is not None:
+            args["env_config"]["seed"] = env_seed
         super().__init__(index=0, **args)
 
         # load network
