@@ -6,7 +6,7 @@
 #  Description: Evaluator for IDSim when test
 #  Update Date: 2023-12-14, Guojian Zhan: create this file
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, NamedTuple
 import json
 import numpy as np
 import torch
@@ -51,6 +51,10 @@ def get_allowable_ref_list(cur_index, lane_list):
         else:
             return [cur_index - 1, cur_index, cur_index + 1]
 
+class IDCConfig(NamedTuple):
+    lane_change_cooldown: int = 30
+    lane_change_channeling: int = 10
+
 class EvalResult:
     def __init__(self):
         self.map_path: str = None
@@ -58,7 +62,7 @@ class EvalResult:
         self.ego_id: str = None
         self.ego_route: Tuple = None
         self.time_stamp_list: List[float] = []
-        self.ego_state_list: List[np.ndarray] = []
+        self.ego_state_list: List[np.ndarray] = [] # x, y, vx, vy, phi, r
         self.reference_list: List[np.ndarray] = []
         self.surr_state_list: List[np.ndarray] = []
         self.surrounding_vehicles: List[SurroundingVehicle] = []
@@ -70,8 +74,9 @@ class EvalResult:
         self.reward_list: List[float] = []
         ## IDC
         self.selected_path_index_list: List[int] = []
+        self.optimal_path_index_list: List[int] = []
         self.paths_value_list: List[List[float]] = []
-        self.ref_allowable: List[List[float]] = []
+        self.ref_allowable: List[List[bool]] = []
         self.lane_change_step: List[int] = []
         self.lc_cd: List[int] = []
         self.lc_cl: List[int] = []
@@ -98,6 +103,7 @@ class IdsimIDCEvaluator(Evaluator):
         self.IDC_MODE = self.kwargs.get("IDC_MODE", False)
         if self.IDC_MODE:
             self.PATH_SELECTION_EVIDENCE = self.kwargs["PATH_SELECTION_EVIDENCE"]
+            self.idc_config = IDCConfig()
         self.eval_PODAR = self.kwargs.get("eval_PODAR", False)
         self.num_eval_episode = self.kwargs["num_eval_episode"]
         self.eval_save = self.kwargs.get("eval_save", True)
@@ -132,6 +138,7 @@ class IdsimIDCEvaluator(Evaluator):
             value, context, obs, action, reward_tuple = self.eval_ref_by_index(
                 ref_index)
             if ref_index == selected_path_index:
+                # TODO: add value
                 value += 100.
             collision_flag = reward_tuple[-1]
             collision = collision_flag.sum().item() > 0
@@ -250,7 +257,7 @@ class IdsimIDCEvaluator(Evaluator):
                 value = rewards[0].item()
             else:
                 rewards = None
-                value = self.networks.value(model_obs).item()
+                value = self.networks.v(model_obs).item()
         return value, idsim_context, model_obs, action, rewards
 
     def run_an_episode(self, iteration, render=False, batch=0, episode=0):
@@ -330,6 +337,7 @@ class IdsimIDCEvaluator(Evaluator):
             next_obs, reward, done, next_info = self.env.step(action)
             eval_result.obs_list.append(obs)
             eval_result.action_list.append(action)
+            eval_result.action_real_list.append(next_info['state'].robot_state[..., -2:])
 
             eval_result.ego_state_list.append(
                 idsim_context.x.ego_state.squeeze().numpy())
