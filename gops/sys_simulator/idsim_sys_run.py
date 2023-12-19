@@ -1,6 +1,6 @@
 import argparse
 import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import numpy as np
@@ -31,7 +31,8 @@ class IdsimTestEvaluator(Evaluator):
         log_policy_dir: str,
         trained_policy_iteration: str,
         num_eval_episode: int,
-        is_render: bool
+        is_render: bool = False,
+        env_seed: Optional[int] = None,
     ):
         log_policy_dir = os.path.join(gops_path, log_policy_dir)
         self.trained_policy_iteration = trained_policy_iteration
@@ -40,13 +41,12 @@ class IdsimTestEvaluator(Evaluator):
         args = self.__load_args(log_policy_dir)
         args.update({
             "num_eval_episode": num_eval_episode,
-            "is_render": is_render
+            "is_render": is_render,
         })
-        # args['env_config']['use_multiple_path_for_multilane'] = False
-
-        args["env_config"]["reference_selector"] = 1
+        args['env_config']['use_multiple_path_for_multilane'] = False
         args["env_config"]["use_render"] = is_render
-        args['env_config']["scenario_root"] = r"D:\Develop\\map\idsim-multilane-v10"
+        if env_seed is not None:
+            args["env_config"]["seed"] = env_seed
         super().__init__(index=0, **args)
 
         # load network
@@ -57,8 +57,9 @@ class IdsimTestEvaluator(Evaluator):
         path = os.path.join(os.path.dirname(__file__), "..", "..", "figures")
         path = os.path.abspath(path)
         self.save_path = os.path.join(
-            log_policy_dir,
-            "simulation-" + datetime.datetime.now().strftime("%y%m%d-%H%M%S")+ "-iter-" + trained_policy_iteration,
+            path,
+            args["env_id"] + "-" + args["algorithm"] + "-" + args["env_scenario"],
+            datetime.datetime.now().strftime("%y%m%d-%H%M%S"),
         )
         os.makedirs(self.save_path, exist_ok=True)
 

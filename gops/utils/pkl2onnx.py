@@ -103,11 +103,15 @@ class _InferenceHelper_Policy_DSAC(nn.Module):
         return mean
     
 class _InferenceHelper_Q_DSAC(nn.Module):
-    def __init__(self, model):
+    def __init__(self, model, act_dim):
         super().__init__()
         self.model = model
+        self.act_dim = act_dim
 
-    def forward(self, obs: torch.Tensor, act: torch.Tensor):
+
+    def forward(self, obs_act: torch.Tensor):
+        obs  = obs_act[:,0:-act_dim]
+        act = obs_act[:,-act_dim:]
         logits = self.model(obs,act)
         mean ,_ = torch.chunk(logits,2,-1)
         return mean
@@ -163,14 +167,20 @@ def DSAC_policy_export_onnx_model(networks, input_dim, policy_dir):
     torch.onnx.export(model, example, output_onnx_model, input_names=['input'], output_names=['output'],
                           opset_version=11)
 
-def DSAC_Q_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir):
+def DSAC_Q1_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir):
 
-    example_obs = torch.rand(1, input_dim_obs)  # network input dim
-    
-    example_act = torch.rand(1, input_dim_act)  # network input dim
+    example_obs_act = torch.rand(1, input_dim_obs+input_dim_act)  # network input dim
     output_onnx_model = policy_dir
-    model = _InferenceHelper_Q_DSAC(networks.q1)
-    torch.onnx.export(model, (example_obs,example_act), output_onnx_model, input_names=['input1','input2'], output_names=['output'],
+    model = _InferenceHelper_Q_DSAC(networks.q,input_dim_act)
+    torch.onnx.export(model, example_obs_act, output_onnx_model, input_names=['input'], output_names=['output'],
+                          opset_version=11)
+
+def DSAC_Q2_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir):
+
+    example_obs_act = torch.rand(1, input_dim_obs+input_dim_act)  # network input dim
+    output_onnx_model = policy_dir
+    model = _InferenceHelper_Q_DSAC(networks.q2,input_dim_act)
+    torch.onnx.export(model, example_obs_act, output_onnx_model, input_names=['input'], output_names=['output'],
                           opset_version=11)
 
 
@@ -178,7 +188,7 @@ def DSAC_Q_export_onnx_model(networks, input_dim_obs, input_dim_act,policy_dir):
 if __name__=='__main__':
 
     # Load trained policy
-    log_policy_dir = "../../results/pyth_idsim/FHADP2_231209-162345-only-tracking"
+    log_policy_dir = "/home/gaojiaxin/gops/results/pyth_idsim/DSAC_231216-160828"
     args = __load_args(log_policy_dir)
     alg_name = args["algorithm"]
     alg_file_name = alg_name.lower()
@@ -187,18 +197,28 @@ if __name__=='__main__':
     networks = ApproxContainer(**args)
 
     # Load trained policy
-    log_path = log_policy_dir + "/apprfunc/apprfunc_{}.pkl".format(40000)  # network position
+    log_path = log_policy_dir + "/apprfunc/apprfunc_{}.pkl".format(300000)  # network position
     networks.load_state_dict(torch.load(log_path))
     networks.eval()
 
     # create onnx model
     ### example of deterministic policy FHADP algorithm
-    policy_input_dim = 202
-    value_input_dim = 202
+    # input_dim = 202
+    # policy_dir = '../../transform_onnx_network/idsim_policy.onnx'
+    # value_dir = '../../transform_onnx_network/idsim_value.onnx'
+    # fhadp2_policy_export_onnx_model(networks, input_dim, policy_dir)
+    # deterministic_value_export_onnx_model(networks, input_dim, value_dir)
+
+    # DSAC
+    obs_dim = 170
+    act_dim = 2
     policy_dir = '../../transform_onnx_network/idsim_policy.onnx'
-    value_dir = '../../transform_onnx_network/idsim_value.onnx'
-    fhadp2_policy_export_onnx_model(networks, policy_input_dim, policy_dir)
-    deterministic_value_export_onnx_model(networks, value_input_dim, value_dir)
+    Q1_dir = '../../transform_onnx_network/idsim_DSAC_Q1.onnx'
+    Q2_dir = '../../transform_onnx_network/idsim_DSAC_Q2.onnx'
+    DSAC_policy_export_onnx_model(networks, obs_dim, policy_dir)
+    DSAC_Q1_export_onnx_model(networks, obs_dim, act_dim, Q1_dir)
+    # DSAC_Q2_export_onnx_model(networks, obs_dim, act_dim, act_dim)
+
 
 
     # ### example of stochastic policy sac algorithm
@@ -208,21 +228,21 @@ if __name__=='__main__':
 
     # load onnx model for test
     ### example of deterministic policy FHADP algorithm
-    ort_session_policy = ort.InferenceSession("../../transform_onnx_network/idsim_policy.onnx")
-    example_policy = np.random.randn(202).astype(np.float32)
-    inputs_policy = {ort_session_policy.get_inputs()[0].name: example_policy}
-    outputs_policy = ort_session_policy.run(None, inputs_policy)
-    print(outputs_policy[0])
-    action = networks.policy(torch.tensor(example_policy).unsqueeze(0))
-    print(action[0])
+    # ort_session_policy = ort.InferenceSession("../../transform_onnx_network/idsim_policy.onnx")
+    # example_policy = np.random.randn(202).astype(np.float32)
+    # inputs_policy = {ort_session_policy.get_inputs()[0].name: example_policy}
+    # outputs_policy = ort_session_policy.run(None, inputs_policy)
+    # print(outputs_policy[0])
+    # action = networks.policy(torch.tensor(example_policy).unsqueeze(0))
+    # print(action[0])
 
-    ort_session_value = ort.InferenceSession("../../transform_onnx_network/idsim_value.onnx")
-    example_value = np.random.randn(1, 202).astype(np.float32)
-    inputs_value = {ort_session_value.get_inputs()[0].name: example_value}
-    outputs_value = ort_session_value.run(None, inputs_value)
-    print(outputs_value[0])
-    value = networks.v(torch.tensor(example_value))
-    print(value)
+    # ort_session_value = ort.InferenceSession("../../transform_onnx_network/idsim_value.onnx")
+    # example_value = np.random.randn(1, 202).astype(np.float32)
+    # inputs_value = {ort_session_value.get_inputs()[0].name: example_value}
+    # outputs_value = ort_session_value.run(None, inputs_value)
+    # print(outputs_value[0])
+    # value = networks.v(torch.tensor(example_value))
+    # print(value)
 
     # ### example of stochastic policy sac algorithm
     # ort_session = ort.InferenceSession("../../transform_onnx_network/network_sac_ziqing.onnx")
@@ -233,3 +253,22 @@ if __name__=='__main__':
     # action = networks.policy(torch.tensor(example1))
     # act_dist = model.get_act_dist(action).mode()
     # print(act_dist)
+
+    # ### example of DSAC algorithm
+    ort_session_policy = ort.InferenceSession(policy_dir)
+    example_policy = np.random.randn(1,obs_dim).astype(np.float32)
+    inputs_policy = {ort_session_policy.get_inputs()[0].name: example_policy}
+    outputs_policy = ort_session_policy.run(None, inputs_policy)
+    print(outputs_policy[0])
+    logits = networks.policy(torch.tensor(example_policy).unsqueeze(0))
+    action,_ = torch.chunk(logits,2,-1) 
+    action = torch.tanh(action)
+    print(action)
+
+    ort_session_value = ort.InferenceSession(Q1_dir)
+    example_obs_act = np.random.randn(1, obs_dim+act_dim).astype(np.float32)
+    inputs_value = {ort_session_value.get_inputs()[0].name: example_obs_act,} 
+    outputs_value = ort_session_value.run(None, inputs_value)
+    print(outputs_value[0])
+    value = networks.q(torch.tensor(example_obs_act)[:,:-act_dim],torch.tensor(example_obs_act)[:,-act_dim:])
+    print(value)
