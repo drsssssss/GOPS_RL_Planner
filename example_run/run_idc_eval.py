@@ -39,7 +39,9 @@ if __name__ == "__main__":
     args['IDC_MODE'] = True
     args['record_loss'] = True
     args["PATH_SELECTION_EVIDENCE"] = 'loss' # 'loss' or 'value'
+    args['PATH_SELECTION_DIFF_THRESHOLD'] = 0.5 # preference for current lane
     args['env_config']['max_steps'] = 2000
+    args['env_config']['use_multiple_path_for_multilane'] = False
     args['env_config']['num_scenarios'] = num_scenarios = 4
     args['env_config']['scenario_reuse'] = scenario_reuse = 5
     args['env_config']['scenario_root'] = scenario_root
