@@ -104,6 +104,7 @@ class IdsimIDCEvaluator(Evaluator):
         if self.IDC_MODE:
             self.PATH_SELECTION_EVIDENCE = self.kwargs["PATH_SELECTION_EVIDENCE"]
             self.idc_config = IDCConfig()
+            self.PATH_SELECTION_DIFF_THRESHOLD = self.kwargs["PATH_SELECTION_DIFF_THRESHOLD"]
         self.eval_PODAR = self.kwargs.get("eval_PODAR", False)
         self.num_eval_episode = self.kwargs["num_eval_episode"]
         self.eval_save = self.kwargs.get("eval_save", True)
@@ -138,8 +139,7 @@ class IdsimIDCEvaluator(Evaluator):
             value, context, obs, action, reward_tuple = self.eval_ref_by_index(
                 ref_index)
             if ref_index == selected_path_index:
-                # TODO: add value
-                value += 100.
+                value += self.PATH_SELECTION_DIFF_THRESHOLD
             collision_flag = reward_tuple[-1]
             collision = collision_flag.sum().item() > 0
             allowable_ref_value.append(value)
@@ -334,17 +334,18 @@ class IdsimIDCEvaluator(Evaluator):
             action_distribution = self.networks.create_action_distributions(logits)
             action = action_distribution.mode()
             action = action.detach().numpy()[0]
+            self.env.set_ref_index(selected_path_index)
             next_obs, reward, done, next_info = self.env.step(action)
             eval_result.obs_list.append(obs)
             eval_result.action_list.append(action)
             eval_result.action_real_list.append(next_info['state'].robot_state[..., -2:])
 
             eval_result.ego_state_list.append(
-                idsim_context.x.ego_state.squeeze().numpy())
+            idsim_context.x.ego_state.squeeze(0).numpy())
             eval_result.reference_list.append(
-                idsim_context.p.ref_param.squeeze().numpy())
+            idsim_context.p.ref_param.squeeze(0).numpy())
             eval_result.surr_state_list.append(
-                idsim_context.p.sur_param.squeeze().numpy())
+            idsim_context.p.sur_param.squeeze(0).numpy())
             eval_result.time_stamp_list.append(idsim_context.t.item())
             eval_result.selected_path_index_list.append(selected_path_index)
             for k, v in eval_result.reward_info.items():
@@ -363,6 +364,7 @@ class IdsimIDCEvaluator(Evaluator):
             if render:
                 self.env.render()
             eval_result.reward_list.append(reward)
+            episode_step += 1
         episode_return = sum(eval_result.reward_list)
         idsim_tb_eval_dict["total_avg_return"] = episode_return
         if self.eval_save:
