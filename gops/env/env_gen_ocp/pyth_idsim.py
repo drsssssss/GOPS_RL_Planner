@@ -51,24 +51,34 @@ class idSimEnv(CrossRoad, Env):
         # get observation_space
         self.model = IdSimModel(env_config, model_config)
         obs_dim = self.model.obs_dim
+        self.use_random_ref_param = env_config.use_multiple_path_for_multilane
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
         self.context = idSimContext() # fake idsim context
         self.set_scenario(scenario)
+        self.ref_index = None
     
     def reset(self) -> Tuple[np.ndarray, dict]:
         obs, info = super(idSimEnv, self).reset()
-        self._get_state_from_idsim()
+        self.ref_index = np.random.choice(
+            np.arange(self.model_config.num_ref_lines)
+        ) if self.use_random_ref_param else None
+        self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         return self._get_obs(), self._get_info(info)
     
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
-        self._get_state_from_idsim()
-        reward_from_model, reward_details = self._get_reward(action)
+        if np.random.rand() < 0.01 and self.use_random_ref_param:
+            self.ref_index = np.random.choice(np.arange(self.model_config.num_ref_lines))
+
+        reward_model, reward_details = self._get_reward(action)
         info["reward_details"] = dict(
             zip(reward_tags, [i.item() for i in reward_details])
         )
         done = terminated or truncated
         return self._get_obs(), reward, done, self._get_info(info)
+
+    def set_ref_index(self, ref_index: int):
+        self.ref_index = ref_index
     
     def _get_info(self, info) -> dict:
         info.update(Env._get_info(self))
@@ -80,14 +90,15 @@ class idSimEnv(CrossRoad, Env):
         model_obs = self.model.observe(idsim_context)
         return model_obs.numpy().squeeze(0)
 
-    def _get_reward(self, action: np.ndarray) -> float:
-        torch_state = self._state.array2tensor()
-        idsim_context = get_idsimcontext(State.stack([torch_state]), mode="batch", scenario=self.scenario)
+    def _get_reward(self, action: np.ndarray) -> Tuple[float, Tuple]:
+        cur_state = self._state.array2tensor()
+        next_state = self._get_state_from_idsim(ref_index_param=self.ref_index).array2tensor()
+        idsim_context = get_idsimcontext(State.stack([next_state]), mode="batch", scenario=self.scenario)
         action = torch.tensor(action)
         reward_details = self.model.reward_nn_state(
             context=idsim_context,
-            last_last_action=torch_state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
-            last_action=torch_state.robot_state[..., -2:].unsqueeze(0), # absolute action
+            last_last_action=cur_state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
+            last_action=cur_state.robot_state[..., -2:].unsqueeze(0), # absolute action
             action=action.unsqueeze(0) # incremental action
         )
         return reward_details[0].item(), reward_details
@@ -104,7 +115,7 @@ class idSimEnv(CrossRoad, Env):
         else:
             raise NotImplementedError
 
-        self._state = State(
+        return State(
             robot_state=torch.concat([
                 idsim_context.x.ego_state, 
                 idsim_context.x.last_last_action, 
@@ -118,8 +129,7 @@ class idSimEnv(CrossRoad, Env):
                 real_t = torch.tensor(idsim_context.t).int(),
                 t = torch.tensor(idsim_context.i).int()
             )
-        )
-        self._state = self._state.tensor2array()
+        ).tensor2array()
 
     # def get_state_from_idsim(self, ref_index_param=None) -> State:
     #     self._get_state_from_idsim(ref_index_param=ref_index_param)
