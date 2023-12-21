@@ -71,6 +71,8 @@ class idSimEnv(CrossRoad, Env):
             self.ref_index = np.random.choice(np.arange(self.model_config.num_ref_lines))
 
         reward_model, reward_details = self._get_reward(action)
+
+        self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         info["reward_details"] = dict(
             zip(reward_tags, [i.item() for i in reward_details])
         )
