@@ -317,7 +317,7 @@ class AnimationCross(AnimationBase):
                 # )
 
             # save ax as png
-            fig.savefig('testc.png')
+            # fig.savefig('testc.png')
             # exit(0)
 
             writer.grab_frame()

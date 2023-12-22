@@ -182,7 +182,7 @@ class AnimationLane(AnimationBase):
                 max_value=max_value,
                 zorder=3,
             )
-            fig.savefig('test.png')
+            # fig.savefig('test.png')
             # exit(0)
 
             writer.grab_frame()
