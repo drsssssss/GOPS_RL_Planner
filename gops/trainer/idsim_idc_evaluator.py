@@ -124,7 +124,7 @@ class IdsimIDCEvaluator(Evaluator):
                      eval_result: EvalResult):
         cur_index, lane_list = idc_env_info
 
-        paths_value_list = [0] * len(lane_list)
+        paths_value_list = [0.] * len(lane_list)
         ref_allowable = [False] * len(lane_list)
         allowable_ref_index_list = get_allowable_ref_list(cur_index, lane_list)
         if selected_path_index not in allowable_ref_index_list:
@@ -136,14 +136,10 @@ class IdsimIDCEvaluator(Evaluator):
         allowable_obs_list = []
         allowable_action_list = []
         for ref_index in allowable_ref_index_list:
-            value, context, obs, action, reward_tuple = self.eval_ref_by_index(
-                ref_index)
+            value, context, obs, action = self.eval_ref_by_index(ref_index)
             if ref_index == selected_path_index:
                 value += self.PATH_SELECTION_DIFF_THRESHOLD
-            collision_flag = reward_tuple[-1]
-            collision = collision_flag.sum().item() > 0
             allowable_ref_value.append(value)
-            allowable_ref_safe.append(not collision)
             allowable_context_list.append(context)
             allowable_obs_list.append(obs)
             allowable_action_list.append(action[:2])
@@ -152,7 +148,7 @@ class IdsimIDCEvaluator(Evaluator):
         optimal_path_in_allowable = allowable_ref_index_list.index(optimal_path_index)
         optimal_value = allowable_ref_value[optimal_path_in_allowable]
         for i, ref_index in enumerate(allowable_ref_index_list):
-            if allowable_ref_safe[i] and allowable_ref_value[i] > optimal_value:
+            if allowable_ref_value[i] > optimal_value:
                 optimal_path_index = ref_index
                 optimal_value = allowable_ref_value[i]
 
@@ -243,22 +239,26 @@ class IdsimIDCEvaluator(Evaluator):
             )
         )
         idsim_context = stack_samples([idsim_context])
-        model_obs = self.env.model.observe(idsim_context)
+        model_obs = self.envmodel.idsim_model.observe(idsim_context)
+        info = {'state': State.stack([state])}
+        d = torch.tensor([0.])
+
         with torch.no_grad():
             if self.PATH_SELECTION_EVIDENCE == "loss":
-                action = self.networks.policy(model_obs)[0]
-                next_state = self.envmodel.get_next_state(state, action)
-                rewards = self.envmodel.idsim_model.reward_nn_state(
-                    context=get_idsimcontext(State.stack([next_state]), mode="batch", scenario=self.env.scenario),
-                    last_last_action=next_state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
-                    last_action=next_state.robot_state[..., -2:].unsqueeze(0), # absolute action
-                    action=action.unsqueeze(0) # incremental action
-                )
-                value = rewards[0].item()
+                if self.kwargs['algorithm'] == 'FHADP2':
+                    a_full = self.networks.policy.forward_all_policy(model_obs)
+                v_pi = torch.tensor([0.])
+                for step in range(self.envmodel.idsim_model.N):
+                    if self.kwargs['algorithm'] == 'FHADP2':
+                        a = a_full[:, step] # [B, 2]
+                    if step == 0:
+                        action = a_full[0, 0] # [2]
+                    model_obs, r, d, info = self.envmodel.forward(model_obs, a, d, info)
+                    v_pi += r
+                value = v_pi.item()
             else:
-                rewards = None
                 value = self.networks.v(model_obs).item()
-        return value, idsim_context, model_obs, action, rewards
+        return value, idsim_context, model_obs, action
 
     def run_an_episode(self, iteration, render=False, batch=0, episode=0):
         if self.print_iteration != iteration:
@@ -285,9 +285,6 @@ class IdsimIDCEvaluator(Evaluator):
             lane_list = env_context.scenario.network.get_edge_lanes(
                 vehicle.edge, vehicle.v_class)
             cur_index = lane_list.index(vehicle.lane)
-            reference_list = [env_context.scenario.network.get_lane_center_line(
-                lane) for lane in lane_list]
-            reference_info_list = vehicle.reference_info_list * 3
             lc_cd, lc_cl = 0, 0
             last_optimal_path_index = cur_index
             selected_path_index = cur_index
