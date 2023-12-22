@@ -52,6 +52,12 @@ class idSimEnv(CrossRoad, Env):
         self.model = IdSimModel(env_config, model_config)
         obs_dim = self.model.obs_dim
         self.use_random_ref_param = env_config.use_multiple_path_for_multilane
+        self.random_ref_probability = env_config.random_ref_probability
+        if self.random_ref_probability > 0.0:
+            print(f'INFO: randomly choosing reference when resetting env')
+        if self.random_ref_probability > 0.0:
+            print(f'INFO: randomly choosing reference when stepping at P={self.random_ref_probability}')
+
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
         self.context = idSimContext() # fake idsim context
         self.set_scenario(scenario)
@@ -67,7 +73,7 @@ class idSimEnv(CrossRoad, Env):
     
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
-        if np.random.rand() < 0.01 and self.use_random_ref_param:
+        if self.use_random_ref_param and np.random.rand() < self.random_ref_probability :
             self.ref_index = np.random.choice(np.arange(self.model_config.num_ref_lines))
 
         reward_model, reward_details = self._get_reward(action)

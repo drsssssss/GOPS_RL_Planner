@@ -115,7 +115,7 @@ class IdsimIDCEvaluator(Evaluator):
                 torch.load(self.kwargs["ini_network_dir"]))
     
     def idc_decision(self,
-                     idc_env_info: Tuple[int, List[str], List[List[float]], List[List[float]]],
+                     idc_env_info: Tuple,
                      last_optimal_path_index: int,
                      selected_path_index: int,
                      episode_step: int,
@@ -124,35 +124,25 @@ class IdsimIDCEvaluator(Evaluator):
                      eval_result: EvalResult):
         cur_index, lane_list = idc_env_info
 
-        paths_value_list = [0] * len(lane_list)
+        paths_value_list = [0.] * len(lane_list)
         ref_allowable = [False] * len(lane_list)
         allowable_ref_index_list = get_allowable_ref_list(cur_index, lane_list)
         if selected_path_index not in allowable_ref_index_list:
             allowable_ref_index_list.append(selected_path_index)
         allowable_ref_value = []
-        allowable_ref_safe = []
-        # cal value and safe for allowable ref
         allowable_context_list = []
-        allowable_obs_list = []
-        allowable_action_list = []
         for ref_index in allowable_ref_index_list:
-            value, context, obs, action, reward_tuple = self.eval_ref_by_index(
-                ref_index)
+            value, context = self.eval_ref_by_index(ref_index)
             if ref_index == selected_path_index:
                 value += self.PATH_SELECTION_DIFF_THRESHOLD
-            collision_flag = reward_tuple[-1]
-            collision = collision_flag.sum().item() > 0
             allowable_ref_value.append(value)
-            allowable_ref_safe.append(not collision)
             allowable_context_list.append(context)
-            allowable_obs_list.append(obs)
-            allowable_action_list.append(action[:2])
         # find optimal path: safe and max value, default selected path
         optimal_path_index = selected_path_index
         optimal_path_in_allowable = allowable_ref_index_list.index(optimal_path_index)
         optimal_value = allowable_ref_value[optimal_path_in_allowable]
         for i, ref_index in enumerate(allowable_ref_index_list):
-            if allowable_ref_safe[i] and allowable_ref_value[i] > optimal_value:
+            if allowable_ref_value[i] > optimal_value:
                 optimal_path_index = ref_index
                 optimal_value = allowable_ref_value[i]
 
@@ -161,6 +151,7 @@ class IdsimIDCEvaluator(Evaluator):
             lc_cd += 1
             lc_cl = 0
         else:
+            print(f'Lane Changing: {selected_path_index} -> {optimal_path_index}')
             if selected_path_index not in allowable_ref_index_list:
                 print("selected path not in allowable ref")
                 print("selected_path_index", selected_path_index)
@@ -171,44 +162,32 @@ class IdsimIDCEvaluator(Evaluator):
                 print("ego_state_full", eval_result.ego_state_list)
                 print("ego_state", self.env.engine.context.vehicle.state)
                 print(eval_result.selected_path_index_list)
-            selected_path_in_allowable = allowable_ref_index_list.index(
-                selected_path_index)
-            selected_ref_safe = allowable_ref_safe[selected_path_in_allowable]
-            if not selected_ref_safe:
-                # emergency
-                new_selected_path_index = optimal_path_index
-                lc_cd = 0
+            if lc_cd < self.idc_config.lane_change_cooldown:
+                print(f'    [Shutdown] lc_cd={lc_cd}<{self.idc_config.lane_change_cooldown}')
+                new_selected_path_index = selected_path_index
+                lc_cd += 1
                 lc_cl = 0
             else:
-                if lc_cd < self.idc_config.lane_change_cooldown:
+                if not optimal_path_index == last_optimal_path_index:
                     new_selected_path_index = selected_path_index
                     lc_cd += 1
                     lc_cl = 0
                 else:
-                    if not optimal_path_index == last_optimal_path_index:
+                    if lc_cl < self.idc_config.lane_change_channeling:
                         new_selected_path_index = selected_path_index
                         lc_cd += 1
-                        lc_cl = 0
+                        lc_cl += 1
                     else:
-                        if lc_cl < self.idc_config.lane_change_channeling:
-                            new_selected_path_index = selected_path_index
-                            lc_cd += 1
-                            lc_cl += 1
-                        else:
-                            new_selected_path_index = optimal_path_index
-                            lc_cd = 0
-                            lc_cl = 0
+                        print(f'    [Success] {selected_path_index} -> {optimal_path_index}')
+                        new_selected_path_index = optimal_path_index
+                        lc_cd = 0
+                        lc_cl = 0
 
         for i, ref_index in enumerate(allowable_ref_index_list):
             paths_value_list[ref_index] = allowable_ref_value[i]
             ref_allowable[ref_index] = True
 
-        context = allowable_context_list[allowable_ref_index_list.index(
-            new_selected_path_index)]
-        obs = allowable_obs_list[allowable_ref_index_list.index(
-            new_selected_path_index)]
-        action = allowable_action_list[allowable_ref_index_list.index(
-            new_selected_path_index)]
+        context = allowable_context_list[allowable_ref_index_list.index(new_selected_path_index)]
 
         # save
         eval_result.lc_cl.append(lc_cl)
@@ -219,8 +198,7 @@ class IdsimIDCEvaluator(Evaluator):
         if new_selected_path_index != selected_path_index:
             eval_result.lane_change_step.append(episode_step)
 
-        return optimal_path_index, new_selected_path_index, lc_cd, lc_cl, \
-            context, obs, action
+        return optimal_path_index, new_selected_path_index, lc_cd, lc_cl
 
     def eval_ref_by_index(self, index):
         if self.env.scenario == "crossroad":
@@ -243,22 +221,25 @@ class IdsimIDCEvaluator(Evaluator):
             )
         )
         idsim_context = stack_samples([idsim_context])
-        model_obs = self.env.model.observe(idsim_context)
+        model_obs = self.envmodel.idsim_model.observe(idsim_context)
+        info = {'state': State.stack([state])}
+        d = torch.tensor([0.])
+
         with torch.no_grad():
             if self.PATH_SELECTION_EVIDENCE == "loss":
-                action = self.networks.policy(model_obs)[0]
-                next_state = self.envmodel.get_next_state(state, action)
-                rewards = self.envmodel.idsim_model.reward_nn_state(
-                    context=get_idsimcontext(State.stack([next_state]), mode="batch", scenario=self.env.scenario),
-                    last_last_action=next_state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
-                    last_action=next_state.robot_state[..., -2:].unsqueeze(0), # absolute action
-                    action=action.unsqueeze(0) # incremental action
-                )
-                value = rewards[0].item()
-            else:
-                rewards = None
+                assert self.kwargs['algorithm'] == 'FHADP2', "only FHADP2 is supported for using loss!"
+                a_full = self.networks.policy.forward_all_policy(model_obs)
+                v_pi = torch.tensor([0.])
+                for step in range(self.envmodel.idsim_model.N):
+                    a = a_full[:, step] # [B, 2]
+                    model_obs, r, d, info = self.envmodel.forward(model_obs, a, d, info)
+                    v_pi += r
+                value = v_pi.item()
+            elif self.PATH_SELECTION_EVIDENCE == "value":
                 value = self.networks.v(model_obs).item()
-        return value, idsim_context, model_obs, action, rewards
+            else:
+                raise NotImplementedError
+        return value, idsim_context
 
     def run_an_episode(self, iteration, render=False, batch=0, episode=0):
         if self.print_iteration != iteration:
@@ -285,9 +266,6 @@ class IdsimIDCEvaluator(Evaluator):
             lane_list = env_context.scenario.network.get_edge_lanes(
                 vehicle.edge, vehicle.v_class)
             cur_index = lane_list.index(vehicle.lane)
-            reference_list = [env_context.scenario.network.get_lane_center_line(
-                lane) for lane in lane_list]
-            reference_info_list = vehicle.reference_info_list * 3
             lc_cd, lc_cl = 0, 0
             last_optimal_path_index = cur_index
             selected_path_index = cur_index
@@ -300,6 +278,7 @@ class IdsimIDCEvaluator(Evaluator):
 
         episode_step = 0
         while not (done or info["TimeLimit.truncated"]):
+            # ----------- select path ------------
             if self.IDC_MODE:
                 # idc env info
                 if self.env.scenario == "multilane":
@@ -308,12 +287,10 @@ class IdsimIDCEvaluator(Evaluator):
                     cur_index = selected_path_index
                 idc_env_info = (cur_index, lane_list)
                 # idc decision
-                optimal_path_index, new_selected_path_index, lc_cd, lc_cl, \
-                    context, obs, action \
-                    = self.idc_decision(
-                        idc_env_info,
-                        last_optimal_path_index, selected_path_index,
-                            episode_step, lc_cd, lc_cl, eval_result)
+                optimal_path_index, new_selected_path_index, lc_cd, lc_cl = self.idc_decision(
+                    idc_env_info, last_optimal_path_index, selected_path_index,
+                    episode_step, lc_cd, lc_cl, eval_result
+                )
                 # update last_optimal_path_index
                 last_optimal_path_index = optimal_path_index
                 selected_path_index = new_selected_path_index
@@ -323,6 +300,7 @@ class IdsimIDCEvaluator(Evaluator):
                 else:
                     selected_path_index = 0
 
+            # ----------- get obs ------------
             if self.env.scenario == "crossroad":
                 idsim_context = CrossRoadContext.from_env(self.env, self.env.model_config, selected_path_index)
             elif self.env.scenario == "multilane":
@@ -330,12 +308,17 @@ class IdsimIDCEvaluator(Evaluator):
             idsim_context = stack_samples([idsim_context])
             obs = self.env.model.observe(idsim_context)
 
+            # ----------- get action ------------
             logits = self.networks.policy(obs)
             action_distribution = self.networks.create_action_distributions(logits)
             action = action_distribution.mode()
             action = action.detach().numpy()[0]
+
+            # ----------- step ------------
             self.env.set_ref_index(selected_path_index)
             next_obs, reward, done, next_info = self.env.step(action)
+
+            # ----------- save to list------------
             eval_result.obs_list.append(obs)
             eval_result.action_list.append(action)
             eval_result.action_real_list.append(next_info['state'].robot_state[..., -2:])
