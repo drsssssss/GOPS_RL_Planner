@@ -38,7 +38,7 @@ if __name__ == "__main__":
     parser.add_argument("--env_config", type=dict, default=get_idsim_env_config(env_scenario))
     parser.add_argument("--env_model_config", type=dict, default=get_idsim_model_config(env_scenario))
 
-    parser.add_argument("--algorithm", type=str, default="DSAC", help="RL algorithm")
+    parser.add_argument("--algorithm", type=str, default="DSACT", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
     parser.add_argument("--seed", default=1, help="seed")
 
@@ -98,10 +98,10 @@ if __name__ == "__main__":
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
     parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
-    parser.add_argument("--alpha_learning_rate", type=float, default=1e-4)
+    parser.add_argument("--alpha_learning_rate", type=float, default=3e-4)
     # special parameter
     parser.add_argument("--gamma", type=float, default=0.99)
-    parser.add_argument("--tau", type=float, default=0.05)
+    parser.add_argument("--tau", type=float, default=0.005)
     parser.add_argument("--auto_alpha", type=bool, default=True)
     parser.add_argument("--alpha", type=bool, default=0.2)
     parser.add_argument("--delay_update", type=int, default=2)
@@ -117,7 +117,7 @@ if __name__ == "__main__":
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
     # Maximum iteration number
-    parser.add_argument("--max_iteration", type=int, default=300000)
+    parser.add_argument("--max_iteration", type=int, default=1000000)
     parser.add_argument(
         "--ini_network_dir",
         type=str,
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     # 6. Parameters for evaluator
     parser.add_argument("--evaluator_name", type=str, default="idsim_train_evaluator")
     parser.add_argument("--num_eval_episode", type=int, default=20)
-    parser.add_argument("--eval_interval", type=int, default=2000)
+    parser.add_argument("--eval_interval", type=int, default=1000)
     parser.add_argument("--eval_save", type=str, default=False, help="save evaluation data")
 
     ################################################
