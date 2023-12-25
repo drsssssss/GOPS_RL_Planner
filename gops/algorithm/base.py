@@ -24,12 +24,16 @@ import torch
 class ApprBase(ABC, torch.nn.Module):
     """Base Class of Approximate function container"""
 
-    def __init__(self, **kwargs):
+    def __init__(self, kwargs):
         super().__init__()
         # Create a shared feature networks for value function and policy function
         if kwargs["cnn_shared"]:
             feature_args = get_apprfunc_dict("feature", **kwargs)
             kwargs["feature_net"] = create_apprfunc(**feature_args)
+        PI_shared = kwargs.get("PI_shared", False) # backward compatibility
+        if PI_shared:
+            pi_args = get_apprfunc_dict("pi_net", **kwargs)
+            kwargs["pi_net"] = create_apprfunc(**pi_args) 
 
     def init_scheduler(self, **kwargs):
         # self.optimizer_dict should be initialized in alg before calling this function

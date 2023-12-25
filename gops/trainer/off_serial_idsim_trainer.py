@@ -38,7 +38,9 @@ class OffSerialIdsimTrainer(OffSerialTrainer):
 
         # create center network
         self.networks = self.alg.networks
+        self.networks.eval()
         self.sampler.networks = self.networks
+
 
         # initialize center network
         if kwargs["ini_network_dir"] is not None:

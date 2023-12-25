@@ -47,6 +47,7 @@ class BaseSampler(metaclass=ABCMeta):
         self.env = create_env(**kwargs)
         _, self.env = set_seed(kwargs["trainer"], kwargs["seed"], index + 200, self.env)  #? seed here?
         self.networks = create_approx_contrainer(**kwargs)
+        self.networks.eval()
         self.noise_params = noise_params
         self.sample_batch_size = sample_batch_size
         if isinstance(self.env, VectorEnv):
