@@ -88,6 +88,12 @@ class EvalResult:
 class IdsimIDCEvaluator(Evaluator):
     def __init__(self, index=0, **kwargs):
         kwargs['env_config']['singleton_mode'] = 'invalidate'
+        kwargs.update({
+            "reward_scale": None,
+            "repeat_num": None,
+            "gym2gymnasium": False,
+            "vector_env_num": None,
+        })
         self.kwargs = kwargs
         # update env_config in kwargs
         env_config = {**self.kwargs['env_config'],
