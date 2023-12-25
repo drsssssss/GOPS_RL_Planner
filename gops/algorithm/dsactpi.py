@@ -14,7 +14,7 @@
 #  Update: 2021-03-05, Ziqing Gu: create DSAC algorithm
 #  Update: 2021-03-05, Wenxuan Wang: debug DSAC algorithm
 
-__all__=["ApproxContainer","DSACT"]
+__all__=["ApproxContainer","DSACTPI"]
 import time
 from copy import deepcopy
 from typing import Tuple
@@ -43,38 +43,55 @@ class ApproxContainer(ApprBase):
         q_args = get_apprfunc_dict("value", **kwargs)
         self.q1: nn.Module = create_apprfunc(**q_args)
         self.q2: nn.Module = create_apprfunc(**q_args)
+        self.pi_net = self.q1.pi_net
+        self.q2.pi_net = self.pi_net
+
+        
         self.q1_target = deepcopy(self.q1)
         self.q2_target = deepcopy(self.q2)
+        if kwargs["target_PI"]:
+            self.pi_net_target = deepcopy(self.pi_net)   # use target pi
+            self.q1_target.pi_net = self.pi_net_target
+            self.q2_target.pi_net = self.pi_net_target
+        else:
+            self.q1_target.pi_net = self.pi_net   # use online pi
+            self.q2_target.pi_net = self.pi_net
 
         # create policy network
         policy_args = get_apprfunc_dict("policy", **kwargs)
         self.policy: nn.Module = create_apprfunc(**policy_args)
+        self.policy.pi_net = self.pi_net
         self.policy_target = deepcopy(self.policy)
+        self.policy_target.pi_net = self.pi_net
 
         # set target network gradients
-        for p in self.policy_target.parameters():
+        for p in self.policy_target.ego_paras():
             p.requires_grad = False
-        for p in self.q1_target.parameters():
+        for p in self.q1_target.ego_paras():
             p.requires_grad = False
-        for p in self.q2_target.parameters():
+        for p in self.q2_target.ego_paras():
             p.requires_grad = False
+        if kwargs["target_PI"]:
+            for p in self.pi_net_target.parameters():
+                p.requires_grad = False
 
         # create entropy coefficient
         self.log_alpha = nn.Parameter(torch.tensor(1, dtype=torch.float32))
 
         # create optimizers
-        self.q1_optimizer = Adam(self.q1.parameters(), lr=kwargs["value_learning_rate"])
-        self.q2_optimizer = Adam(self.q2.parameters(), lr=kwargs["value_learning_rate"])
+        self.q1_optimizer = Adam(self.q1.ego_paras(), lr=kwargs["value_learning_rate"])
+        self.q2_optimizer = Adam(self.q2.ego_paras(), lr=kwargs["value_learning_rate"])
         self.policy_optimizer = Adam(
-            self.policy.parameters(), lr=kwargs["policy_learning_rate"]
+            self.policy.ego_paras(), lr=kwargs["policy_learning_rate"]
         )
+        self.pi_optimizer = Adam(self.pi_net.parameters(), lr=kwargs["pi_learning_rate"])
         self.alpha_optimizer = Adam([self.log_alpha], lr=kwargs["alpha_learning_rate"])
 
     def create_action_distributions(self, logits):
         return self.policy.get_act_dist(logits)
 
 
-class DSACT(AlgorithmBase):
+class DSACTPI(AlgorithmBase):
     """DSAC algorithm with three refinements, higher performance and more stable.
 
     Paper: https://arxiv.org/abs/2310.05858
@@ -100,6 +117,7 @@ class DSACT(AlgorithmBase):
         self.mean_std1= None
         self.mean_std2= None
         self.tau_b = kwargs.get("tau_b", self.tau)
+        self.target_PI = kwargs["target_PI"]
 
     @property
     def adjustable_parameters(self):
@@ -122,9 +140,10 @@ class DSACT(AlgorithmBase):
         tb_info = self.__compute_gradient(data, iteration)
 
         update_info = {
-            "q1_grad": [p._grad for p in self.networks.q1.parameters()],
-            "q2_grad": [p._grad for p in self.networks.q2.parameters()],
-            "policy_grad": [p._grad for p in self.networks.policy.parameters()],
+            "q1_grad": [p._grad for p in self.networks.q1.ego_paras()],
+            "q2_grad": [p._grad for p in self.networks.q2.ego_paras()],
+            "policy_grad": [p._grad for p in self.networks.policy.ego_paras()],
+             "pi_grad": [p._grad for p in self.networks.pi_net.parameters()],
             "iteration": iteration,
         }
         if self.auto_alpha:
@@ -137,12 +156,15 @@ class DSACT(AlgorithmBase):
         q1_grad = update_info["q1_grad"]
         q2_grad = update_info["q2_grad"]
         policy_grad = update_info["policy_grad"]
+        pi_grad = update_info["pi_grad"]
 
-        for p, grad in zip(self.networks.q1.parameters(), q1_grad):
+        for p, grad in zip(self.networks.q1.ego_paras(), q1_grad):
             p._grad = grad
-        for p, grad in zip(self.networks.q2.parameters(), q2_grad):
+        for p, grad in zip(self.networks.q2.ego_paras(), q2_grad):
             p._grad = grad
-        for p, grad in zip(self.networks.policy.parameters(), policy_grad):
+        for p, grad in zip(self.networks.policy.ego_paras(), policy_grad):
+            p._grad = grad
+        for p, grad in zip(self.networks.pi_net.parameters(), pi_grad):
             p._grad = grad
         if self.auto_alpha:
             self.networks.log_alpha._grad = update_info["log_alpha_grad"]
@@ -174,6 +196,7 @@ class DSACT(AlgorithmBase):
 
         self.networks.q1_optimizer.zero_grad()
         self.networks.q2_optimizer.zero_grad()
+        self.networks.pi_optimizer.zero_grad()
         loss_q, q1, q2, std1, std2, min_std1, min_std2 = self.__compute_loss_q(data)
         loss_q.backward()
 
@@ -234,12 +257,13 @@ class DSACT(AlgorithmBase):
             data["obs2"],
             data["done"],
         )
-        logits_2 = self.networks.policy_target(obs2)
-        act2_dist = self.networks.create_action_distributions(logits_2)
-        act2, log_prob_act2 = act2_dist.rsample()
+        with torch.no_grad():
+            logits_2 = self.networks.policy_target(obs2)
+            act2_dist = self.networks.create_action_distributions(logits_2)
+            act2, log_prob_act2 = act2_dist.rsample()
 
         q1, q1_std, _ = self.__q_evaluate(obs, act, self.networks.q1)
-        _, q1_std_target, _ = self.__q_evaluate(obs, act, self.networks.q1_target)
+
         q2, q2_std, _ = self.__q_evaluate(obs, act, self.networks.q2)
         if self.mean_std1 is None:
             self.mean_std1 = torch.mean(q1_std.detach())
@@ -251,16 +275,16 @@ class DSACT(AlgorithmBase):
         else:
             self.mean_std2 = (1 - self.tau_b) * self.mean_std2 + self.tau_b * torch.mean(q2_std.detach())
 
-
-        q1_next, _, q1_next_sample = self.__q_evaluate(
-            obs2, act2, self.networks.q1_target
-        )
-        
-        q2_next, _, q2_next_sample = self.__q_evaluate(
-            obs2, act2, self.networks.q2_target
-        )
-        q_next = torch.min(q1_next, q2_next)
-        q_next_sample = torch.where(q1_next < q2_next, q1_next_sample, q2_next_sample)
+        with torch.no_grad():
+            q1_next, _, q1_next_sample = self.__q_evaluate(
+                obs2, act2, self.networks.q1_target
+            )
+            
+            q2_next, _, q2_next_sample = self.__q_evaluate(
+                obs2, act2, self.networks.q2_target
+            )
+            q_next = torch.min(q1_next, q2_next)
+            q_next_sample = torch.where(q1_next < q2_next, q1_next_sample, q2_next_sample)
 
         target_q1, target_q1_bound = self.__compute_target_q(
             rew,
@@ -332,6 +356,7 @@ class DSACT(AlgorithmBase):
     def __update(self, iteration: int):
         self.networks.q1_optimizer.step()
         self.networks.q2_optimizer.step()
+        self.networks.pi_optimizer.step()
 
         if iteration % self.delay_update == 0:
             self.networks.policy_optimizer.step()
@@ -342,18 +367,26 @@ class DSACT(AlgorithmBase):
             with torch.no_grad():
                 polyak = 1 - self.tau
                 for p, p_targ in zip(
-                    self.networks.q1.parameters(), self.networks.q1_target.parameters()
+                    self.networks.q1.ego_paras(), self.networks.q1_target.ego_paras()
                 ):
                     p_targ.data.mul_(polyak)
                     p_targ.data.add_((1 - polyak) * p.data)
                 for p, p_targ in zip(
-                    self.networks.q2.parameters(), self.networks.q2_target.parameters()
+                    self.networks.q2.ego_paras(), self.networks.q2_target.ego_paras()
                 ):
                     p_targ.data.mul_(polyak)
                     p_targ.data.add_((1 - polyak) * p.data)
                 for p, p_targ in zip(
-                    self.networks.policy.parameters(),
-                    self.networks.policy_target.parameters(),
+                    self.networks.policy.ego_paras(),
+                    self.networks.policy_target.ego_paras(),
                 ):
                     p_targ.data.mul_(polyak)
                     p_targ.data.add_((1 - polyak) * p.data)
+
+                if self.target_PI:
+                    for p, p_targ in zip(
+                        self.networks.pi_net.parameters(),
+                        self.networks.pi_net_target.parameters(),
+                    ):
+                        p_targ.data.mul_(polyak)
+                        p_targ.data.add_((1 - polyak) * p.data)

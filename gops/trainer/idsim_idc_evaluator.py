@@ -247,7 +247,7 @@ class IdsimIDCEvaluator(Evaluator):
                     v_pi += r
                 value = v_pi.item()
             elif self.PATH_SELECTION_EVIDENCE == "value":
-                if self.kwargs['algorithm'] == "DSACT":
+                if self.kwargs['algorithm'] == "DSACT" or self.kwargs['algorithm'] == "DSACTPI":
                     logits = self.networks.policy(scaled_obs)
                     action_distribution = self.networks.create_action_distributions(logits)
                     action = action_distribution.mode().float()
@@ -354,10 +354,10 @@ class IdsimIDCEvaluator(Evaluator):
             eval_result.time_stamp_list.append(idsim_context.t.item())
             eval_result.selected_path_index_list.append(selected_path_index)
             for k in eval_result.reward_info.keys():
-                if k in next_info.keys():
+                if k in next_info.keys() and  k.startswith("env_scaled"):
                     eval_result.reward_info[k].append(next_info[k])
-                if k in next_info["reward_details"].keys():
-                    eval_result.reward_info[k].append(next_info["reward_details"][k])
+                # if k in next_info["reward_details"].keys():
+                #     eval_result.reward_info[k].append(next_info["reward_details"][k])
             obs = next_obs
             info = next_info
 

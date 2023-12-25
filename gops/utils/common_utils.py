@@ -112,6 +112,30 @@ def get_apprfunc_dict(key: str, **kwargs):
         var["local_lips"] = kwargs[key + "_local_lips"]
         var["squash_action"] = kwargs[key + "_squash_action"]
         var["learning_rate"] = kwargs[key + "_learning_rate"]
+    elif apprfunc_type == "PINet":
+        if key == "pi_net":
+            var["pi_begin"] = kwargs["pi_begin"]
+            var["pi_end"] = kwargs["pi_end"]
+            var["enable_mask"] = kwargs["enable_mask"]
+            var["obj_dim"] = kwargs["obj_dim"]
+            var["pi_out_dim"] = kwargs["pi_out_dim"]
+            var["encoding_others"] = kwargs["encoding_others"]
+            if var["encoding_others"]:
+                var["others_out_dim"] = kwargs["others_out_dim"]
+                var["others_hidden_sizes"] = kwargs["others_hidden_sizes"]
+                var["others_hidden_activation"] = kwargs["others_hidden_activation"]
+                var["others_output_activation"] = kwargs["others_output_activation"]
+            var["pi_hidden_sizes"] = kwargs["pi_hidden_sizes"]
+            var["pi_hidden_activation"] = kwargs["pi_hidden_activation"]
+            var["pi_output_activation"] = kwargs["pi_output_activation"]
+        else:
+            var["pi_net"] = kwargs["pi_net"]
+            var["target_PI"] = kwargs["target_PI"]
+            var["freeze_pi_net"] = kwargs["freeze_pi_net"]
+            assert var["freeze_pi_net"] in ["actor", "critic", "none"]
+            var["hidden_sizes"] = kwargs[key + "_hidden_sizes"]
+            var["hidden_activation"] = kwargs[key + "_hidden_activation"]
+            var["output_activation"] = kwargs[key + "_output_activation"]
     else:
         raise NotImplementedError
 
@@ -246,7 +270,7 @@ def set_seed(trainer_name, seed, offset, env=None):
 
 
 class FreezeParameters:
-    def __init__(self, modules):
+    def __init__(self, modules, freeze=True):
         """
         Context manager to locally freeze gradients.
         In some cases with can speed up computation because gradients aren't calculated for these listed modules.
@@ -258,15 +282,18 @@ class FreezeParameters:
         :param modules: iterable of modules. used to call .parameters() to freeze gradients.
         """
         self.modules = modules
+        self.freeze = freeze
         self.param_states = [p.requires_grad for p in get_parameters(self.modules)]
 
     def __enter__(self):
-        for param in get_parameters(self.modules):
-            param.requires_grad = False
+        if self.freeze:
+            for param in get_parameters(self.modules):
+                param.requires_grad = False
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        for i, param in enumerate(get_parameters(self.modules)):
-            param.requires_grad = self.param_states[i]
+        if self.freeze:
+            for i, param in enumerate(get_parameters(self.modules)):
+                param.requires_grad = self.param_states[i]
 
 
 def get_parameters(modules):
