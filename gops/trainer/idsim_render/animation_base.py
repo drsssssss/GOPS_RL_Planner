@@ -172,6 +172,8 @@ class AnimationBase:
             surr_ref.remove()
         self.surr_focus_list = []
         self.surr_focus_ref_list = []
+        if len(surr_states.shape) == 1:  # NOTE: when num_veh=1, surr_states.shape=(feature_dim,)
+            surr_states = surr_states.reshape(1, -1)
         for i in range(surr_states.shape[0]):
             x, y, phi, speed, length, width, mask = surr_states[i]
             if mask == 1:
