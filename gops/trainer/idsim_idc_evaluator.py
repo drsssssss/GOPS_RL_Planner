@@ -12,6 +12,7 @@ import numpy as np
 import torch
 import pickle
 import os
+import pathlib
 from copy import deepcopy
 from gops.trainer.evaluator import Evaluator
 from gops.env.env_gen_ocp.resources.idsim_tags import idsim_tb_tags_dict, reward_tags
@@ -400,3 +401,23 @@ class IdsimIDCEvaluator(Evaluator):
         for k, v in avg_idsim_tb_eval_dict.items():
             print(k, v)
         return avg_idsim_tb_eval_dict
+    
+    def run_testcase(self, idx: int, test_case: Dict):
+        scenario_root = pathlib.Path(test_case['scenario_root'])
+        self.save_folder = self.kwargs['save_folder'] + '/test_' + str(idx)
+        env_config = {
+                    **self.kwargs['env_config'], 
+                    'logging_root': self.save_folder, 
+                    'scenario_root' : scenario_root,
+                    'scenario_selector' : test_case['map_id'],
+                    'seed' : test_case['seed'],
+                    'warmup_time' : test_case['warmup_time'],
+                    'ego_id' : test_case['ego_id'],
+                    'num_scenarios' :  1,
+                    'scenario_reuse' :  1,
+                }
+        kwargs = {**self.kwargs, 'env_config': env_config}
+        self.env.close()
+        self.env = create_env(**kwargs)
+        idsim_tb_eval_dict = self.run_an_episode(0, self.render, batch=0, episode=0)
+        return idsim_tb_eval_dict
