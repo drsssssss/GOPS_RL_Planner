@@ -12,6 +12,7 @@
 import argparse
 import os
 import numpy as np
+import json
 
 from gops.create_pkg.create_alg import create_alg
 from gops.create_pkg.create_buffer import create_buffer
@@ -22,10 +23,10 @@ from gops.create_pkg.create_trainer import create_trainer
 from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
-from gops.env.env_gen_ocp.resources.idsim_config import get_idsim_env_config, get_idsim_model_config, pre_horizon
+from gops.env.env_gen_ocp.resources.idsim_config_wwx import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
 
-os.environ["OMP_NUM_THREADS"] = "4"
-
+os.environ["OMP_NUM_THREADS"] = "2"
+os.environ['RAY_memory_monitor_refresh_ms'] = "0"  # disable memory monitor
 if __name__ == "__main__":
     # Parameters Setup
     parser = argparse.ArgumentParser()
@@ -33,12 +34,43 @@ if __name__ == "__main__":
     ################################################
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
-    parser.add_argument("--env_scenario", type=str, default="crossroad", help="crossroad / multilane")
+    parser.add_argument("--env_scenario", type=str, default="multilane", help="crossroad / multilane")
     env_scenario = parser.parse_known_args()[0].env_scenario
-    parser.add_argument("--env_config", type=dict, default=get_idsim_env_config(env_scenario))
-    parser.add_argument("--env_model_config", type=dict, default=get_idsim_model_config(env_scenario))
 
-    parser.add_argument("--algorithm", type=str, default="DSAC", help="RL algorithm")
+    base_env_config = get_idsim_env_config(env_scenario)
+    base_env_model_config = get_idsim_model_config(env_scenario)
+    parser.add_argument("--extra_env_config", type=str, default=r'{}')
+    parser.add_argument("--extra_env_model_config", type=str, default=r'{}')
+    extra_env_config = parser.parse_known_args()[0].extra_env_config
+    print(extra_env_config )
+    extra_env_config = json.loads(extra_env_config)
+    extra_env_model_config = parser.parse_known_args()[0].extra_env_model_config
+    extra_env_model_config = json.loads(extra_env_model_config)
+    base_env_config.update(extra_env_config)
+    base_env_model_config.update(extra_env_model_config)
+    parser.add_argument("--env_config", type=dict, default=base_env_config)
+    parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
+
+    parser.add_argument("--vector_env_num", type=int, default=4, help="Number of vector envs")
+    parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
+    parser.add_argument("--gym2gymnasium", type=bool, default=True, help="Convert Gym-style env to Gymnasium-style")
+
+    parser.add_argument("--ego_scale", type=list, default=[1, 20, 20, 1, 4, 1, 4] ) #  vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
+    parser.add_argument("--sur_scale", type=list, default=[0.2, 1, 1, 10, 1, 1, 1, 1] ) #  rel_x, rel_y , cos(phi), sin(phi), speed, length, width, mask
+    parser.add_argument("--ref_scale", type=list, default=[0.2, 1, 1, 10, 1] ) # ref_x ref_y ref_cos(ref_phi) ref_sin(ref_phi), error_v
+    ego_scale = parser.parse_known_args()[0].ego_scale
+    sur_scale = parser.parse_known_args()[0].sur_scale
+    ref_scale = parser.parse_known_args()[0].ref_scale
+    obs_scale = cal_idsim_obs_scale(
+        ego_scale=ego_scale,
+        sur_scale=sur_scale,
+        ref_scale=ref_scale,
+        env_config=base_env_config,
+        env_model_config=base_env_model_config
+    )
+    parser.add_argument("--obs_scale", type=dict, default=obs_scale)
+
+    parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
     parser.add_argument("--seed", default=1, help="seed")
 
@@ -58,9 +90,8 @@ if __name__ == "__main__":
         default="ActionValueDistri",
         help="Options: StateValue/ActionValue/ActionValueDis/ActionValueDistri",
     )
-    parser.add_argument("--value_func_type", type=str, default="MLP", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS")
-    value_func_type = parser.parse_known_args()[0].value_func_type
-    parser.add_argument("--value_hidden_sizes", type=list, default=[256, 256, 256, 256])
+    parser.add_argument("--value_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS")
+    parser.add_argument("--value_hidden_sizes", type=list, default=[256, 256])
     parser.add_argument(
         "--value_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
@@ -76,7 +107,7 @@ if __name__ == "__main__":
         help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy",
     )
     parser.add_argument(
-        "--policy_func_type", type=str, default="MLP", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS"
+        "--policy_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS"
     )
     parser.add_argument(
         "--policy_act_distribution",
@@ -84,21 +115,39 @@ if __name__ == "__main__":
         default="TanhGaussDistribution",
         help="Options: default/TanhGaussDistribution/GaussDistribution",
     )
-    policy_func_type = parser.parse_known_args()[0].policy_func_type
-    if policy_func_type == "MLP":
-        parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256, 256, 256])
-        parser.add_argument(
-            "--policy_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
-        )
-        parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
+    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256])
+    parser.add_argument(
+        "--policy_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
+    )
+    parser.add_argument("--policy_output_activation", type=str, default="linear", help="Options: linear/tanh")
     parser.add_argument("--policy_min_log_std", type=int, default=-20)
     parser.add_argument("--policy_max_log_std", type=int, default=0.5)
+
+    # 2.3 Parameters of shared approximate function
+    pi_paras = cal_idsim_pi_paras(env_config=base_env_config, env_model_config=base_env_model_config)
+    parser.add_argument("--target_PI", type=bool, default=True)
+    parser.add_argument("--pi_begin", type=int, default=pi_paras["pi_begin"])
+    parser.add_argument("--pi_end", type=int, default=pi_paras["pi_end"])
+    parser.add_argument("--enable_mask", type=bool, default=True)
+    parser.add_argument("--obj_dim", type=int, default=pi_paras["obj_dim"])
+    parser.add_argument("--pi_out_dim", type=int, default=pi_paras["output_dim"])
+    parser.add_argument("--pi_hidden_sizes", type=list, default=[256, 256])
+    parser.add_argument("--pi_hidden_activation", type=str, default="relu")
+    parser.add_argument("--pi_output_activation", type=str, default="linear")
+    parser.add_argument("--freeze_pi_net", type=str, default="actor")
+    parser.add_argument("--encoding_others", type=bool, default=False)
+
+
+
+
 
     ################################################
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
     parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
+    parser.add_argument("--pi_learning_rate", type=float, default=1e-4)
     parser.add_argument("--alpha_learning_rate", type=float, default=3e-4)
+
     # special parameter
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--tau", type=float, default=0.005)
@@ -131,7 +180,7 @@ if __name__ == "__main__":
     # Size of collected samples before training
     parser.add_argument("--buffer_warm_size", type=int, default=int(1e4))
     # Max size of reply buffer
-    parser.add_argument("--buffer_max_size", type=int, default=int(1e6))
+    parser.add_argument("--buffer_max_size", type=int, default=int(1e5))
     # Batch size of replay samples from buffer
     parser.add_argument("--replay_batch_size", type=int, default=256)
     # Period of sampling
@@ -149,21 +198,21 @@ if __name__ == "__main__":
     # 6. Parameters for evaluator
     parser.add_argument("--evaluator_name", type=str, default="idsim_train_evaluator")
     parser.add_argument("--num_eval_episode", type=int, default=20)
-    parser.add_argument("--eval_interval", type=int, default=1000)
+    parser.add_argument("--eval_interval", type=int, default=2000)
     parser.add_argument("--eval_save", type=str, default=False, help="save evaluation data")
 
     ################################################
     # 7. Data savings
     parser.add_argument("--save_folder", type=str, default=None)
     # Save value/policy every N updates
-    parser.add_argument("--apprfunc_save_interval", type=int, default=10000)
+    parser.add_argument("--apprfunc_save_interval", type=int, default=50000)
     # Save key info every N updates
     parser.add_argument("--log_save_interval", type=int, default=1000)
 
     ################################################
     # Get parameter dictionary
     args = vars(parser.parse_args())
-    env = create_env(**args)
+    env = create_env(**{**args, "vector_env_num": None})
     args = init_args(env, **args)
 
     # start_tensorboard(args["save_folder"])
@@ -185,6 +234,6 @@ if __name__ == "__main__":
 
     ################################################
     # Plot and save training figures
-    plot_all(args["save_folder"])
-    save_tb_to_csv(args["save_folder"])
+    # plot_all(args["save_folder"])
+    # save_tb_to_csv(args["save_folder"])
     print("Plot & Save are finished!")

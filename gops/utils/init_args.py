@@ -88,7 +88,7 @@ def init_args(env, **args):
     if hasattr(env, "constraint_dim"):
         args["constraint_dim"] = env.constraint_dim
 
-    if hasattr(args, "value_func_type") and args["value_func_type"] == "CNN_SHARED":
+    if "value_func_type" in args.keys() and args["value_func_type"] == "CNN_SHARED":
         if hasattr(args, "policy_func_type"):
             assert (
                 args["value_func_type"] == args["policy_func_type"]
@@ -102,6 +102,17 @@ def init_args(env, **args):
         args["conv_type"] = args["value_conv_type"]
     else:
         args["cnn_shared"] = False
+
+    if "value_func_type" in args.keys() and args["value_func_type"] == "PINet":
+        if "policy_func_type" in args.keys():
+            assert (
+                args["value_func_type"] == args["policy_func_type"]
+            ), "The function type of both value and policy should be PINet"
+        args["PI_shared"] = True
+        args["pi_net_func_name"] = "PINet"
+        args["pi_net_func_type"] = "PINet"
+    else:
+        args["PI_shared"] = False
 
     # Create save arguments
     if args["save_folder"] is None:

@@ -1,4 +1,5 @@
-from typing import Dict
+from typing import Dict, Union, Tuple
+import numpy as np
 
 MAP_ROOT_CROSSROAD = 'YOUR_MAP_ROOT_CROSSROAD'
 MAP_ROOT_MULTILANE = 'YOUR_MAP_ROOT_MULTILANE'
@@ -152,3 +153,41 @@ def get_idsim_model_config(scenario="crossroad") -> Dict:
         return model_config_multilane
     else:
         raise NotImplementedError
+    
+def cal_idsim_obs_scale(
+        ego_scale: Union[float, list] = 1.0,
+        sur_scale: Union[float, list] = 1.0,
+        ref_scale: Union[float, list] = 1.0,
+        env_config: Dict = None,
+        env_model_config: Dict = None,
+):
+    ego_dim = env_model_config["ego_feat_dim"]
+    sur_dim = env_model_config["per_sur_feat_dim"] + 3 # +3 for length, width, mask
+    ref_dim = env_model_config["per_ref_feat_dim"]
+    sur_num = int(sum(i for i in env_config["obs_num_surrounding_vehicles"].values()))
+    full_horizon_sur_obs = env_model_config["full_horizon_sur_obs"]
+
+    if isinstance (ego_scale, float):
+        ego_scale = [ego_scale] * ego_dim
+    if isinstance (sur_scale, float):
+        sur_scale = [sur_scale] * sur_dim
+    if isinstance (ref_scale, float):
+        ref_scale = [ref_scale] * ref_dim
+
+    assert len(ego_scale) == ego_dim, f"len(ego_scale)={len(ego_scale)}, ego_dim={ego_dim}"
+    assert len(sur_scale) == sur_dim, f"len(sur_scale)={len(sur_scale)}, sur_dim={sur_dim}"
+    assert len(ref_scale) == ref_dim, f"len(ref_scale)={len(ref_scale)}, ref_dim={ref_dim}"
+    
+    obs_scale = []
+    obs_scale += ego_scale
+
+    for scale in ref_scale:
+        obs_scale += [scale] * (pre_horizon + 1)
+
+    if full_horizon_sur_obs:
+        obs_scale += (sur_scale * sur_num * (pre_horizon + 1))
+    else:
+        obs_scale += sur_scale * sur_num
+
+    obs_scale = np.array(obs_scale, dtype=np.float32)
+    return obs_scale

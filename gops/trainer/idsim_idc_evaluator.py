@@ -88,6 +88,12 @@ class EvalResult:
 class IdsimIDCEvaluator(Evaluator):
     def __init__(self, index=0, **kwargs):
         kwargs['env_config']['singleton_mode'] = 'invalidate'
+        kwargs.update({
+            "reward_scale": None,
+            "repeat_num": None,
+            "gym2gymnasium": False,
+            "vector_env_num": None,
+        })
         self.kwargs = kwargs
         # update env_config in kwargs
         env_config = {**self.kwargs['env_config'],
@@ -222,6 +228,11 @@ class IdsimIDCEvaluator(Evaluator):
         )
         idsim_context = stack_samples([idsim_context])
         model_obs = self.envmodel.idsim_model.observe(idsim_context)
+        if self.kwargs['obs_scale'] is not None:  # NOTE: A temporary solution for obs scale, not good
+            scaled_obs = self.env.observation(model_obs)
+        else:
+            scaled_obs = model_obs
+
         info = {'state': State.stack([state])}
         d = torch.tensor([0.])
 
@@ -236,7 +247,13 @@ class IdsimIDCEvaluator(Evaluator):
                     v_pi += r
                 value = v_pi.item()
             elif self.PATH_SELECTION_EVIDENCE == "value":
-                value = self.networks.v(model_obs).item()
+                if self.kwargs['algorithm'] == "DSACT" or self.kwargs['algorithm'] == "DSACTPI":
+                    logits = self.networks.policy(scaled_obs)
+                    action_distribution = self.networks.create_action_distributions(logits)
+                    action = action_distribution.mode().float()
+                    value = torch.min(self.networks.q1(scaled_obs,action)[:,0], self.networks.q2(scaled_obs,action)[:,0]).item()
+                else:
+                    value = self.networks.v(scaled_obs).item()
             else:
                 raise NotImplementedError
         return value, idsim_context
@@ -306,10 +323,15 @@ class IdsimIDCEvaluator(Evaluator):
             elif self.env.scenario == "multilane":
                 idsim_context = MultiLaneContext.from_env(self.env, self.env.model_config, selected_path_index)
             idsim_context = stack_samples([idsim_context])
-            obs = self.env.model.observe(idsim_context)
+            raw_obs = self.env.model.observe(idsim_context)
+
+            if self.kwargs['obs_scale'] is not None:  # NOTE: A temporary solution for obs sscale, not good
+                scaled_obs = self.env.observation(raw_obs)
+            else:
+                scaled_obs = raw_obs
 
             # ----------- get action ------------
-            logits = self.networks.policy(obs)
+            logits = self.networks.policy(scaled_obs)
             action_distribution = self.networks.create_action_distributions(logits)
             action = action_distribution.mode()
             action = action.detach().numpy()[0]
@@ -319,7 +341,7 @@ class IdsimIDCEvaluator(Evaluator):
             next_obs, reward, done, next_info = self.env.step(action)
 
             # ----------- save to list------------
-            eval_result.obs_list.append(obs)
+            eval_result.obs_list.append(raw_obs)
             eval_result.action_list.append(action)
             eval_result.action_real_list.append(next_info['state'].robot_state[..., -2:])
 
@@ -331,8 +353,11 @@ class IdsimIDCEvaluator(Evaluator):
             idsim_context.p.sur_param.squeeze(0).numpy())
             eval_result.time_stamp_list.append(idsim_context.t.item())
             eval_result.selected_path_index_list.append(selected_path_index)
-            for k, v in eval_result.reward_info.items():
-                eval_result.reward_info[k].append(next_info['reward_details'][k])
+            for k in eval_result.reward_info.keys():
+                if k in next_info.keys() and  k.startswith("env_scaled"):
+                    eval_result.reward_info[k].append(next_info[k])
+                # if k in next_info["reward_details"].keys():
+                #     eval_result.reward_info[k].append(next_info["reward_details"][k])
             obs = next_obs
             info = next_info
 
@@ -366,7 +391,7 @@ class IdsimIDCEvaluator(Evaluator):
                 batch = batch % self.kwargs['env_config']['num_scenarios']
                 env_config = {
                     **self.kwargs['env_config'], 'logging_root': self.kwargs['save_folder'], 'scenario_selector': str(batch)}
-                kwargs = {**self.kwargs, 'env_config': env_config}
+                kwargs = {**self.kwargs, 'env_config': env_config, "vector_env_num": None,"gym2gymnasium":False}
                 self.env = create_env(**kwargs)
             eval_list.append(idsim_tb_eval_dict)
         avg_idsim_tb_eval_dict = {
