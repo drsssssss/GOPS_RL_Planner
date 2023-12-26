@@ -77,13 +77,14 @@ class idSimEnv(CrossRoad, Env):
             self.ref_index = np.random.choice(np.arange(self.model_config.num_ref_lines))
 
         reward_model, reward_details = self._get_reward(action)
-
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
+        reward_model_free = self._get_model_free_reward(action)
+
         info["reward_details"] = dict(
             zip(reward_tags, [i.item() for i in reward_details])
         )
         done = terminated or truncated
-        return self._get_obs(), reward, done, self._get_info(info)
+        return self._get_obs(), reward + reward_model_free, done, self._get_info(info)
 
     def set_ref_index(self, ref_index: int):
         self.ref_index = ref_index
@@ -110,6 +111,20 @@ class idSimEnv(CrossRoad, Env):
             action=action.unsqueeze(0) # incremental action
         )
         return reward_details[0].item(), reward_details
+    
+    def _get_model_free_reward(self, action: np.ndarray) -> float:
+        idsim_context = get_idsimcontext(
+            State.stack([self._state]), 
+            mode="batch", 
+            scenario=self.scenario
+        )
+        reward = self.model_free_reward(
+            context=idsim_context,
+            last_last_action=self._state.robot_state[..., -4:-2][None, :], # absolute action
+            last_action=self._state.robot_state[..., -2:][None, :], # absolute action
+            action=action[None, :] # incremental action
+        )
+        return reward
     
     def _get_terminated(self) -> bool:
         """abandon this function, use terminated from idsim instead"""
@@ -139,10 +154,6 @@ class idSimEnv(CrossRoad, Env):
             )
         ).tensor2array()
 
-    # def get_state_from_idsim(self, ref_index_param=None) -> State:
-    #     self._get_state_from_idsim(ref_index_param=ref_index_param)
-    #     return self._state
-    
     def get_zero_state(self) -> State[np.ndarray]:
         if self._state is None:
             self.reset()
@@ -183,7 +194,12 @@ def get_idsimcontext(state: State, mode: str, scenario: str) -> BaseContext:
             i = state.context_state.t.long()
         )
     elif mode == "batch":
-        assert state.context_state.t.unique().shape[0] == 1, "batch mode only support same t"
+        if isinstance(state.context_state.t, np.ndarray):
+            assert np.unique(state.context_state.t).shape[0] == 1, "batch mode only support same t"
+        elif isinstance(state.context_state.t, torch.Tensor):
+            assert state.context_state.t.unique().shape[0] == 1, "batch mode only support same t"
+        else:
+            raise NotImplementedError
         context = Context(
             x = ModelState(
                 ego_state = state.robot_state[..., :-4],
