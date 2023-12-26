@@ -157,6 +157,9 @@ class idSimEnv(CrossRoad, Env):
                 real_t=np.zeros_like(self._state.context_state.real_t, dtype=np.int64)
             )
         )
+    # close
+    def close(self) -> None:
+        super(idSimEnv, self).close()
 
 
 def get_idsimcontext(state: State, mode: str, scenario: str) -> BaseContext:
