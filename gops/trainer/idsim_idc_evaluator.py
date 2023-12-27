@@ -229,7 +229,7 @@ class IdsimIDCEvaluator(Evaluator):
         )
         idsim_context = stack_samples([idsim_context])
         model_obs = self.envmodel.idsim_model.observe(idsim_context)
-        if self.kwargs['obs_scale'] is not None:  # NOTE: A temporary solution for obs scale, not good
+        if self.kwargs.get('obs_scale') is not None:  # NOTE: A temporary solution for obs scale, not good
             scaled_obs = self.env.observation(model_obs)
         else:
             scaled_obs = model_obs
@@ -326,7 +326,7 @@ class IdsimIDCEvaluator(Evaluator):
             idsim_context = stack_samples([idsim_context])
             raw_obs = self.env.model.observe(idsim_context)
 
-            if self.kwargs['obs_scale'] is not None:  # NOTE: A temporary solution for obs sscale, not good
+            if self.kwargs.get('obs_scale') is not None:  # NOTE: A temporary solution for obs sscale, not good
                 scaled_obs = self.env.observation(raw_obs)
             else:
                 scaled_obs = raw_obs
