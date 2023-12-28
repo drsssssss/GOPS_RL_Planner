@@ -79,7 +79,8 @@ class idSimEnvModel(EnvModel):
     def get_obs(self, state: State) -> torch.Tensor:
         return self.idsim_model.observe(get_idsimcontext(state, mode = 'batch', scenario=self.env_scenario))
         
-    def get_reward(self, state: State, action: torch.Tensor, mode: str = "full_horizon") -> torch.Tensor:
+    def get_reward(self, state: State, action: torch.Tensor, mode: str = "full_horizon",
+                   return_details: bool = False) -> torch.Tensor:
         next_state = self.get_next_state(state, action)
         if mode == "full_horizon":
             rewards = self.idsim_model.reward_full_horizon(
@@ -97,7 +98,11 @@ class idSimEnvModel(EnvModel):
             )
         else:
             raise NotImplementedError
-        return rewards[0]
+        
+        if return_details:
+            return rewards[0], rewards
+        else:
+            return rewards[0]
 
     def get_terminated(self, state: State) -> torch.bool:
         # only support batched state
@@ -107,10 +112,11 @@ class idSimEnvModel(EnvModel):
         state = info["state"]
         next_state = self.get_next_state(state, action)
         next_obs = self.get_obs(next_state)
-        reward = self.get_reward(state, action, mode = "batch")
+        reward, reward_details = self.get_reward(state, action, mode = "batch", return_details=True)
         terminated = self.get_terminated(state)
         next_info = {}
         next_info["state"] = next_state
+        next_info["reward_details"] = reward_details
         return next_obs, reward, terminated, next_info
 
 

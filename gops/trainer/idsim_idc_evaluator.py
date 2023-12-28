@@ -11,7 +11,7 @@ import json
 import numpy as np
 import torch
 import pickle
-import os
+import pathlib
 from copy import deepcopy
 from gops.trainer.evaluator import Evaluator
 from gops.env.env_gen_ocp.resources.idsim_tags import idsim_tb_tags_dict, reward_tags
@@ -26,8 +26,6 @@ from gops.env.env_gen_ocp.env_model.pyth_idsim_model import idSimEnvModel
 from idsim_model.model_context import BaseContext
 from idsim_model.crossroad.context import CrossRoadContext
 from idsim_model.multilane.context import MultiLaneContext
-from idsim_model.model import IdSimModel
-from idsim_model.params import ModelConfig
 from idsim_model.utils.model_utils import stack_samples
 from idsim.component.vehicle.surrounding import SurroundingVehicle
 
@@ -238,13 +236,22 @@ class IdsimIDCEvaluator(Evaluator):
 
         with torch.no_grad():
             if self.PATH_SELECTION_EVIDENCE == "loss":
-                assert self.kwargs['algorithm'] == 'FHADP2', "only FHADP2 is supported for using loss!"
-                a_full = self.networks.policy.forward_all_policy(model_obs)
                 v_pi = torch.tensor([0.])
-                for step in range(self.envmodel.idsim_model.N):
-                    a = a_full[:, step] # [B, 2]
-                    model_obs, r, d, info = self.envmodel.forward(model_obs, a, d, info)
-                    v_pi += r
+                if self.kwargs['algorithm'] == 'FHADP2':
+                    a_full = self.networks.policy.forward_all_policy(model_obs)
+                    for step in range(self.envmodel.idsim_model.N):
+                        a = a_full[:, step] # [B, 2]
+                        model_obs, r, d, info = self.envmodel.forward(model_obs, a, d, info)
+                        r_details = info["reward_details"]
+                        v_pi += r
+                elif self.kwargs['algorithm'] == "DSACT" or self.kwargs['algorithm'] == "DSACTPI":
+                    for step in range(self.envmodel.idsim_model.N):
+                        logits = self.networks.policy(scaled_obs)
+                        action_distribution = self.networks.create_action_distributions(logits)
+                        action = action_distribution.mode().float()
+                        model_obs, r, d, info = self.envmodel.forward(model_obs, action, d, info)
+                        r_details = info["reward_details"]
+                        v_pi += r
                 value = v_pi.item()
             elif self.PATH_SELECTION_EVIDENCE == "value":
                 if self.kwargs['algorithm'] == "DSACT" or self.kwargs['algorithm'] == "DSACTPI":
@@ -356,8 +363,8 @@ class IdsimIDCEvaluator(Evaluator):
             for k in eval_result.reward_info.keys():
                 if k in next_info.keys() and  k.startswith("env_scaled"):
                     eval_result.reward_info[k].append(next_info[k])
-                # if k in next_info["reward_details"].keys():
-                #     eval_result.reward_info[k].append(next_info["reward_details"][k])
+                if k in next_info["reward_details"].keys():
+                    eval_result.reward_info[k].append(next_info["reward_details"][k])
             obs = next_obs
             info = next_info
 
@@ -400,3 +407,23 @@ class IdsimIDCEvaluator(Evaluator):
         for k, v in avg_idsim_tb_eval_dict.items():
             print(k, v)
         return avg_idsim_tb_eval_dict
+    
+    def run_testcase(self, idx: int, test_case: Dict):
+        scenario_root = pathlib.Path(test_case['scenario_root'])
+        self.save_folder = self.kwargs['save_folder'] + '/test_' + str(idx)
+        env_config = {
+                    **self.kwargs['env_config'], 
+                    'logging_root': self.save_folder, 
+                    'scenario_root' : scenario_root,
+                    'scenario_selector' : test_case['map_id'],
+                    'seed' : test_case['seed'],
+                    'warmup_time' : test_case['warmup_time'],
+                    'ego_id' : test_case['ego_id'],
+                    'num_scenarios' :  1,
+                    'scenario_reuse' :  1,
+                }
+        kwargs = {**self.kwargs, 'env_config': env_config}
+        self.env.close()
+        self.env = create_env(**kwargs)
+        idsim_tb_eval_dict = self.run_an_episode(0, self.render, batch=0, episode=0)
+        return idsim_tb_eval_dict
