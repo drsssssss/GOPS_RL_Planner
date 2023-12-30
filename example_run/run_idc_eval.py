@@ -18,8 +18,8 @@ torch.set_num_threads(1)
 # 4. Run this script
 
 if __name__ == "__main__":
-    scenario_root = pathlib.Path('YOUR_MAP_ROOT_FOR_TEST')
-    ini_network_root = r"/home/example/results/pyth_idsim/FHADP2_231212-163916"
+    scenario_root = pathlib.Path('idsim-multilane-v10')
+    ini_network_root = r"gops/results/pyth_idsim/FHADP2_231212-091300-fhadp2-v12"
     nn_index = 20000
 
     config_path = os.path.join(ini_network_root, "config.json")
@@ -40,11 +40,11 @@ if __name__ == "__main__":
     args['record_loss'] = True
     args["PATH_SELECTION_EVIDENCE"] = 'loss' # 'loss' or 'value'
     args['PATH_SELECTION_DIFF_THRESHOLD'] = 0.0 # preference for current lane
-    args['env_config']['max_steps'] = 2000
+    args['env_config']['max_steps'] = 20
     args['env_config']['use_multiple_path_for_multilane'] = True
     args['env_config']['random_ref_probability'] = 0.0
-    args['env_config']['num_scenarios'] = num_scenarios = 4
-    args['env_config']['scenario_reuse'] = scenario_reuse = 5
+    args['env_config']['num_scenarios'] = num_scenarios = 1
+    args['env_config']['scenario_reuse'] = scenario_reuse = 1
     args['env_config']['scenario_root'] = scenario_root
     args['env_config']['use_logging'] = True
     args['env_config']['singleton_mode'] = 'invalidate' 
