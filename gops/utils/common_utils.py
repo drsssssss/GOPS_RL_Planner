@@ -65,6 +65,7 @@ def get_apprfunc_dict(key: str, **kwargs):
     var["std_type"] = kwargs.get(key + "_std_type", "mlp_shared")
     var["norm_matrix"] = kwargs.get("norm_matrix", None)
     var["pre_horizon"] = kwargs.get("pre_horizon", None)
+    var["additional_info"] = kwargs.get("additional_info", None)
 
     apprfunc_type = kwargs[key + "_func_type"]
     if key + "_output_activation" not in kwargs.keys():

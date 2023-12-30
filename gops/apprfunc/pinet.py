@@ -14,6 +14,7 @@ __all__ = [
     "ActionValue",
     "ActionValueDis",
     "ActionValueDistri",
+    "ActionValueDistriMultiR",
 ]
 import numpy as np
 import torch
@@ -21,6 +22,7 @@ import warnings
 import itertools
 import torch.nn as nn
 from typing import Tuple
+from functools import reduce
 from abc import abstractmethod, ABCMeta
 from gops.utils.act_distribution_cls import Action_Distribution
 from gops.utils.common_utils import get_activation_func, FreezeParameters
@@ -304,3 +306,57 @@ class ActionValueDistri(nn.Module):
         value_log_std = torch.nn.functional.softplus(value_std) 
 
         return torch.cat((value_mean, value_log_std), dim=-1)
+    
+
+
+class ActionValueDistriMultiR(nn.Module):
+    """
+    Approximated function of distributed action-value function.
+    Input: observation.
+    Output: parameters of action-value distribution.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        act_dim = kwargs["act_dim"]
+        hidden_sizes = kwargs["hidden_sizes"]
+        self.pi_net = kwargs["pi_net"]
+        self.freeze_pi_net = kwargs["freeze_pi_net"] == "critic"
+        input_dim = self.pi_net.output_dim + act_dim
+        self.q = mlp(
+            [input_dim] + list(hidden_sizes) + [2],
+            get_activation_func(kwargs["hidden_activation"]),
+            get_activation_func(kwargs["output_activation"]),
+        )
+        if "min_log_std"  in kwargs or "max_log_std" in kwargs:
+            warnings.warn("min_log_std and max_log_std are deprecated in ActionValueDistri.")
+
+        #rew_comp_dim = reduce(lambda x, y: x + y, [value["shape"] for value in kwargs["additional_info"].values()])
+        rew_comp_dim = kwargs["additional_info"]["reward_comps"]["shape"][0]
+        self.q_comp = mlp(
+            [input_dim] + list(hidden_sizes) + [rew_comp_dim],
+            get_activation_func(kwargs["hidden_activation"]),
+            get_activation_func(kwargs["output_activation"]),
+        )
+
+    def shared_paras(self):
+        return self.pi_net.parameters()
+
+    def ego_paras(self):
+        return itertools.chain(*[modules.parameters() for modules in self.children() if modules != self.pi_net])
+
+    def forward(self, obs, act):
+        
+        with FreezeParameters([self.pi_net], self.freeze_pi_net):
+            encoding = self.pi_net(obs)
+        
+        logits = self.q(torch.cat([encoding, act], dim=-1))
+        value_mean, value_std = torch.chunk(logits, chunks=2, dim=-1)
+        value_log_std = torch.nn.functional.softplus(value_std) 
+
+        return torch.cat((value_mean, value_log_std), dim=-1)
+    
+    def cal_comp(self, obs, act):
+        with FreezeParameters([self.pi_net], self.freeze_pi_net):
+            encoding = self.pi_net(obs)
+        return self.q_comp(torch.cat([encoding, act], dim=-1))
