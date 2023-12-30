@@ -191,3 +191,20 @@ def cal_idsim_obs_scale(
 
     obs_scale = np.array(obs_scale, dtype=np.float32)
     return obs_scale
+
+def cal_idsim_pi_paras(
+        env_config: Dict = None,
+        env_model_config: Dict = None,
+):
+    ego_dim = env_model_config["ego_feat_dim"]
+    sur_dim = env_model_config["per_sur_feat_dim"] + 3 # +3 for length, width, mask
+    ref_dim = env_model_config["per_ref_feat_dim"]
+    pre_horizon = env_model_config["N"]
+    num_objs = int(sum(i for i in env_config["obs_num_surrounding_vehicles"].values()))
+
+    pi_paras = {}
+    pi_paras["pi_begin"] = ego_dim + ref_dim*(pre_horizon + 1)
+    pi_paras["pi_end"] = pi_paras["pi_begin"] + sur_dim*num_objs 
+    pi_paras["obj_dim"] = sur_dim 
+    pi_paras["output_dim"] = sur_dim*num_objs + 1
+    return pi_paras

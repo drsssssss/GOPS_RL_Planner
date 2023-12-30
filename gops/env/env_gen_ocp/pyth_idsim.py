@@ -78,7 +78,8 @@ class idSimEnv(CrossRoad, Env):
 
         reward_model, reward_details = self._get_reward(action)
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
-        reward_model_free = self._get_model_free_reward(action)
+        reward_model_free, mf_info = self._get_model_free_reward(action)
+        info.update(mf_info)
 
         info["reward_details"] = dict(
             zip(reward_tags, [i.item() for i in reward_details])
@@ -118,13 +119,13 @@ class idSimEnv(CrossRoad, Env):
             mode="batch", 
             scenario=self.scenario
         )
-        reward = self.model_free_reward(
+        reward, info = self.model_free_reward(
             context=idsim_context,
             last_last_action=self._state.robot_state[..., -4:-2][None, :], # absolute action
             last_action=self._state.robot_state[..., -2:][None, :], # absolute action
             action=action[None, :] # incremental action
         )
-        return reward
+        return reward, info
     
     def _get_terminated(self) -> bool:
         """abandon this function, use terminated from idsim instead"""
