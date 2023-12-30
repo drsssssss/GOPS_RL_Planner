@@ -194,18 +194,18 @@ def get_idsimcontext(state: State, mode: str, scenario: str) -> BaseContext:
     if mode == "full_horizon":
         context = Context(
             x = ModelState(
-                ego_state = state.robot_state[..., :-4].unsqueeze(0),
-                last_last_action = state.robot_state[..., -4:-2].unsqueeze(0),
-                last_action = state.robot_state[..., -2:].unsqueeze(0)
+                ego_state = state.robot_state[..., :-4],
+                last_last_action = state.robot_state[..., -4:-2],
+                last_action = state.robot_state[..., -2:]
             ),
             p = Parameter(
-                ref_param = state.context_state.reference.unsqueeze(0),
-                sur_param = state.context_state.constraint.unsqueeze(0),
-                light_param = state.context_state.light_param.unsqueeze(0),
-                ref_index_param = state.context_state.ref_index_param.unsqueeze(0)
+                ref_param = state.context_state.reference,
+                sur_param = state.context_state.constraint,
+                light_param = state.context_state.light_param,
+                ref_index_param = state.context_state.ref_index_param
             ),
-            t = state.context_state.real_t.unsqueeze(0),
-            i = state.context_state.t.long()
+            t = state.context_state.real_t,
+            i = state.context_state.t[0]
         )
     elif mode == "batch":
         if isinstance(state.context_state.t, np.ndarray):
