@@ -97,7 +97,7 @@ class AnimationLane(AnimationBase):
                              VEH_WIDTH, facecolor=EGO_COLOR_WITH_ALPHA, edgecolor=EGO_COLOR)
 
         writer.setup(fig, os.path.join(save_video_path,
-                     f'{self.task_name}_{episode_index}_preview.mp4'))
+                     f'{self.task_name}_{episode_index}_frame_skip_{frame_skip}.mp4'), dpi=dpi)
 
         value = episode_data.paths_value_list
         value = np.array(value) if value else None
