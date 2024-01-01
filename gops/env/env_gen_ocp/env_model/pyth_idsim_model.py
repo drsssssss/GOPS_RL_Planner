@@ -83,11 +83,12 @@ class idSimEnvModel(EnvModel):
                    return_details: bool = False) -> torch.Tensor:
         next_state = self.get_next_state(state, action)
         if mode == "full_horizon":
+            next_state_full = State.stack([next_state], dim = 0) # [1, N, d]
             rewards = self.idsim_model.reward_full_horizon(
-                context_full = get_idsimcontext(next_state, mode = mode, scenario=self.env_scenario),
-                last_last_action_full = state.robot_state[..., -4:-2], # absolute action
-                last_action_full = state.robot_state[..., -2:], # absolute action
-                action_full = action # incremental action
+                context_full = get_idsimcontext(next_state_full, mode = mode, scenario=self.env_scenario),
+                last_last_action_full = state.robot_state[..., -4:-2].unsqueeze(0), # absolute action
+                last_action_full = state.robot_state[..., -2:].unsqueeze(0), # absolute action
+                action_full = action.unsqueeze(0) # incremental action
             )
         elif mode == "batch":
             rewards = self.idsim_model.reward_nn_state(
