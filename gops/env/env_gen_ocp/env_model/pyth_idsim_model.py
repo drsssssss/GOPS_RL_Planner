@@ -118,7 +118,25 @@ class idSimEnvModel(EnvModel):
         next_info["state"] = next_state
         next_info["reward_details"] = reward_details
         return next_obs, reward, terminated, next_info
-
+    
+    def forward_dynamics(self, obs, action, done, info):
+        state = info["state"]
+        next_state = self.get_next_state(state, action)
+        next_obs = self.get_obs(next_state)
+        terminated = self.get_terminated(state)
+        next_info = {}
+        next_info["state"] = next_state
+        return next_obs, 0., terminated, next_info
+    
+    def forward_reward(self, state_list, action_full_horizon):
+        state_full_horizon = State.stack(state_list, dim = 1)
+        reward, reward_details = self.get_reward(state_full_horizon, action_full_horizon, mode = "full_horizon", return_details=True)
+        reward = reward.reshape(-1, self.idsim_model.model_config.N).sum(dim=-1)
+        r_details = []
+        for r in reward_details:
+            r = r.reshape(-1, self.idsim_model.model_config.N).sum(dim=-1)
+            r_details.append(r)
+        return reward, tuple(r_details)
 
 def env_model_creator(**kwargs):
     """
