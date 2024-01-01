@@ -118,6 +118,7 @@ class OptController:
         )
 
         self.verbose = verbose
+        self.return_res = False
         self._reset_statistics()
 
     def __call__(self, x: State[np.ndarray]) -> np.ndarray:
@@ -128,8 +129,10 @@ class OptController:
 
         Return: optimal control input for current state x
         """
-        
-        x = x.array2tensor()
+        try:
+            x = x.array2tensor()
+        except:
+            pass
 
         constraints = []
         if self.model.get_constraint is not None:
@@ -170,9 +173,14 @@ class OptController:
         self.total_time = t2 - t1
         if self.verbose > 0:
             self._print_statistics(res)
-        return res.x.reshape((self.num_ctrl_points, self.optimize_dim))[
-            0, : self.action_dim
-        ]
+        
+        a0 = res.x.reshape((self.num_ctrl_points, self.optimize_dim))[
+                0, : self.action_dim
+            ]
+        if self.return_res:
+            return a0, res
+        else:
+            return a0
 
     def _cost_fcn_and_jac(
         self, inputs: np.ndarray, x: State[torch.Tensor]
