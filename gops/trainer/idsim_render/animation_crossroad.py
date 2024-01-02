@@ -69,6 +69,9 @@ class AnimationCross(AnimationBase):
         writer = FFMpegWriter(fps=fps, metadata=metadata)
 
         # ------------------ initialization -------------------
+        # clear all list
+        self.clear_all_list()
+
         map_path = episode_data.map_path
         map_data_path = f'{map_path}/scene.pkl'
         with open(map_data_path, 'rb') as f:
