@@ -120,24 +120,15 @@ class FHADP2(AlgorithmBase):
         self.tb_info[tb_tags["alg_time"]] = (end_time - start_time) * 1000  # ms
 
     def _compute_loss_policy(self, data):
-        o, a, r, o2, d = (
-            data["obs"],
-            data["act"],
-            data["rew"],
-            data["obs2"],
-            data["done"],
-        )
-        info_init = data
+        o, d = data["obs"], data["done"]
+        info = data
         v_pi = 0
+        state_list = []
         a = self.networks.policy.forward_all_policy(o)
         for step in range(self.pre_horizon):
-            if step == 0:
-                o2, r, d, info = self.envmodel.forward(o, a[:, 0, :], d, info_init)
-                v_pi = r
-            else:
-                o = o2
-                o2, r, d, info = self.envmodel.forward(o, a[:, step, :], d, info)
-                v_pi += r * (self.gamma**step)
+            o, _, d, info = self.envmodel.forward_dynamics(o, a[:, step, :], d, info)
+            state_list.append(info['state'])
+        v_pi, v_pi_details = self.envmodel.forward_reward(state_list, a)
         loss_policy = -v_pi.mean()
         loss_info = {
             tb_tags["loss_actor"]: loss_policy.item()
@@ -146,18 +137,16 @@ class FHADP2(AlgorithmBase):
 
     def _compute_loss_v(self, data: DataDict) -> Tuple[torch.Tensor, InfoDict]:
         o, d = data["obs"], data["done"]
-        info_init = data
-        v_pi = 0
+        info = data
+        v_pi = torch.tensor(0.)
+        state_list = []
         a = self.networks.policy.forward_all_policy(o)
         for step in range(self.pre_horizon):
             if step == 0:
-                o2, r, d, info = self.envmodel.forward(o, a[:, 0, :], d, info_init)
-                v_pi = r
                 value_nn = self.networks.v(o)
-            else:
-                o = o2
-                o2, r, d, info = self.envmodel.forward(o, a[:, step, :], d, info)
-                v_pi += r * (self.gamma**step)
+            o, _, d, info = self.envmodel.forward_dynamics(o, a[:, step, :], d, info)
+            state_list.append(info['state'])
+        v_pi, v_pi_details = self.envmodel.forward_reward(state_list, a)
         loss_v = ((value_nn - v_pi.detach()) ** 2).mean()
         loss_info = {
             tb_tags["loss_critic"]: loss_v.item()
