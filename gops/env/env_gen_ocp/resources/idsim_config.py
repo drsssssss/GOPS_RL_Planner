@@ -116,6 +116,11 @@ env_config_param_multilane = {
     "action_upper_bound": (2.5 * delta_t, 0.065 * delta_t),
     "real_action_lower_bound": (-3.0, -0.065),
     "real_action_upper_bound": (0.8, 0.065),
+    "use_random_acc": True,
+    "random_acc_cooldown": (20, 50, 20), # cooldown for acceleration, deceleration and ref_v, respectively
+    "random_acc_prob": (0.1, 0.5), # probability to accelerate and decelerate, respectively
+    "random_acc_range": (0.2, 0.8), # (m/s^2), used for acceleration
+    "random_dec_range": (-3.0, -1.0), # (m/s^2), used for deceleration
 }
 
 model_config_multilane = {

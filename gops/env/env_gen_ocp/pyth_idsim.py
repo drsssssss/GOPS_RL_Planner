@@ -53,10 +53,18 @@ class idSimEnv(CrossRoad, Env):
         obs_dim = self.model.obs_dim
         self.use_random_ref_param = env_config.use_multiple_path_for_multilane
         self.random_ref_probability = env_config.random_ref_probability
-        if self.random_ref_probability > 0.0:
+
+        if self.use_random_ref_param > 0.0:
             print(f'INFO: randomly choosing reference when resetting env')
         if self.random_ref_probability > 0.0:
             print(f'INFO: randomly choosing reference when stepping at P={self.random_ref_probability}')
+        if env_config.takeover_bias:
+            print('INFO: using takeover bias True')
+        if env_config.use_random_acc:
+            print('INFO: using random acceleration')
+        if model_config.track_closest_ref_point:
+            print('INFO: tracking closest reference point')
+
         self.lc_cooldown = 30
         self.lc_cooldown_counter = 0
 
