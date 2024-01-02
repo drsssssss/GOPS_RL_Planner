@@ -204,11 +204,14 @@ class IdsimIDCEvaluator(Evaluator):
 
         return optimal_path_index, new_selected_path_index, lc_cd, lc_cl
 
-    def eval_ref_by_index(self, index):
+    def get_idsim_context(self, index):
         if self.env.scenario == "crossroad":
             idsim_context = CrossRoadContext.from_env(self.env, self.env.model_config, index)
         elif self.env.scenario == "multilane":
             idsim_context = MultiLaneContext.from_env(self.env, self.env.model_config, index)
+        return idsim_context
+    
+    def get_pyth_idsim_state(self, idsim_context):
         state = State(
             robot_state=torch.concat([
                 idsim_context.x.ego_state, 
@@ -224,8 +227,13 @@ class IdsimIDCEvaluator(Evaluator):
                 t = torch.tensor(idsim_context.i).int()
             )
         )
-        idsim_context = stack_samples([idsim_context])
-        model_obs = self.envmodel.idsim_model.observe(idsim_context)
+        return state
+
+    def eval_ref_by_index(self, index):
+        idsim_context = self.get_idsim_context(index)
+        state = self.get_pyth_idsim_state(idsim_context)
+        idsim_context_batch = stack_samples([idsim_context])
+        model_obs = self.envmodel.idsim_model.observe(idsim_context_batch)
         if self.kwargs.get('obs_scale') is not None:  # NOTE: A temporary solution for obs scale, not good
             scaled_obs = self.env.observation(model_obs)
         else:
@@ -233,7 +241,6 @@ class IdsimIDCEvaluator(Evaluator):
 
         info = {'state': State.stack([state])}
         d = torch.tensor([0.])
-
         with torch.no_grad():
             if self.PATH_SELECTION_EVIDENCE == "loss":
                 v_pi = torch.tensor([0.])
@@ -244,7 +251,7 @@ class IdsimIDCEvaluator(Evaluator):
                         model_obs, r, d, info = self.envmodel.forward(model_obs, a, d, info)
                         r_details = info["reward_details"]
                         v_pi += r
-                elif self.kwargs['algorithm'] == "DSACT" or self.kwargs['algorithm'] == "DSACTPI":
+                elif self.kwargs['algorithm'] in ["DSACT", "DSACTPI"]:
                     for step in range(self.envmodel.idsim_model.N):
                         logits = self.networks.policy(scaled_obs)
                         action_distribution = self.networks.create_action_distributions(logits)
@@ -263,14 +270,12 @@ class IdsimIDCEvaluator(Evaluator):
                     value = self.networks.v(scaled_obs).item()
             else:
                 raise NotImplementedError
-        return value, idsim_context
+        if self.use_mpc:
+            action, res = self.opt_controller(state)
+            value = - res.fun
+        return value, idsim_context_batch
 
-    def run_an_episode(self, iteration, render=False, batch=0, episode=0):
-        if self.print_iteration != iteration:
-            self.print_iteration = iteration
-            self.print_time = 0
-        else:
-            self.print_time += 1
+    def run_an_episode(self, render=False, batch=0, episode=0):
         obs, info = self.env.reset()
         env_context = self.env.engine.context
         vehicle = env_context.vehicle
@@ -329,8 +334,8 @@ class IdsimIDCEvaluator(Evaluator):
                 idsim_context = CrossRoadContext.from_env(self.env, self.env.model_config, selected_path_index)
             elif self.env.scenario == "multilane":
                 idsim_context = MultiLaneContext.from_env(self.env, self.env.model_config, selected_path_index)
-            idsim_context = stack_samples([idsim_context])
-            raw_obs = self.env.model.observe(idsim_context)
+            idsim_context_batch = stack_samples([idsim_context])
+            raw_obs = self.env.model.observe(idsim_context_batch)
 
             if self.kwargs.get('obs_scale') is not None:  # NOTE: A temporary solution for obs sscale, not good
                 scaled_obs = self.env.observation(raw_obs)
@@ -343,6 +348,11 @@ class IdsimIDCEvaluator(Evaluator):
             action = action_distribution.mode()
             action = action.detach().numpy()[0]
 
+            # ----------- use mpc to get action ------------
+            if self.use_mpc:
+                state = self.get_pyth_idsim_state(idsim_context)
+                action, res = self.opt_controller(state)
+
             # ----------- step ------------
             self.env.set_ref_index(selected_path_index)
             next_obs, reward, done, next_info = self.env.step(action)
@@ -353,12 +363,12 @@ class IdsimIDCEvaluator(Evaluator):
             eval_result.action_real_list.append(next_info['state'].robot_state[..., -2:])
 
             eval_result.ego_state_list.append(
-            idsim_context.x.ego_state.squeeze(0).numpy())
+            idsim_context.x.ego_state.numpy())
             eval_result.reference_list.append(
-            idsim_context.p.ref_param.squeeze(0).numpy())
+            idsim_context.p.ref_param.numpy())
             eval_result.surr_state_list.append(
-            idsim_context.p.sur_param.squeeze(0).numpy())
-            eval_result.time_stamp_list.append(idsim_context.t.item())
+            idsim_context.p.sur_param.numpy())
+            eval_result.time_stamp_list.append(idsim_context.t)
             eval_result.selected_path_index_list.append(selected_path_index)
             for k in eval_result.reward_info.keys():
                 if k in next_info.keys() and  k.startswith("env_scaled"):
@@ -387,12 +397,12 @@ class IdsimIDCEvaluator(Evaluator):
                 pickle.dump(eval_result, f, -1)
         return idsim_tb_eval_dict
 
-    def run_n_episodes(self, n, iteration):
+    def run_n_episodes(self, n):
         batch = 0
         eval_list = []
         for episode in range(n):
             print("##### episode {} #####".format(episode)) 
-            idsim_tb_eval_dict = self.run_an_episode(iteration, self.render, batch, episode)
+            idsim_tb_eval_dict = self.run_an_episode(self.render, batch, episode)
             if (episode>0) and ((episode+1) % self.kwargs['env_config']['scenario_reuse'] == 0):
                 batch += 1
                 batch = batch % self.kwargs['env_config']['num_scenarios']
@@ -408,7 +418,7 @@ class IdsimIDCEvaluator(Evaluator):
             print(k, v)
         return avg_idsim_tb_eval_dict
     
-    def run_testcase(self, idx: int, test_case: Dict):
+    def run_testcase(self, idx: int, test_case: Dict, use_mpc: bool = False):
         scenario_root = pathlib.Path(test_case['scenario_root'])
         self.save_folder = self.kwargs['save_folder'] + '/test_' + str(idx)
         env_config = {
@@ -425,5 +435,20 @@ class IdsimIDCEvaluator(Evaluator):
         kwargs = {**self.kwargs, 'env_config': env_config}
         self.env.close()
         self.env = create_env(**kwargs)
-        idsim_tb_eval_dict = self.run_an_episode(0, self.render, batch=0, episode=0)
+        self.envmodel: idSimEnvModel = create_env_model(**kwargs)
+        if use_mpc:
+            from gops.sys_simulator.opt_controller_for_gen_env import OptController
+            opt_args={
+                "num_pred_step": self.envmodel.idsim_model.N,
+                "gamma": 1,
+                "mode": "shooting",
+                "minimize_options": {"max_iter": 200, "tol": 1e-3,
+                                    "acceptable_tol": 1e0,
+                                    "acceptable_iter": 10,},
+                "use_terminal_cost": False,
+            }
+            self.opt_controller = OptController(self.envmodel, **opt_args)
+            self.opt_controller.return_res = True
+            self.use_mpc = True
+        idsim_tb_eval_dict = self.run_an_episode(self.render, batch=0, episode=0)
         return idsim_tb_eval_dict

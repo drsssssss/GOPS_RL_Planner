@@ -57,6 +57,8 @@ class idSimEnv(CrossRoad, Env):
             print(f'INFO: randomly choosing reference when resetting env')
         if self.random_ref_probability > 0.0:
             print(f'INFO: randomly choosing reference when stepping at P={self.random_ref_probability}')
+        self.lc_cooldown = 30
+        self.lc_cooldown_counter = 0
 
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
         self.context = idSimContext() # fake idsim context
@@ -64,6 +66,7 @@ class idSimEnv(CrossRoad, Env):
         self.ref_index = None
     
     def reset(self) -> Tuple[np.ndarray, dict]:
+        self.lc_cooldown_counter = 0
         obs, info = super(idSimEnv, self).reset()
         self.ref_index = np.random.choice(
             np.arange(self.model_config.num_ref_lines)
@@ -73,9 +76,17 @@ class idSimEnv(CrossRoad, Env):
     
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
-        if self.use_random_ref_param and np.random.rand() < self.random_ref_probability :
-            self.ref_index = np.random.choice(np.arange(self.model_config.num_ref_lines))
 
+        # ----- cal the next_obs, reward -----
+        self.lc_cooldown_counter += 1
+        if self.lc_cooldown_counter > self.lc_cooldown:
+            # lane change is allowable
+            if self.use_random_ref_param and np.random.rand() < self.random_ref_probability :
+                new_ref_index = np.random.choice(np.arange(self.model_config.num_ref_lines))
+                if new_ref_index != self.ref_index:
+                    # lane change
+                    self.ref_index = new_ref_index
+                    self.lc_cooldown_counter = 0
         reward_model, reward_details = self._get_reward(action)
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         reward_model_free, mf_info = self._get_model_free_reward(action)
@@ -184,18 +195,18 @@ def get_idsimcontext(state: State, mode: str, scenario: str) -> BaseContext:
     if mode == "full_horizon":
         context = Context(
             x = ModelState(
-                ego_state = state.robot_state[..., :-4].unsqueeze(0),
-                last_last_action = state.robot_state[..., -4:-2].unsqueeze(0),
-                last_action = state.robot_state[..., -2:].unsqueeze(0)
+                ego_state = state.robot_state[..., :-4],
+                last_last_action = state.robot_state[..., -4:-2],
+                last_action = state.robot_state[..., -2:]
             ),
             p = Parameter(
-                ref_param = state.context_state.reference.unsqueeze(0),
-                sur_param = state.context_state.constraint.unsqueeze(0),
-                light_param = state.context_state.light_param.unsqueeze(0),
-                ref_index_param = state.context_state.ref_index_param.unsqueeze(0)
+                ref_param = state.context_state.reference,
+                sur_param = state.context_state.constraint,
+                light_param = state.context_state.light_param,
+                ref_index_param = state.context_state.ref_index_param
             ),
-            t = state.context_state.real_t.unsqueeze(0),
-            i = state.context_state.t.long()
+            t = state.context_state.real_t,
+            i = state.context_state.t[0]
         )
     elif mode == "batch":
         if isinstance(state.context_state.t, np.ndarray):
