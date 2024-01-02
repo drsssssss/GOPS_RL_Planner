@@ -361,7 +361,7 @@ class IdsimIDCEvaluator(Evaluator):
             eval_result.time_stamp_list.append(idsim_context.t.item())
             eval_result.selected_path_index_list.append(selected_path_index)
             for k in eval_result.reward_info.keys():
-                if k in next_info.keys() and  k.startswith("env_scaled"):
+                if k in next_info.keys() and  (k.startswith("env_scaled") or k in ["env_speed_error","env_tracking_error","env_delta_phi"]): 
                     eval_result.reward_info[k].append(next_info[k])
             obs = next_obs
             info = next_info
