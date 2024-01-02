@@ -12,7 +12,7 @@ from shapely.geometry import LineString
 
 from gops.trainer.idsim_idc_evaluator import EvalResult
 from gops.trainer.idsim_render.animation_base import AnimationBase, create_veh, update_veh, veh2vis, rad_to_deg
-from gops.trainer.idsim_render.color import EGO_COLOR_WITH_ALPHA, EGO_COLOR
+from gops.trainer.idsim_render.color import EGO_COLOR_WITH_ALPHA, EGO_COLOR, TRAJ_COLOR_WITH_ALPHA
 
 from gops.trainer.idsim_render.crossroad.static_background import static_view
 from gops.trainer.idsim_render.utils import get_line_points
@@ -93,14 +93,14 @@ class AnimationCross(AnimationBase):
                     if network.has_connection_line(from_lane, to_lane):
                         if i == 0:
                             start_lanes.append(from_lane)
-                        self.create_static_path_line(ax, network.get_lane_center_line(to_lane),
-                                                     line_color=ref_color_list[index])
+                        # self.create_static_path_line(ax, network.get_lane_center_line(to_lane),
+                        #                              line_color=ref_color_list[index])
                         self.create_static_path_line(ax, network.get_connection_line(from_lane, to_lane),
                                                      line_color=ref_color_list[index])
                         index += 1
-        for start_lane in start_lanes:
-            self.create_static_path_line(ax, network.get_lane_center_line(start_lane),
-                                         line_color=ref_color_list[0])
+        # for start_lane in start_lanes:
+        #     self.create_static_path_line(ax, network.get_lane_center_line(start_lane),
+        #                                  line_color=ref_color_list[0])
 
         # create ego veh and head
         ego_veh = create_veh(ax, (0, 0), 0, veh_length,
@@ -175,6 +175,8 @@ class AnimationCross(AnimationBase):
 
             # # ---------------- update ego veh------------------
             ego_x, ego_y, _, _, ego_phi, _ = episode_data.ego_state_list[step]
+            circle = Circle((ego_x, ego_y), 1.0, facecolor=TRAJ_COLOR_WITH_ALPHA, edgecolor='none')
+            ax.add_patch(circle)
             update_veh(ego_veh, (ego_x, ego_y), ego_phi, veh_length, veh_width)
             ego_head[0].set_data([ego_x, ego_x+veh_length*0.8*np.cos(ego_phi)],
                                  [ego_y, ego_y+veh_length*0.8*np.sin(ego_phi)])

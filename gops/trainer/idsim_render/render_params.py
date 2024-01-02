@@ -3,12 +3,12 @@
 ## static background
 theme_color_dict = {
     'light': {
-        'road': '#4f4f5a',
-        'line': '#c5c5c5',
-        'line_edge': '#b8b8b8',
-        'line_zebra': '#FFFFFF',
-        'line_roadlane':'#C1C1C1',
-        'line_center':'#f9ce41',
+        'road': '#dbdbdb',
+        'line': '#555555',
+        'line_edge': '#425425',
+        'line_zebra': '#b6b6b6',
+        'line_roadlane':'#565656',
+        'line_center':'#85640a',
         'background': '#8fb74f',
     },
     'dark': {
@@ -39,4 +39,4 @@ traffic_light_length = lane_linewidth
 traffic_light_width = lane_width
 sur_face_color = 'blue'
 ego_face_color = 'magenta'
-ref_color_list = ['#4BD5FF', '#FF4B4B', '#FFD54B', '#4BFF4B']
+ref_color_list = ['#4600a3', '#b41f00', '#00a306', '#b47f00']
