@@ -50,5 +50,6 @@ if __name__ == "__main__":
     args['env_config']['singleton_mode'] = 'invalidate' 
     args['env_config']['logging_name_template'] = "{context.scenario_id:03d}/{context.episode_count:04d}.pkl"
     args['env_config']['fcd_name_template'] = "{context.scenario_id:03d}/fcd.xml"
+    args['env_config']['use_random_acc'] = False
     IDCevaluator = IdsimIDCEvaluator(**args, print_done=True)
     IDCevaluator.run_n_episodes(num_scenarios * scenario_reuse, iteration=0)
