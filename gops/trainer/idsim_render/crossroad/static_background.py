@@ -23,10 +23,8 @@ def static_view(network: SumoNetwork, theme_style: str):
     # plot junction
     junction_points = get_polygon_points(
         network.get_junction_polygon("1").convex_hull)
-    ax.fill(*zip(*junction_points),
-            color=theme_color['road'], linewidth=0.0, zorder=100)
-    ax.plot(*zip(*junction_points),
-            color=theme_color['line_edge'], linewidth=lane_linewidth, zorder=100)
+    ax.fill(*zip(*junction_points), color=theme_color['road'], linewidth=0.0)
+    ax.plot(*zip(*junction_points), color=theme_color['line_edge'], linewidth=lane_linewidth, zorder=100)
 
     # plot edge and lanes
     for edge in network.edges:
@@ -50,7 +48,7 @@ def static_view(network: SumoNetwork, theme_style: str):
                     ax.fill(
                         *zip(*lane_points_dict[lane_id]), color=theme_color['road'], linewidth=0.0)
                     ax.plot(
-                        *zip(*lane_points_dict[lane_id]), color=theme_color['line_roadlane'], linewidth=lane_linewidth, ls='--')
+                        *zip(*lane_points_dict[lane_id]), color=theme_color['line_roadlane'], linewidth=lane_linewidth, ls=(0, (5, 5)))
                 elif lane_id[-1] in cyl_lane_list:
                     # plot cyclist lane
                     ax.fill(
@@ -65,7 +63,7 @@ def static_view(network: SumoNetwork, theme_style: str):
                     middle_line = get_yellow_line(
                         network, lane_id, bias=lane_width/2)
                     ax.plot(middle_line[:, 0], middle_line[:, 1],
-                            color=theme_color['line_center'], linewidth=0.8, zorder=100)
+                            color=theme_color['line_center'], linewidth=2, zorder=100)
         elif edge_function == "crossing":
             # Special case: crossing
             assert len(edge.getLanes()) == 1
