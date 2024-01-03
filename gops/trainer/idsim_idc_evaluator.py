@@ -113,6 +113,7 @@ class IdsimIDCEvaluator(Evaluator):
         self.num_eval_episode = self.kwargs["num_eval_episode"]
         self.eval_save = self.kwargs.get("eval_save", True)
         self.save_folder = self.kwargs["save_folder"]
+        self.use_mpc = False
 
         if kwargs["ini_network_dir"] is not None:
             self.networks.load_state_dict(
@@ -429,7 +430,7 @@ class IdsimIDCEvaluator(Evaluator):
                     'seed' : test_case['seed'],
                     'warmup_time' : test_case['warmup_time'],
                     'ego_id' : test_case['ego_id'],
-                    'num_scenarios' :  1,
+                    'num_scenarios' :  self.kwargs['env_config']['num_scenarios'],
                     'scenario_reuse' :  1,
                 }
         kwargs = {**self.kwargs, 'env_config': env_config}
@@ -450,5 +451,5 @@ class IdsimIDCEvaluator(Evaluator):
             self.opt_controller = OptController(self.envmodel, **opt_args)
             self.opt_controller.return_res = True
             self.use_mpc = True
-        idsim_tb_eval_dict = self.run_an_episode(self.render, batch=0, episode=0)
+        idsim_tb_eval_dict = self.run_an_episode(self.render, batch=int(test_case['map_id']), episode=0)
         return idsim_tb_eval_dict
