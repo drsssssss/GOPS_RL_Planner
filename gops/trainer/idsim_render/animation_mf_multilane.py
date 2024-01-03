@@ -271,8 +271,8 @@ class AnimationLane(AnimationBase):
             'r_list': [x[0, 2].item() for x in episode_data.obs_list],
             'acc_list': [x[0, 5].item() for x in episode_data.obs_list],
             'steer_list': [x[0, 6].item() * 180 / np.pi for x in episode_data.obs_list],
-            "y_ref_list": [x[0, 7 + 31].item() for x in episode_data.obs_list],
-            "phi_ref_list": [np.arccos(x[0, 7 + 31 + 31].item()) * 180 / np.pi for x in episode_data.obs_list],
+            "y_ref_list": [x[0, 7 + 4].item() for x in episode_data.obs_list],
+            "phi_ref_list": [np.arccos(x[0, 7 + 4 + 4].item()) * 180 / np.pi for x in episode_data.obs_list],
             "ego_phi_list": [context.x.ego_state[0,4].item() * 180 / np.pi for context in episode_data.context_list],
             'step_list': episode_data.time_stamp_list,
         }
