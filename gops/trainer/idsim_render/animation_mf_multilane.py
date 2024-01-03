@@ -3,7 +3,8 @@ import pickle
 from pathlib import Path
 
 from gops.trainer.idsim_idc_evaluator import EvalResult
-from gops.trainer.idsim_render.color import EGO_COLOR, SUR_COLOR, EGO_COLOR_WITH_ALPHA, SUR_COLOR_WITH_ALPHA
+from gops.trainer.idsim_render.color import EGO_COLOR, SUR_COLOR, EGO_COLOR_WITH_ALPHA, SUR_COLOR_WITH_ALPHA, \
+    TRAJ_COLOR_WITH_ALPHA
 from gops.trainer.idsim_render.multilane.info_bar import plot_scale, plot_speed_dashboard, plot_action_bar, \
     plot_value_bar
 from gops.trainer.idsim_render.multilane.lane import plot_lane_lines
@@ -18,6 +19,7 @@ import numpy as np
 from idscene.scenario import ScenarioData
 from matplotlib.animation import FFMpegWriter
 from matplotlib.lines import Line2D
+from matplotlib.patches import Circle
 from matplotlib.patches import Rectangle as Rt
 
 VEH_LENGTH = 5.0
@@ -122,6 +124,8 @@ class AnimationLane(AnimationBase):
 
             # # ---------------- update ego veh------------------
             ego_x, ego_y, _, _, ego_phi, _ = episode_data.ego_state_list[step]
+            circle = Circle((ego_x, ego_y), 1.0, facecolor=TRAJ_COLOR_WITH_ALPHA, edgecolor='none')
+            ax.add_patch(circle)
             update_veh(ego_veh, (ego_x, ego_y), ego_phi, VEH_LENGTH, VEH_WIDTH)
 
             # # ---------------- update ego ref------------------
@@ -219,8 +223,6 @@ class AnimationLane(AnimationBase):
         writer.finish()
         plt.close(fig)
         print('video export success!')
-    
-
 
     def update_ego_ref(self, ax, episode_data, step):
         for ref in self.ref_artist_list:
