@@ -44,6 +44,7 @@ class AnimationLane(AnimationBase):
         self.action_bar_artist_list = []
         self.value_bar_artist_list = []
         self.task_name = "multilane"
+        self.ref_points_num = len(self.config['env_model_config']['downsample_ref_point_index'])
 
     def clear_all_list(self):
         super().clear_all_list()
@@ -83,7 +84,9 @@ class AnimationLane(AnimationBase):
         for k in empty_keys:
             del episode_data.reward_info[k]
 
-
+        if len(episode_data.time_stamp_list) <=1:
+            print('no data to plot')
+            return
         # create figure
         fig: Figure = plt.figure(figsize=(20, 10), dpi=dpi)
         gs = gridspec.GridSpec(4, 2)
@@ -111,7 +114,6 @@ class AnimationLane(AnimationBase):
         reward_text_labels = self.ax3_1.get_legend_handles_labels()[1]
         reward_text_values = [line.get_ydata() for line in self.ax3_1.get_lines()]
         text_handles = []
-
         # ---------------------- update-----------------------
         for step in range(0, len(episode_data.time_stamp_list), frame_skip):
             if mode == 'debug' and step % 10 == 0:
@@ -205,19 +207,20 @@ class AnimationLane(AnimationBase):
             )
 
             # plot value bar
-            value = episode_data.paths_value_list[step]
-            ref_allowable = episode_data.ref_allowable[step]
-            for artist in self.value_bar_artist_list:
-                artist.remove()
-            self.value_bar_artist_list = plot_value_bar(
-                ax=ax,
-                xy=(center_x + 28, center_y - screen_height / 2 + 6),
-                value=value,
-                allowable=ref_allowable,
-                min_value=min_value,
-                max_value=max_value,
-                zorder=3,
-            )
+            if episode_data.paths_value_list:
+                value = episode_data.paths_value_list[step]
+                ref_allowable = episode_data.ref_allowable[step]
+                for artist in self.value_bar_artist_list:
+                    artist.remove()
+                self.value_bar_artist_list = plot_value_bar(
+                    ax=ax,
+                    xy=(center_x + 28, center_y - screen_height / 2 + 6),
+                    value=value,
+                    allowable=ref_allowable,
+                    min_value=min_value,
+                    max_value=max_value,
+                    zorder=3,
+                )
 
             writer.grab_frame()
         writer.finish()
@@ -273,13 +276,14 @@ class AnimationLane(AnimationBase):
             'r_list': [x[0, 2].item() for x in episode_data.obs_list],
             'acc_list': [x[0, 5].item() for x in episode_data.obs_list],
             'steer_list': [x[0, 6].item() * 180 / np.pi for x in episode_data.obs_list],
-            "y_ref_list": [x[0, 7 + 4].item() for x in episode_data.obs_list],
-            "phi_ref_list": [np.arccos(x[0, 7 + 4 + 4].item()) * 180 / np.pi for x in episode_data.obs_list],
-            "ego_phi_list": [context.x.ego_state[0,4].item() * 180 / np.pi for context in episode_data.context_list],
+            "y_ref_list": [x[0, 7 + self.ref_points_num].item() for x in episode_data.obs_list],
+            "phi_ref_list": [np.arccos(x[0, 7 + self.ref_points_num*2].item()) * 180 / np.pi for x in episode_data.obs_list],
+            "ego_phi_list": [x[4] * 180 / np.pi for x in episode_data.ego_state_list],
             'step_list': episode_data.time_stamp_list,
         }
         eval_dict['ref_phi_list'] = np.array(eval_dict['phi_ref_list']) + np.array(eval_dict['ego_phi_list']) - eval_dict['ego_phi_list'][0]
         eval_dict['ego_phi_list'] = np.array(eval_dict['ego_phi_list']) - eval_dict['ego_phi_list'][0]
+        eval_dict["ego_id"] = episode_data.ego_id
         if 'collision_flag' in episode_data.reward_info:
             del episode_data.reward_info['collision_flag']
         # ego vx, vy, yaw rate
@@ -306,6 +310,12 @@ class AnimationLane(AnimationBase):
             scenario_data: ScenarioData = pickle.load(f)
             network = scenario_data.network
         plot_lane_lines(ax, network, zorder=0)
+        # plot ego_id info in the left top corner
+        ax.text( # ego_id
+            0.01, 0.98, f'ego_id: {episode_data.ego_id}', fontsize=10,
+            horizontalalignment='left', verticalalignment='top',
+            transform=ax.transAxes
+        )
         return ax
 
 
