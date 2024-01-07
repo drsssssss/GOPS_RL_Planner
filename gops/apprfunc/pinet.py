@@ -357,6 +357,6 @@ class ActionValueDistriMultiR(nn.Module):
         return torch.cat((value_mean, value_log_std), dim=-1)
     
     def cal_comp(self, obs, act):
-        with FreezeParameters([self.pi_net], self.freeze_pi_net):
+        with FreezeParameters([self.pi_net], True):
             encoding = self.pi_net(obs)
         return self.q_comp(torch.cat([encoding, act], dim=-1))

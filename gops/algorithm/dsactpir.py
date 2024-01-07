@@ -119,7 +119,10 @@ class DSACTPIR(AlgorithmBase):
         self.tau_b = kwargs.get("tau_b", self.tau)
         self.target_PI = kwargs["target_PI"]
         self.rew_comp_dim = kwargs.get("reward_comps_dim", (1))[0]
-        self.reward_comp_factor = kwargs.get("reward_comp_factor", 1.0)
+        reward_comp_factor = kwargs.get("reward_comp_factor", 1.0)
+        self.reward_comp_factor = torch.tensor(reward_comp_factor, dtype=torch.float32)
+        self.reward_comp_names = kwargs["reward_comp_names"]
+
 
 
     @property
@@ -243,8 +246,8 @@ class DSACTPIR(AlgorithmBase):
             tb_tags["alg_time"]: (time.time() - start_time) * 1000,
         }
 
-        q1_comp_info = dict(zip(["DSAC2/q1_comp_{}".format(i) for i in range(self.rew_comp_dim)], [q1_comp[..., i].mean().item() for i in range(self.rew_comp_dim)]))
-        q2_comp_info = dict(zip(["DSAC2/q2_comp_{}".format(i) for i in range(self.rew_comp_dim)], [q2_comp[..., i].mean().item() for i in range(self.rew_comp_dim)]))
+        q1_comp_info = dict(zip(["DSAC2/q1_"+self.reward_comp_names[i] for i in range(self.rew_comp_dim)], [q1_comp[..., i].mean().item() for i in range(self.rew_comp_dim)]))
+        q2_comp_info = dict(zip(["DSAC2/q2_"+self.reward_comp_names[i] for i in range(self.rew_comp_dim)], [q2_comp[..., i].mean().item() for i in range(self.rew_comp_dim)]))
         tb_info.update(q1_comp_info)
         tb_info.update(q2_comp_info)
 

@@ -35,6 +35,7 @@ if __name__ == "__main__":
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
     parser.add_argument("--env_scenario", type=str, default="multilane", help="crossroad / multilane")
+    parser.add_argument("--num_threads_main", type=int, default=4, help="Number of threads in main process")
     env_scenario = parser.parse_known_args()[0].env_scenario
 
     base_env_config = get_idsim_env_config(env_scenario)
@@ -50,8 +51,10 @@ if __name__ == "__main__":
     base_env_model_config.update(extra_env_model_config)
     parser.add_argument("--env_config", type=dict, default=base_env_config)
     parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
+    reward_comp_names = base_env_model_config["reward_comps"]
+    parser.add_argument("--reward_comp_names", type=tuple, default=reward_comp_names)
 
-    parser.add_argument("--vector_env_num", type=int, default=4, help="Number of vector envs")
+    parser.add_argument("--vector_env_num", type=int, default=1, help="Number of vector envs")
     parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
     parser.add_argument("--gym2gymnasium", type=bool, default=True, help="Convert Gym-style env to Gymnasium-style")
 
@@ -91,7 +94,7 @@ if __name__ == "__main__":
         help="Options: StateValue/ActionValue/ActionValueDis/ActionValueDistri",
     )
     parser.add_argument("--value_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS")
-    parser.add_argument("--value_hidden_sizes", type=list, default=[256, 256])
+    parser.add_argument("--value_hidden_sizes", type=list, default=[256, 256,256])
     parser.add_argument(
         "--value_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
@@ -115,7 +118,7 @@ if __name__ == "__main__":
         default="TanhGaussDistribution",
         help="Options: default/TanhGaussDistribution/GaussDistribution",
     )
-    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256])
+    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256,256])
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
@@ -131,7 +134,7 @@ if __name__ == "__main__":
     parser.add_argument("--enable_mask", type=bool, default=True)
     parser.add_argument("--obj_dim", type=int, default=pi_paras["obj_dim"])
     parser.add_argument("--pi_out_dim", type=int, default=pi_paras["output_dim"])
-    parser.add_argument("--pi_hidden_sizes", type=list, default=[256, 256])
+    parser.add_argument("--pi_hidden_sizes", type=list, default=[256, 256,256])
     parser.add_argument("--pi_hidden_activation", type=str, default="gelu")
     parser.add_argument("--pi_output_activation", type=str, default="linear")
     parser.add_argument("--freeze_pi_net", type=str, default="actor")
@@ -166,7 +169,7 @@ if __name__ == "__main__":
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
     # Maximum iteration number
-    parser.add_argument("--max_iteration", type=int, default=2000000)
+    parser.add_argument("--max_iteration", type=int, default=1000000)
     parser.add_argument(
         "--ini_network_dir",
         type=str,
@@ -178,19 +181,19 @@ if __name__ == "__main__":
         "--buffer_name", type=str, default="replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
     )
     # Size of collected samples before training
-    parser.add_argument("--buffer_warm_size", type=int, default=int(1e4))
+    parser.add_argument("--buffer_warm_size", type=int, default=1000)
     # Max size of reply buffer
-    parser.add_argument("--buffer_max_size", type=int, default=int(1e5))
+    parser.add_argument("--buffer_max_size", type=int, default=250000)
     # Batch size of replay samples from buffer
     parser.add_argument("--replay_batch_size", type=int, default=256)
     # Period of sampling
-    parser.add_argument("--sample_interval", type=int, default=1)
+    parser.add_argument("--sample_interval", type=int, default=10)
 
     ################################################
     # 5. Parameters for sampler
     parser.add_argument("--sampler_name", type=str, default="off_sampler", help="Options: on_sampler/off_sampler")
     # Batch size of sampler for buffer store
-    parser.add_argument("--sample_batch_size", type=int, default=20)
+    parser.add_argument("--sample_batch_size", type=int, default=50)
     # Add noise to action for better exploration
     parser.add_argument("--noise_params", type=dict, default=None)
 
