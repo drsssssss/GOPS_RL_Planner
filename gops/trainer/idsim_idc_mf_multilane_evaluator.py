@@ -280,6 +280,7 @@ class IdsimIDCEvaluator(Evaluator):
         else:
             self.print_time += 1
         obs, info = self.env.reset()
+        warmup_time = self.env.engine.context.simulation_time
         env_context = self.env.engine.context
         vehicle = env_context.vehicle
         eval_result = EvalResult()
@@ -392,14 +393,15 @@ class IdsimIDCEvaluator(Evaluator):
             with open(self.save_folder + "/{}/episode{}".format('%03d' % batch, '%03d' % episode) + 'scene_info.json', 'w') as f:
                 # record scene info
                 # record the parent dir of mappath
-                scene_info = {
+                scenario_info = {
                     "scenario_root": str(pathlib.Path(eval_result.map_path).parent),
                     "map_id": self.env.config.scenario_selector,
                     "seed": self.env.config.seed,
                     "ego_id": eval_result.ego_id,
-                    "warmup_time": self.env.config.warmup_time,
+                    "warmup_time": warmup_time,
+                    "traffic_seed": int(self.env.engine.context.traffic_seed),
                 }
-                json.dump(scene_info, f, indent=4)
+                json.dump(scenario_info, f, indent=4)
 
 
         return idsim_tb_eval_dict
@@ -436,7 +438,7 @@ class IdsimIDCEvaluator(Evaluator):
                     'seed' : test_case['seed'],
                     'warmup_time' : test_case['warmup_time'],
                     'ego_id' : test_case['ego_id'],
-                    'num_scenarios' :  1,
+                    'num_scenarios' :  self.kwargs['env_config']['num_scenarios'],
                     'scenario_reuse' :  1,
                 }
         kwargs = {**self.kwargs, 'env_config': env_config}
@@ -457,5 +459,5 @@ class IdsimIDCEvaluator(Evaluator):
             self.opt_controller = OptController(self.envmodel, **opt_args)
             self.opt_controller.return_res = True
             self.use_mpc = True
-        idsim_tb_eval_dict = self.run_an_episode(self.render, batch=0, episode=0)
+        idsim_tb_eval_dict = self.run_an_episode(self.render, batch=int(test_case['map_id']), episode=0)
         return idsim_tb_eval_dict
