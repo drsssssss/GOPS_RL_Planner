@@ -171,6 +171,7 @@ def cal_idsim_obs_scale(
     ref_dim = env_model_config["per_ref_feat_dim"]
     sur_num = int(sum(i for i in env_config["obs_num_surrounding_vehicles"].values()))
     full_horizon_sur_obs = env_model_config["full_horizon_sur_obs"]
+    num_ref_points = len(env_model_config["downsample_ref_point_index"]) 
 
     if isinstance (ego_scale, float):
         ego_scale = [ego_scale] * ego_dim
@@ -187,12 +188,30 @@ def cal_idsim_obs_scale(
     obs_scale += ego_scale
 
     for scale in ref_scale:
-        obs_scale += [scale] * (pre_horizon + 1)
+        obs_scale += [scale] * num_ref_points
 
     if full_horizon_sur_obs:
-        obs_scale += (sur_scale * sur_num * (pre_horizon + 1))
+        obs_scale += (sur_scale * sur_num * num_ref_points)
     else:
         obs_scale += sur_scale * sur_num
 
     obs_scale = np.array(obs_scale, dtype=np.float32)
     return obs_scale
+
+def cal_idsim_pi_paras(
+        env_config: Dict = None,
+        env_model_config: Dict = None,
+):
+    ego_dim = env_model_config["ego_feat_dim"]
+    sur_dim = env_model_config["per_sur_feat_dim"] + 3 # +3 for length, width, mask
+    ref_dim = env_model_config["per_ref_feat_dim"]
+    num_ref_points = len(env_model_config["downsample_ref_point_index"]) 
+    num_objs = int(sum(i for i in env_config["obs_num_surrounding_vehicles"].values()))
+
+    pi_paras = {}
+    pi_paras["pi_begin"] = ego_dim + ref_dim*num_ref_points
+    pi_paras["pi_end"] = pi_paras["pi_begin"] + sur_dim*num_objs 
+    pi_paras["obj_dim"] = sur_dim 
+    pi_paras["output_dim"] = sur_dim*num_objs + 1
+    return pi_paras
+

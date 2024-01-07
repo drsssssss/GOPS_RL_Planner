@@ -93,7 +93,7 @@ if __name__ == "__main__":
     parser.add_argument("--value_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS")
     parser.add_argument("--value_hidden_sizes", type=list, default=[256, 256])
     parser.add_argument(
-        "--value_hidden_activation", type=str, default="relu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
+        "--value_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
     parser.add_argument("--value_output_activation", type=str, default="linear", help="Options: linear/tanh")
     parser.add_argument("--value_min_log_std", type=int, default=-0.1)
@@ -125,14 +125,14 @@ if __name__ == "__main__":
 
     # 2.3 Parameters of shared approximate function
     pi_paras = cal_idsim_pi_paras(env_config=base_env_config, env_model_config=base_env_model_config)
-    parser.add_argument("--target_PI", type=bool, default=True)
+    parser.add_argument("--target_PI", type=bool, default=False)
     parser.add_argument("--pi_begin", type=int, default=pi_paras["pi_begin"])
     parser.add_argument("--pi_end", type=int, default=pi_paras["pi_end"])
     parser.add_argument("--enable_mask", type=bool, default=True)
     parser.add_argument("--obj_dim", type=int, default=pi_paras["obj_dim"])
     parser.add_argument("--pi_out_dim", type=int, default=pi_paras["output_dim"])
     parser.add_argument("--pi_hidden_sizes", type=list, default=[256, 256])
-    parser.add_argument("--pi_hidden_activation", type=str, default="relu")
+    parser.add_argument("--pi_hidden_activation", type=str, default="gelu")
     parser.add_argument("--pi_output_activation", type=str, default="linear")
     parser.add_argument("--freeze_pi_net", type=str, default="actor")
     parser.add_argument("--encoding_others", type=bool, default=False)
