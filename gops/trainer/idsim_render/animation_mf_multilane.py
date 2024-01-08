@@ -8,7 +8,7 @@ from gops.trainer.idsim_render.color import EGO_COLOR, SUR_COLOR, EGO_COLOR_WITH
 from gops.trainer.idsim_render.multilane.info_bar import plot_scale, plot_speed_dashboard, plot_action_bar, \
     plot_value_bar
 from gops.trainer.idsim_render.multilane.lane import plot_lane_lines
-from gops.trainer.idsim_render.plot_time_flow import plot_action, plot_reward, plot_y_ref_phi_ref, plot_vx_vy_r
+from gops.trainer.idsim_render.plot_mf_time_flow import plot_action, plot_reward, plot_y_ref_phi_ref, plot_vx_vy_r
 from matplotlib import gridspec
 from matplotlib.figure import Figure
 
@@ -34,7 +34,7 @@ class AnimationLane(AnimationBase):
     def __init__(self, theme_style, fcd_file, config) -> None:
         super().__init__(theme_style, fcd_file, config)
         self.ax1_1, self.ax1_2, self.ax1_3 = None, None, None
-        self.ax2_1, self.ax2_2 = None, None
+        self.ax2_1, self.ax2_2, self.ax2_3 = None, None, None
         self.ax3_1 = None
         self.ax4_1, self.ax4_2 = None, None
         self.ref_artist_list = []
@@ -60,8 +60,10 @@ class AnimationLane(AnimationBase):
         episode_data: EvalResult,
         save_path: Path,
         episode_index: int,
+        frame_skip=1,
         fps=20,
         mode='debug',
+        dpi = 50,
     ):
         metadata = dict(title='Demo', artist='Guojian Zhan', comment='idsim')
         writer = FFMpegWriter(fps=fps, metadata=metadata)
@@ -72,8 +74,18 @@ class AnimationLane(AnimationBase):
         # clear all list
         self.clear_all_list()
 
+
+        # remove empty list in episode_data.reward_info
+        empty_keys = []
+        for k, v in episode_data.reward_info.items():
+            if len(v) == 0:
+                empty_keys.append(k)
+        for k in empty_keys:
+            del episode_data.reward_info[k]
+
+
         # create figure
-        fig: Figure = plt.figure(figsize=(20, 10))
+        fig: Figure = plt.figure(figsize=(20, 10), dpi=dpi)
         gs = gridspec.GridSpec(4, 2)
 
         print(f'Initializing traffic...')
@@ -87,15 +99,21 @@ class AnimationLane(AnimationBase):
                              VEH_WIDTH, facecolor=EGO_COLOR_WITH_ALPHA, edgecolor=EGO_COLOR)
 
         writer.setup(fig, os.path.join(save_video_path,
-                     f'{self.task_name}_{episode_index}.mp4'))
+                     f'{self.task_name}_{episode_index}_frame_skip_{frame_skip}.mp4'), dpi=dpi)
 
         value = episode_data.paths_value_list
         value = np.array(value) if value else None
         min_value = np.min(value) if value is not None else 0.0
         max_value = np.max(value) if value is not None else 0.0
 
+        # plot reward text info
+        reward_text_colors = [line.get_color() for line in self.ax3_1.get_lines()]
+        reward_text_labels = self.ax3_1.get_legend_handles_labels()[1]
+        reward_text_values = [line.get_ydata() for line in self.ax3_1.get_lines()]
+        text_handles = []
+
         # ---------------------- update-----------------------
-        for step in range(len(episode_data.time_stamp_list)):
+        for step in range(0, len(episode_data.time_stamp_list), frame_skip):
             if mode == 'debug' and step % 10 == 0:
                 print(f'step={step}/{len(episode_data.time_stamp_list)}')
             cur_time = episode_data.time_stamp_list[step]
@@ -157,6 +175,20 @@ class AnimationLane(AnimationBase):
                 speed=speed,
                 zorder=3,
             )
+            
+            # plot reward text info
+            reward_text = ''
+            if step > 0:
+                for handle in text_handles:
+                    handle.remove()
+                text_handles = []
+            for i in range(len(reward_text_labels)):
+                reward_text = f'{reward_text_labels[i]}: {reward_text_values[i][step]:.2f}\n'
+                x_pos = center_x + screen_width / 2 - 30
+                y_pos = center_y - i * 2
+                text_handles.append(ax.text(x_pos,y_pos, reward_text, color=reward_text_colors[i], fontsize=10))
+
+
 
             # plot action bar
             action = episode_data.action_real_list[step]
@@ -186,8 +218,6 @@ class AnimationLane(AnimationBase):
                 max_value=max_value,
                 zorder=3,
             )
-            # fig.savefig('test.png')
-            # exit(0)
 
             writer.grab_frame()
         writer.finish()
@@ -209,16 +239,12 @@ class AnimationLane(AnimationBase):
 
     def adjust_lim(self, episode_data, eval_dict, step):
         index_min = max(0, step - 100)
-        index_max = min(len(episode_data.time_stamp_list) - 1, step + 1)
+        index_max = min(len(episode_data.time_stamp_list) - 1, step + 100)
         x_lim_min = episode_data.time_stamp_list[index_min]
         x_lim_max = episode_data.time_stamp_list[index_max]
         self.ax1_1.set_xlim(x_lim_min, x_lim_max)
-        min_vx = min(eval_dict['vx_list'][index_min:index_max])
-        min_ref_v = min(eval_dict['ref_v_list'][index_min:index_max])
-        max_vx = max(eval_dict['vx_list'][index_min:index_max])
-        max_ref_v = max(eval_dict['ref_v_list'][index_min:index_max])
-        self.ax1_1.set_ylim(min(min_vx, min_ref_v) * 0.95,
-                            max(max_vx, max_ref_v) * 1.05)
+        self.ax1_1.set_ylim(min(eval_dict['vx_list'][index_min:index_max]) * 0.95,
+                            max(eval_dict['vx_list'][index_min:index_max]) * 1.05)
         self.ax1_2.set_ylim(min(eval_dict['vy_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['vy_list'][index_min:index_max]) * 1.05)
         self.ax1_3.set_ylim(min(eval_dict['r_list'][index_min:index_max]) * 0.95,
@@ -226,10 +252,14 @@ class AnimationLane(AnimationBase):
         self.ax2_1.set_xlim(x_lim_min, x_lim_max)
         self.ax2_1.set_ylim(min(eval_dict['y_ref_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['y_ref_list'][index_min:index_max]) * 1.05)
-        self.ax2_2.set_ylim(min(eval_dict['phi_ref_list'][index_min:index_max]) * 0.95,
-                            max(eval_dict['phi_ref_list'][index_min:index_max]) * 1.05)
+        self.ax2_2.set_ylim(min(eval_dict['ref_phi_list'][index_min:index_max]) * 0.95,
+                            max(eval_dict['ref_phi_list'][index_min:index_max]) * 1.05)
+        self.ax2_3.set_ylim(min(eval_dict['ref_phi_list'][index_min:index_max]) * 0.95,
+                            max(eval_dict['ref_phi_list'][index_min:index_max]) * 1.05)
         self.ax3_1.set_xlim(x_lim_min, x_lim_max)
-        self.ax3_1.set_ylim(min(episode_data.reward_info['reward'][index_min:index_max]) * 0.95, 0)
+        min_reward = min([min(v[index_min:index_max]) for v in episode_data.reward_info.values()])
+        max_reward = max([max(v[index_min:index_max]) for v in episode_data.reward_info.values()])
+        self.ax3_1.set_ylim(min_reward * 0.95, max_reward * 1.05)
         self.ax4_1.set_xlim(x_lim_min, x_lim_max)
         self.ax4_1.set_ylim(min(eval_dict['acc_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['acc_list'][index_min:index_max]) * 1.05)
@@ -239,20 +269,23 @@ class AnimationLane(AnimationBase):
     def plot_figures(self, episode_data, fig, gs):
         eval_dict = {
             'vx_list': [x[0, 0].item() for x in episode_data.obs_list],
-            'ref_v_list': [(x[0, 0] - x[0, 7 + 31 * 4]).item() for x in episode_data.obs_list],
             'vy_list': [x[0, 1].item() for x in episode_data.obs_list],
             'r_list': [x[0, 2].item() for x in episode_data.obs_list],
             'acc_list': [x[0, 5].item() for x in episode_data.obs_list],
             'steer_list': [x[0, 6].item() * 180 / np.pi for x in episode_data.obs_list],
-            "y_ref_list": [x[0, 7 + 31].item() for x in episode_data.obs_list],
-            "phi_ref_list": [np.arccos(x[0, 7 + 31 + 31].item()) * 180 / np.pi for x in episode_data.obs_list],
+            "y_ref_list": [x[0, 7 + 4].item() for x in episode_data.obs_list],
+            "phi_ref_list": [np.arccos(x[0, 7 + 4 + 4].item()) * 180 / np.pi for x in episode_data.obs_list],
+            "ego_phi_list": [context.x.ego_state[0,4].item() * 180 / np.pi for context in episode_data.context_list],
             'step_list': episode_data.time_stamp_list,
         }
-        del episode_data.reward_info['collision_flag']
+        eval_dict['ref_phi_list'] = np.array(eval_dict['phi_ref_list']) + np.array(eval_dict['ego_phi_list']) - eval_dict['ego_phi_list'][0]
+        eval_dict['ego_phi_list'] = np.array(eval_dict['ego_phi_list']) - eval_dict['ego_phi_list'][0]
+        if 'collision_flag' in episode_data.reward_info:
+            del episode_data.reward_info['collision_flag']
         # ego vx, vy, yaw rate
         self.ax1_1, self.ax1_2, self.ax1_3 = plot_vx_vy_r(eval_dict, fig, gs)
         # reference delta y and delta phi
-        self.ax2_1, self.ax2_2 = plot_y_ref_phi_ref(eval_dict, fig, gs)
+        self.ax2_1, self.ax2_2, self.ax2_3 = plot_y_ref_phi_ref(eval_dict, fig, gs)
         # all the non-zero reward
         self.ax3_1 = plot_reward(episode_data, eval_dict, fig, gs)
         # real acc, real steer angle

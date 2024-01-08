@@ -8,8 +8,6 @@ def plot_vx_vy_r(eval_dict, fig, gs):
     ax1_1.plot(eval_dict['step_list'], eval_dict['vx_list'], '.-', label='vx', color='b')
     ax1_1.set_ylabel('$v_x$', color='b')
     ax1_1.tick_params('y', colors='b')
-    ax1_1.plot(eval_dict['step_list'], eval_dict['ref_v_list'], '-', label='ref_v', color='k')
-    ax1_1.legend()
     ax1_2 = ax1_1.twinx()
     ax1_2.plot(eval_dict['step_list'], eval_dict['vy_list'], '.-', label='vy', color='r')
     ax1_2.set_ylabel('$v_y$', color='r')
@@ -32,13 +30,21 @@ def plot_y_ref_phi_ref(eval_dict, fig, gs):
     ax2_1.set_ylabel('$y-y_{ref}$', color='b')
     ax2_1.tick_params('y', colors='b')
     ax2_2 = ax2_1.twinx()
-    ax2_2.plot(eval_dict['step_list'], eval_dict['phi_ref_list'], '.-',
-               label='relative orientation', color='r')
-    ax2_2.set_ylabel('$\phi-\phi_{ref}$(degree)', color='r')
+    # ax2_2.plot(eval_dict['step_list'], eval_dict['phi_ref_list'], '.-',
+    #            label='relative orientation', color='r')
+    ax2_2.plot(eval_dict['step_list'], eval_dict['ref_phi_list'], '.-', color='r')
+    ax2_2.set_ylabel('$phi_{ref}$ (degree)', color='r')
     ax2_2.tick_params('y', colors='r')
     ax2_2.set_title('Errors with Reference Trajectory')
+    ax2_3 = ax2_1.twinx()
+    ax2_3.spines['right'].set_position(
+        ('outward', 60))  # Move the last y-axis spine over to the right by 60 points
+    ax2_3.plot(eval_dict['step_list'], eval_dict['ego_phi_list'], '.-', color='g')
+    ax2_3.set_ylabel('$phi$ (degree)', color='g')
+    ax2_3.tick_params('y', colors='g')
+
     ax2_1.set_xlabel('Time')
-    return ax2_1, ax2_2
+    return ax2_1, ax2_2, ax2_3
 
 
 def plot_reward(episode_data, eval_dict, fig, gs):
@@ -49,7 +55,7 @@ def plot_reward(episode_data, eval_dict, fig, gs):
             ax3_1.plot(eval_dict['step_list'], v, '.-', label=k)
     ax3_1.set_ylabel('Reward')
     ax3_1.set_title('Rewards')
-    ax3_1.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    # ax3_1.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     ax3_1.set_xlabel('Time')
     return ax3_1
 

@@ -23,6 +23,7 @@ reward_tags = (
 
     "env_tracking_error",
     "env_delta_phi",
+    "env_speed_error",
     "env_pun2front",
     "env_pun2side",
     "env_pun2space",
@@ -35,9 +36,11 @@ reward_tags = (
     "env_reward_acc_long",
     "env_reward_delta_steer",
     "env_reward_jerk",
-    "env_rew_step",
+    "env_reward_step",
     "env_punish_collision_risk",
-    "env_scaled_rew_step",
+    "env_scaled_reward_part1",
+    "env_scaled_reward_part2",
+    "env_scaled_reward_step",
     "env_scaled_reward_vel_long",
     "env_scaled_reward_yaw_rate",
     "env_scaled_reward_dist_lat",
@@ -92,6 +95,7 @@ idsim_tb_tags = (
     
     "Evaluation/env_tracking_error",
     "Evaluation/env_delta_phi",
+    "Evaluation/env_speed_error",
     "Evaluation/env_pun2front",
     "Evaluation/env_pun2side",
     "Evaluation/env_pun2space",
@@ -104,9 +108,11 @@ idsim_tb_tags = (
     "Evaluation/env_reward_acc_long",
     "Evaluation/env_reward_delta_steer",
     "Evaluation/env_reward_jerk",
-    "Evaluation/env_rew_step",
+    "Evaluation/env_reward_step",
     "Evaluation/env_punish_collision_risk",
-    "Evaluation/env_scaled_rew_step",
+    "Evaluation/env_scaled_reward_part1",
+    "Evaluation/env_scaled_reward_part2",
+    "Evaluation/env_scaled_reward_step",
     "Evaluation/env_scaled_reward_vel_long",
     "Evaluation/env_scaled_reward_yaw_rate",
     "Evaluation/env_scaled_reward_dist_lat",
@@ -122,4 +128,5 @@ idsim_tb_tags = (
 )
 
 idsim_tb_keys = (*done_tags, *reward_tags)
+assert len(idsim_tb_keys) == len(idsim_tb_tags) == len(set(idsim_tb_keys)) == len(set(idsim_tb_tags)), "idsim_tb_keys and idsim_tb_tags should have the same length and no duplicates"
 idsim_tb_tags_dict = dict(zip(idsim_tb_keys, idsim_tb_tags))
