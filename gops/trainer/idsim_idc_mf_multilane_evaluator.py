@@ -135,20 +135,20 @@ class IdsimIDCEvaluator(Evaluator):
             allowable_ref_index_list.append(selected_path_index)
         allowable_ref_value = []
         allowable_context_list = []
-        if lc_cd < self.idc_config.lane_change_cooldown:
-            allowable_ref_index_list = [selected_path_index]
-            context = MultiLaneContext.from_env(self.env, self.env.model_config, selected_path_index)
-            context = stack_samples([context])
-            value = 999
+        # if lc_cd < self.idc_config.lane_change_cooldown:
+        #     allowable_ref_index_list = [selected_path_index]
+        #     context = MultiLaneContext.from_env(self.env, self.env.model_config, selected_path_index)
+        #     context = stack_samples([context])
+        #     value = 999
+        #     allowable_ref_value.append(value)
+        #     allowable_context_list.append(context)
+        # else:
+        for ref_index in allowable_ref_index_list:
+            value, context = self.eval_ref_by_index(ref_index)
+            if ref_index == selected_path_index:
+                value += self.PATH_SELECTION_DIFF_THRESHOLD
             allowable_ref_value.append(value)
             allowable_context_list.append(context)
-        else:
-            for ref_index in allowable_ref_index_list:
-                value, context = self.eval_ref_by_index(ref_index)
-                if ref_index == selected_path_index:
-                    value += self.PATH_SELECTION_DIFF_THRESHOLD
-                allowable_ref_value.append(value)
-                allowable_context_list.append(context)
         # find optimal path: safe and max value, default selected path
         optimal_path_index = selected_path_index
         optimal_path_in_allowable = allowable_ref_index_list.index(optimal_path_index)
@@ -252,7 +252,7 @@ class IdsimIDCEvaluator(Evaluator):
                         model_obs, r, d, info = self.envmodel.forward(model_obs, a, d, info)
                         r_details = info["reward_details"]
                         v_pi += r
-                elif self.kwargs['algorithm'] == "DSACT" or self.kwargs['algorithm'] == "DSACTPI":
+                elif self.kwargs['algorithm'] == "DSACT" or self.kwargs['algorithm'] == "DSACTPI" or self.kwargs['algorithm'] == "DSACTPIR":
                     for step in range(self.envmodel.idsim_model.N):
                         logits = self.networks.policy(scaled_obs)
                         action_distribution = self.networks.create_action_distributions(logits)
@@ -260,6 +260,9 @@ class IdsimIDCEvaluator(Evaluator):
                         model_obs, r, d, info = self.envmodel.forward(model_obs, action, d, info)
                         r_details = info["reward_details"]
                         v_pi += r
+                else:
+                    raise NotImplementedError
+
                 value = v_pi.item()
             elif self.PATH_SELECTION_EVIDENCE == "value":
                 if self.kwargs['algorithm'] == "DSACT" or self.kwargs['algorithm'] == "DSACTPI":
@@ -267,6 +270,13 @@ class IdsimIDCEvaluator(Evaluator):
                     action_distribution = self.networks.create_action_distributions(logits)
                     action = action_distribution.mode().float()
                     value = torch.min(self.networks.q1(scaled_obs,action)[:,0], self.networks.q2(scaled_obs,action)[:,0]).item() /100
+                elif self.kwargs['algorithm'] == "DSACTPIR":
+                    logits = self.networks.policy(scaled_obs)
+                    action_distribution = self.networks.create_action_distributions(logits)
+                    action = action_distribution.mode().float()
+                    v_pi = torch.min(self.networks.q1.cal_comp(scaled_obs,action)[0,10], 
+                                     self.networks.q2.cal_comp(scaled_obs,action)[0,10]) /100
+                    value = v_pi.item()
                 else:
                     value = self.networks.v(scaled_obs).item()
             else:
