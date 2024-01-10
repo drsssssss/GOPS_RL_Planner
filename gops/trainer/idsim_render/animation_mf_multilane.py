@@ -34,7 +34,7 @@ class AnimationLane(AnimationBase):
     def __init__(self, theme_style, fcd_file, config) -> None:
         super().__init__(theme_style, fcd_file, config)
         self.ax1_1, self.ax1_2, self.ax1_3 = None, None, None
-        self.ax2_1, self.ax2_2, self.ax2_3 = None, None, None
+        self.ax2_1, self.ax2_2, self.ax2_3, self.ax2_4 = None, None, None, None
         self.ax3_1 = None
         self.ax4_1, self.ax4_2 = None, None
         self.ref_artist_list = []
@@ -44,7 +44,11 @@ class AnimationLane(AnimationBase):
         self.action_bar_artist_list = []
         self.value_bar_artist_list = []
         self.task_name = "multilane"
-        self.ref_points_num = len(self.config['env_model_config']['downsample_ref_point_index'])
+        downsample_ref_point_index = self.config['env_model_config'].get('downsample_ref_point_index', None)
+        if downsample_ref_point_index is not None:
+            self.ref_points_num = len(downsample_ref_point_index)
+        else:
+            self.ref_points_num = self.config['env_model_config']['N'] +1 
 
     def clear_all_list(self):
         super().clear_all_list()
@@ -259,6 +263,8 @@ class AnimationLane(AnimationBase):
                             max(eval_dict['ref_phi_list'][index_min:index_max]) * 1.05)
         self.ax2_3.set_ylim(min(eval_dict['ref_phi_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['ref_phi_list'][index_min:index_max]) * 1.05)
+        self.ax2_4.set_ylim(min(eval_dict['rel_ego_y_list'][index_min:index_max]) * 0.95,
+                            max(eval_dict['rel_ego_y_list'][index_min:index_max]) * 1.05)
         self.ax3_1.set_xlim(x_lim_min, x_lim_max)
         min_reward = min([min(v[index_min:index_max]) for v in episode_data.reward_info.values()])
         max_reward = max([max(v[index_min:index_max]) for v in episode_data.reward_info.values()])
@@ -279,17 +285,41 @@ class AnimationLane(AnimationBase):
             "y_ref_list": [x[0, 7 + self.ref_points_num].item() for x in episode_data.obs_list],
             "phi_ref_list": [np.arccos(x[0, 7 + self.ref_points_num*2].item()) * 180 / np.pi for x in episode_data.obs_list],
             "ego_phi_list": [x[4] * 180 / np.pi for x in episode_data.ego_state_list],
+            "ego_x_list": [x[0] for x in episode_data.ego_state_list],
+            "ego_y_list": [x[1] for x in episode_data.ego_state_list],
+
             'step_list': episode_data.time_stamp_list,
         }
-        eval_dict['ref_phi_list'] = np.array(eval_dict['phi_ref_list']) + np.array(eval_dict['ego_phi_list']) - eval_dict['ego_phi_list'][0]
-        eval_dict['ego_phi_list'] = np.array(eval_dict['ego_phi_list']) - eval_dict['ego_phi_list'][0]
+        eval_dict['ref_phi_list'] = np.array(eval_dict['phi_ref_list']) + np.array(eval_dict['ego_phi_list'])
+        ego_phi = np.array(eval_dict['ego_phi_list'])*np.pi/180
+        ego_x = np.array(eval_dict['ego_x_list'])
+        ego_y = np.array(eval_dict['ego_y_list'])
+        # convert the future N step ground coord ego x, y, phi to current ego coord ego x, y, phi every N steps
+        N = 100
+        convert_base_point_indexs = list(range(0, len(eval_dict['ego_x_list']), N))
+        for i in convert_base_point_indexs:
+            base_phi = np.mean(ego_phi[i:i+N])
+            end_idx = min(i+N, len(eval_dict['ego_x_list']))
+            ego_x[i:end_idx], ego_y[i:end_idx], ego_phi[i:end_idx] = convert_ground_coord_to_ego_coord(
+                ego_x[i:end_idx], ego_y[i:end_idx], ego_phi[i:end_idx],
+                ego_x[i], ego_y[i], base_phi
+                )
+        eval_dict['rel_ego_phi_list'] = ego_phi.tolist()
+        eval_dict['rel_ego_x_list'] = ego_x.tolist()
+        eval_dict['rel_ego_y_list'] = ego_y.tolist()
+        
+
+            
+
+        
+
         eval_dict["ego_id"] = episode_data.ego_id
         if 'collision_flag' in episode_data.reward_info:
             del episode_data.reward_info['collision_flag']
         # ego vx, vy, yaw rate
         self.ax1_1, self.ax1_2, self.ax1_3 = plot_vx_vy_r(eval_dict, fig, gs)
         # reference delta y and delta phi
-        self.ax2_1, self.ax2_2, self.ax2_3 = plot_y_ref_phi_ref(eval_dict, fig, gs)
+        self.ax2_1, self.ax2_2, self.ax2_3, self.ax2_4 = plot_y_ref_phi_ref(eval_dict, fig, gs)
         # all the non-zero reward
         self.ax3_1 = plot_reward(episode_data, eval_dict, fig, gs)
         # real acc, real steer angle
@@ -320,3 +350,25 @@ class AnimationLane(AnimationBase):
 
 
 
+def convert_ground_coord_to_ego_coord(x, y, phi, ego_x, ego_y, ego_phi):
+    shift_x, shift_y = shift(x, y, ego_x, ego_y)
+    x_ego_coord, y_ego_coord, phi_ego_coord \
+        = rotate(shift_x, shift_y, phi, ego_phi)
+    return x_ego_coord, y_ego_coord, phi_ego_coord
+
+
+def shift(orig_x, orig_y, shift_x, shift_y):
+    shifted_x = orig_x - shift_x
+    shifted_y = orig_y - shift_y
+    return shifted_x, shifted_y
+
+
+def rotate(orig_x, orig_y, orig_phi, rotate_phi):
+    rotated_x = orig_x * np.cos(rotate_phi) + orig_y * np.sin(rotate_phi)
+    rotated_y = -orig_x * np.sin(rotate_phi) + \
+                orig_y * np.cos(rotate_phi)
+    rotated_phi = deal_with_phi_rad(orig_phi - rotate_phi)
+    return rotated_x, rotated_y, rotated_phi
+
+def deal_with_phi_rad(phi: float):
+    return (phi + np.pi) % (2*np.pi) - np.pi
