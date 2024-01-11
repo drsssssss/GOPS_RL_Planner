@@ -65,7 +65,7 @@ class idSimEnv(CrossRoad, Env):
         if model_config.track_closest_ref_point:
             print('INFO: tracking closest reference point')
 
-        self.lc_cooldown = 30
+        self.lc_cooldown = env_config.random_ref_cooldown
         self.lc_cooldown_counter = 0
 
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
@@ -104,6 +104,9 @@ class idSimEnv(CrossRoad, Env):
             zip(reward_tags, [i.item() for i in reward_details])
         )
         done = terminated or truncated
+        if truncated:
+            info["TimeLimit.truncated"] = True # for gym
+
         return self._get_obs(), reward + reward_model_free, done, self._get_info(info)
 
     def set_ref_index(self, ref_index: int):
