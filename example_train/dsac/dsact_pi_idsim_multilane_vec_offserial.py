@@ -14,6 +14,8 @@ import os
 import numpy as np
 import json
 
+from copy import deepcopy
+
 from gops.create_pkg.create_alg import create_alg
 from gops.create_pkg.create_buffer import create_buffer
 from gops.create_pkg.create_env import create_env
@@ -224,7 +226,11 @@ if __name__ == "__main__":
     # Step 3: create buffer in trainer
     buffer = create_buffer(**args)
     # Step 4: create evaluator in trainer
-    evaluator = create_evaluator(**args)
+    eval_args = deepcopy(args)
+    eval_args['env_config']['use_multiple_path_for_multilane'] = False
+    eval_args['env_config']['random_ref_probability'] = 0.0
+    eval_args['env_config']["takeover_bias"] = False
+    evaluator = create_evaluator(**eval_args)
     # Step 5: create trainer
     trainer = create_trainer(alg, sampler, buffer, evaluator, **args)
 
