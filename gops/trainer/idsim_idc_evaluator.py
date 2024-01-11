@@ -56,6 +56,9 @@ class IDCConfig(NamedTuple):
 class EvalResult:
     def __init__(self):
         self.map_path: str = None
+        self.map_id: str = None
+        self.seed: int = None
+        self.warmup_time: float = None
         self.save_folder: str = None
         self.ego_id: str = None
         self.ego_route: Tuple = None
@@ -282,6 +285,9 @@ class IdsimIDCEvaluator(Evaluator):
         vehicle = env_context.vehicle
         eval_result = EvalResult()
         eval_result.map_path = str(env_context.scenario.root)
+        eval_result.map_id = str(self.env.config.scenario_selector)
+        eval_result.seed = self.env.config.seed
+        eval_result.warmup_time = self.env.config.warmup_time
         eval_result.save_folder = str(self.save_folder)
         eval_result.ego_id = str(vehicle.id)
         eval_result.ego_route = vehicle.route
@@ -356,12 +362,12 @@ class IdsimIDCEvaluator(Evaluator):
 
             # ----------- step ------------
             self.env.set_ref_index(selected_path_index)
-            next_obs, reward, done, next_info = self.env.step(action)
+            next_obs, reward, done, info = self.env.step(action)
 
             # ----------- save to list------------
             eval_result.obs_list.append(raw_obs)
             eval_result.action_list.append(action)
-            eval_result.action_real_list.append(next_info['state'].robot_state[..., -2:])
+            eval_result.action_real_list.append(info['state'].robot_state[..., -2:])
 
             eval_result.ego_state_list.append(
             idsim_context.x.ego_state.numpy())
@@ -372,12 +378,11 @@ class IdsimIDCEvaluator(Evaluator):
             eval_result.time_stamp_list.append(idsim_context.t)
             eval_result.selected_path_index_list.append(selected_path_index)
             for k in eval_result.reward_info.keys():
-                if k in next_info.keys() and  k.startswith("env_scaled"):
-                    eval_result.reward_info[k].append(next_info[k])
-                if k in next_info["reward_details"].keys():
-                    eval_result.reward_info[k].append(next_info["reward_details"][k])
+                if k in info.keys() and  k.startswith("env_scaled"):
+                    eval_result.reward_info[k].append(info[k])
+                if k in info["reward_details"].keys():
+                    eval_result.reward_info[k].append(info["reward_details"][k])
             obs = next_obs
-            info = next_info
 
             if "TimeLimit.truncated" not in info.keys():
                 info["TimeLimit.truncated"] = False
@@ -393,6 +398,9 @@ class IdsimIDCEvaluator(Evaluator):
             episode_step += 1
         episode_return = sum(eval_result.reward_list)
         idsim_tb_eval_dict["total_avg_return"] = episode_return
+        for k, v in idsim_tb_eval_dict.items():
+            if k.startswith("done"):
+                eval_result.done_info[k] = v
         if self.eval_save:
             with open(self.save_folder + "/{}/episode{}".format('%03d' % batch, '%03d' % episode) + '_eval_dict.pkl', 'wb') as f:
                 pickle.dump(eval_result, f, -1)
@@ -404,12 +412,14 @@ class IdsimIDCEvaluator(Evaluator):
         for episode in range(n):
             print("##### episode {} #####".format(episode)) 
             idsim_tb_eval_dict = self.run_an_episode(self.render, batch, episode)
-            if (episode>0) and ((episode+1) % self.kwargs['env_config']['scenario_reuse'] == 0):
+            if (episode>0) and ((episode+1) % self.kwargs['env_config']['scenario_reuse'] == 0) \
+                or self.kwargs['env_config']['scenario_reuse'] == 1:
                 batch += 1
                 batch = batch % self.kwargs['env_config']['num_scenarios']
                 env_config = {
                     **self.kwargs['env_config'], 'logging_root': self.kwargs['save_folder'], 'scenario_selector': str(batch)}
                 kwargs = {**self.kwargs, 'env_config': env_config, "vector_env_num": None,"gym2gymnasium":False}
+                self.env.close()
                 self.env = create_env(**kwargs)
             eval_list.append(idsim_tb_eval_dict)
         avg_idsim_tb_eval_dict = {
@@ -418,6 +428,32 @@ class IdsimIDCEvaluator(Evaluator):
         for k, v in avg_idsim_tb_eval_dict.items():
             print(k, v)
         return avg_idsim_tb_eval_dict
+    
+    def filter_episode(self, eval_result: EvalResult):
+        return eval_result.done_info['done/arrival']
+    
+    def save_testcase(self, eval_folder: str, enable_filter_condition: bool = False):
+        import os
+        batch_folder_list = [i for i in os.listdir(eval_folder) if os.path.isdir(os.path.join(eval_folder, i))]
+        test_case_list = []
+        for batch_folder in batch_folder_list:
+            epi_path = os.path.join(eval_folder, batch_folder) + f'/episode{batch_folder}_eval_dict.pkl'
+            with open(epi_path, 'rb') as f:
+                eval_result = pickle.load(f)
+            if enable_filter_condition and self.filter_episode(eval_result):
+                continue
+            else:
+                test_case = {
+                    'scenario_root': eval_result.map_path,
+                    'map_id': eval_result.map_id,
+                    'seed': eval_result.seed,
+                    'warmup_time': eval_result.warmup_time,
+                    'ego_id': eval_result.ego_id,
+                    'done_info': {k: v for k, v in eval_result.done_info.items() if v > 0},
+                }
+                test_case_list.append(test_case)
+        with open(eval_folder + '/test_case.json', 'w') as f:
+            json.dump(test_case_list, f, indent=4)
     
     def run_testcase(self, idx: int, test_case: Dict, use_mpc: bool = False):
         scenario_root = pathlib.Path(test_case['scenario_root'])
