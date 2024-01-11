@@ -76,9 +76,19 @@ class idSimEnv(CrossRoad, Env):
     def reset(self) -> Tuple[np.ndarray, dict]:
         self.lc_cooldown_counter = 0
         obs, info = super(idSimEnv, self).reset()
-        self.ref_index = np.random.choice(
-            np.arange(self.model_config.num_ref_lines)
-        ) if self.use_random_ref_param else None
+        env_context = self.engine.context
+        vehicle = env_context.vehicle
+        self.ref_index = None
+        if self.scenario == "multilane" and self.use_random_ref_param:
+            lane_list = env_context.scenario.network.get_edge_lanes(
+                vehicle.edge, vehicle.v_class)
+            cur_index = lane_list.index(vehicle.lane)
+            self.ref_index = np.random.choice([0,1,-1]) + cur_index # only allow lane change by 1
+            self.ref_index = np.clip(self.ref_index, 0, len(lane_list)-1)
+        else:
+            self.ref_index = np.random.choice(
+                np.arange(self.model_config.num_ref_lines)
+            ) if self.use_random_ref_param else None
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         return self._get_obs(), self._get_info(info)
     
