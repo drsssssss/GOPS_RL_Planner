@@ -52,4 +52,6 @@ if __name__ == "__main__":
     args['env_config']['fcd_name_template'] = "{context.scenario_id:03d}/fcd.xml"
     args['env_config']['use_random_acc'] = False
     IDCevaluator = IdsimIDCEvaluator(**args, print_done=True)
-    IDCevaluator.run_n_episodes(num_scenarios * scenario_reuse, iteration=0)
+    IDCevaluator.run_n_episodes(num_scenarios * scenario_reuse)
+    IDCevaluator.save_testcase(eval_folder=save_folder)
+    IDCevaluator.env.close()
