@@ -135,12 +135,20 @@ class IdsimIDCEvaluator(Evaluator):
             allowable_ref_index_list.append(selected_path_index)
         allowable_ref_value = []
         allowable_context_list = []
-        for ref_index in allowable_ref_index_list:
-            value, context = self.eval_ref_by_index(ref_index)
-            if ref_index == selected_path_index:
-                value += self.PATH_SELECTION_DIFF_THRESHOLD
+        if lc_cd < self.idc_config.lane_change_cooldown:
+            allowable_ref_index_list = [selected_path_index]
+            context = MultiLaneContext.from_env(self.env, self.env.model_config, selected_path_index)
+            context = stack_samples([context])
+            value = 999
             allowable_ref_value.append(value)
             allowable_context_list.append(context)
+        else:
+            for ref_index in allowable_ref_index_list:
+                value, context = self.eval_ref_by_index(ref_index)
+                if ref_index == selected_path_index:
+                    value += self.PATH_SELECTION_DIFF_THRESHOLD
+                allowable_ref_value.append(value)
+                allowable_context_list.append(context)
         # find optimal path: safe and max value, default selected path
         optimal_path_index = selected_path_index
         optimal_path_in_allowable = allowable_ref_index_list.index(optimal_path_index)
@@ -272,6 +280,7 @@ class IdsimIDCEvaluator(Evaluator):
         else:
             self.print_time += 1
         obs, info = self.env.reset()
+        warmup_time = self.env.engine.context.simulation_time
         env_context = self.env.engine.context
         vehicle = env_context.vehicle
         eval_result = EvalResult()
@@ -381,6 +390,20 @@ class IdsimIDCEvaluator(Evaluator):
         if self.eval_save:
             with open(self.save_folder + "/{}/episode{}".format('%03d' % batch, '%03d' % episode) + '_eval_dict.pkl', 'wb') as f:
                 pickle.dump(eval_result, f, -1)
+            with open(self.save_folder + "/{}/episode{}".format('%03d' % batch, '%03d' % episode) + 'scene_info.json', 'w') as f:
+                # record scene info
+                # record the parent dir of mappath
+                scenario_info = {
+                    "scenario_root": str(pathlib.Path(eval_result.map_path).parent),
+                    "map_id": self.env.config.scenario_selector,
+                    "seed": self.env.config.seed,
+                    "ego_id": eval_result.ego_id,
+                    "warmup_time": warmup_time,
+                    "traffic_seed": int(self.env.engine.context.traffic_seed),
+                }
+                json.dump(scenario_info, f, indent=4)
+
+
         return idsim_tb_eval_dict
 
     def run_n_episodes(self, n, iteration):
@@ -404,7 +427,7 @@ class IdsimIDCEvaluator(Evaluator):
             print(k, v)
         return avg_idsim_tb_eval_dict
     
-    def run_testcase(self, idx: int, test_case: Dict):
+    def run_testcase(self, idx: int, test_case: Dict, use_mpc: bool = False):
         scenario_root = pathlib.Path(test_case['scenario_root'])
         self.save_folder = self.kwargs['save_folder'] + '/test_' + str(idx)
         env_config = {
@@ -415,11 +438,26 @@ class IdsimIDCEvaluator(Evaluator):
                     'seed' : test_case['seed'],
                     'warmup_time' : test_case['warmup_time'],
                     'ego_id' : test_case['ego_id'],
-                    'num_scenarios' :  1,
+                    'num_scenarios' :  self.kwargs['env_config']['num_scenarios'],
                     'scenario_reuse' :  1,
                 }
         kwargs = {**self.kwargs, 'env_config': env_config}
         self.env.close()
         self.env = create_env(**kwargs)
-        idsim_tb_eval_dict = self.run_an_episode(0, self.render, batch=0, episode=0)
+        self.envmodel: idSimEnvModel = create_env_model(**kwargs)
+        if use_mpc:
+            from gops.sys_simulator.opt_controller_for_gen_env import OptController
+            opt_args={
+                "num_pred_step": self.envmodel.idsim_model.N,
+                "gamma": 1,
+                "mode": "shooting",
+                "minimize_options": {"max_iter": 200, "tol": 1e-3,
+                                    "acceptable_tol": 1e0,
+                                    "acceptable_iter": 10,},
+                "use_terminal_cost": False,
+            }
+            self.opt_controller = OptController(self.envmodel, **opt_args)
+            self.opt_controller.return_res = True
+            self.use_mpc = True
+        idsim_tb_eval_dict = self.run_an_episode(self.render, batch=int(test_case['map_id']), episode=0)
         return idsim_tb_eval_dict
