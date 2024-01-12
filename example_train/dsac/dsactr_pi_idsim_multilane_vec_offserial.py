@@ -14,6 +14,8 @@ import os
 import numpy as np
 import json
 
+from copy import deepcopy
+
 from gops.create_pkg.create_alg import create_alg
 from gops.create_pkg.create_buffer import create_buffer
 from gops.create_pkg.create_env import create_env
@@ -213,8 +215,18 @@ if __name__ == "__main__":
     parser.add_argument("--log_save_interval", type=int, default=1000)
 
     ################################################
+    eval_env_config = {
+        "use_multiple_path_for_multilane": False,
+        "takeover_bias": False,
+        "scenario_reuse": 1,
+        "warmup_time": 100.0,
+        "takeover_bias_x": (0.0, 1),
+        "takeover_bias_y": (0.0, 1),
+        "takeover_bias_phi": (0.0, 0.02),
+    }
     # Get parameter dictionary
     args = vars(parser.parse_args())
+    args["eval_env_config"] = eval_env_config
     env = create_env(**{**args, "vector_env_num": None})
     args = init_args(env, **args)
 
@@ -226,7 +238,9 @@ if __name__ == "__main__":
     # Step 3: create buffer in trainer
     buffer = create_buffer(**args)
     # Step 4: create evaluator in trainer
-    evaluator = create_evaluator(**args)
+    eval_args = deepcopy(args)
+    eval_args["env_config"].update(eval_env_config)
+    evaluator = create_evaluator(**eval_args)
     # Step 5: create trainer
     trainer = create_trainer(alg, sampler, buffer, evaluator, **args)
 
