@@ -48,6 +48,8 @@ class idSimEnv(CrossRoad, Env):
         self.scenario = scenario
 
         self._state = None
+        self._info = {"reward_comps": np.zeros(len(model_config.reward_comps), dtype=np.float32)}
+        self._reward_comp_list = model_config.reward_comps
         # get observation_space
         self.model = IdSimModel(env_config, model_config)
         obs_dim = self.model.obs_dim
@@ -90,7 +92,8 @@ class idSimEnv(CrossRoad, Env):
                 np.arange(self.model_config.num_ref_lines)
             ) if self.use_random_ref_param else None
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
-        return self._get_obs(), self._get_info(info)
+        self._info = self._get_info(info)
+        return self._get_obs(), self._info
     
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
@@ -117,13 +120,23 @@ class idSimEnv(CrossRoad, Env):
         if truncated:
             info["TimeLimit.truncated"] = True # for gym
 
-        return self._get_obs(), reward + reward_model_free, done, self._get_info(info)
+        self._info = self._get_info(info)
+        return self._get_obs(), reward + reward_model_free, done, self._info
 
     def set_ref_index(self, ref_index: int):
         self.ref_index = ref_index
     
     def _get_info(self, info) -> dict:
         info.update(Env._get_info(self))
+        if "env_reward_step" in info.keys():
+            info["reward_comps"] = np.array([info[i] for i in self._reward_comp_list], dtype=np.float32)
+        else:
+            info["reward_comps"] = np.zeros(len(self._reward_comp_list), dtype=np.float32)
+        return info
+    
+    @property
+    def additional_info(self) -> dict:
+        info = {"reward_comps":{"shape":(len(self._reward_comp_list),), "dtype":np.float32}}
         return info
     
     def _get_obs(self) -> np.ndarray:
