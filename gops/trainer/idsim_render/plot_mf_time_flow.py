@@ -43,8 +43,15 @@ def plot_y_ref_phi_ref(eval_dict, fig, gs):
     ax2_3.set_ylabel('$phi$ (degree)', color='g')
     ax2_3.tick_params('y', colors='g')
 
+    ax2_4 = ax2_1.twinx()
+    ax2_4.spines['right'].set_position(
+        ('outward', 120))  # Move the last y-axis spine over to the right by 60 points
+    ax2_4.plot(eval_dict['step_list'], eval_dict['rel_ego_y_list'], '.-', color='c')
+    ax2_4.set_ylabel('$rel y$ (m)', color='c')
+    ax2_4.tick_params('y', colors='c')
+
     ax2_1.set_xlabel('Time')
-    return ax2_1, ax2_2, ax2_3
+    return ax2_1, ax2_2, ax2_3, ax2_4
 
 
 def plot_reward(episode_data, eval_dict, fig, gs):
