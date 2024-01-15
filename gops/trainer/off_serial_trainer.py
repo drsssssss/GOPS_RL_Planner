@@ -25,7 +25,7 @@ from gops.utils.common_utils import ModuleOnDevice
 from gops.utils.parallel_task_manager import TaskPool
 from gops.utils.tensorboard_setup import add_scalars, tb_tags
 from gops.utils.log_data import LogData
-
+from typing import Dict
 
 class OffSerialTrainer:
     def __init__(self, alg, sampler, buffer, evaluator, **kwargs):
@@ -59,6 +59,13 @@ class OffSerialTrainer:
             {tb_tags["alg_time"]: 0, tb_tags["sampler_time"]: 0}, self.writer, 0
         )
         self.writer.flush()
+
+        # buffer statistics
+        head = "Iter, Mean, Std, 0%, 25%, 50%, 75%, 100%\n"
+        with open(self.save_folder + "/buffer_vx_stat.csv", "w") as f:
+            f.write(head)
+        with open(self.save_folder + "/buffer_y_ref_stat.csv", "w") as f:
+            f.write(head)
 
         # pre sampling
         while self.buffer.size < kwargs["buffer_warm_size"]:
@@ -107,7 +114,13 @@ class OffSerialTrainer:
             print("Iter = ", self.iteration)
             add_scalars(alg_tb_dict, self.writer, step=self.iteration)
             add_scalars(self.sampler_tb_dict.pop(), self.writer, step=self.iteration)
-
+            
+        if self.iteration % 10000 == 0:  # TODO: Hard code
+            stat_dict: Dict = self.buffer.sample_statistic(self.iteration)
+            with open(self.save_folder + "/buffer_vx_stat.csv", "a") as f:
+                f.write(stat_dict["vx"] + "\n")
+            with open(self.save_folder + "/buffer_y_ref_stat.csv", "a") as f:
+                f.write(stat_dict["y_ref"] + "\n")
         # save
         if self.iteration % self.apprfunc_save_interval == 0:
             self.save_apprfunc()

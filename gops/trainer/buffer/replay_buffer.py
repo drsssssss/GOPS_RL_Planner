@@ -116,8 +116,8 @@ class ReplayBuffer:
             else:
                 batch[k] = v[idxes].array2tensor()
         vx,_ = torch.sort(batch["obs"][:, 0])
-        yref, _ = torch.sort(torch.abs(batch["obs"][:, 7 + 31]))
-        max_yref = np.max(self.buf["obs"][:, 7 + 31])
+        yref, _ = torch.sort(torch.abs(batch["obs"][:, 7 + 4])) # TODO: Hard code
+        max_yref = np.max(self.buf["obs"][:, 7 + 4])
         print(f'max yref = {max_yref}')
         return {
             'vx': (
