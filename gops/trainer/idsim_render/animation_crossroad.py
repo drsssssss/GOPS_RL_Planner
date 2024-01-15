@@ -237,6 +237,17 @@ class AnimationCross(AnimationBase):
                 ego_action_str = ", ".join(ego_action_list)
                 self.put_text_on_ax(f'action: {ego_action_str}')
 
+                # reward
+                for k in episode_data.reward_info.keys():
+                        if k.startswith("reward"):
+                            self.put_text_on_ax(f'{k}: {episode_data.reward_info[k][step]:.4f}')
+                
+                # path value
+                path_value_list = ["{:.4f}".format(
+                    i) for i in episode_data.paths_value_list[step]]
+                path_value_str = ", ".join(path_value_list)
+                self.put_text_on_ax(f'path value: {path_value_str}')
+
                 ## loss
                 # cur_obs = episode_data.obs_list[step]
                 # self.put_text_on_ax(f'loss pi: {episode_data.loss_policy_list[step]:.4f}')
