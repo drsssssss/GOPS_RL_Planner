@@ -136,7 +136,13 @@ class idSimEnv(CrossRoad, Env):
     
     @property
     def additional_info(self) -> dict:
-        info = {"reward_comps":{"shape":(len(self._reward_comp_list),), "dtype":np.float32}}
+        info = super().additional_info
+        info.update({
+            "reward_comps":{
+                "shape":(len(self._reward_comp_list),), 
+                "dtype":np.float32
+            }
+        })
         return info
     
     def _get_obs(self) -> np.ndarray:

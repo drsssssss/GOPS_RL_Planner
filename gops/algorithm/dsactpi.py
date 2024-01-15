@@ -197,7 +197,7 @@ class DSACTPI(AlgorithmBase):
         self.networks.q1_optimizer.zero_grad()
         self.networks.q2_optimizer.zero_grad()
         self.networks.pi_optimizer.zero_grad()
-        loss_q, q1, q2, std1, std2, min_std1, min_std2 = self.__compute_loss_q(data)
+        loss_q, q1, q2, std1, std2, min_std1, min_std2, origin_q_loss = self.__compute_loss_q(data)
         loss_q.backward()
 
         for p in self.networks.q1.parameters():
@@ -220,6 +220,11 @@ class DSACTPI(AlgorithmBase):
             loss_alpha = self.__compute_loss_alpha(data)
             loss_alpha.backward()
 
+        # calculate gradient norm
+        q1_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.q1.ego_paras()]))
+        q2_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.q2.ego_paras()]))
+        policy_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.policy.ego_paras()]))
+        pi_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.pi_net.parameters()]))
         tb_info = {
             "DSAC2/critic_avg_q1-RL iter": q1.item(),
             "DSAC2/critic_avg_q2-RL iter": q2.item(),
@@ -228,13 +233,16 @@ class DSACTPI(AlgorithmBase):
             "DSAC2/critic_avg_min_std1-RL iter": min_std1.item(),
             "DSAC2/critic_avg_min_std2-RL iter": min_std2.item(),
             tb_tags["loss_actor"]: loss_policy.item(),
-            tb_tags["loss_critic"]: loss_q.item(),
+            tb_tags["loss_critic"]: origin_q_loss.item(),
             "DSAC2/policy_mean-RL iter": policy_mean,
             "DSAC2/policy_std-RL iter": policy_std,
             "DSAC2/entropy-RL iter": entropy.item(),
             "DSAC2/alpha-RL iter": self.__get_alpha(),
             "DSAC2/mean_std1": self.mean_std1,
             "DSAC2/mean_std2": self.mean_std2,
+            "DSAC2/q_grad_norm": (q1_grad_norm+ q2_grad_norm).item()/2,
+            "DSAC2/policy_grad_norm": policy_grad_norm.item(),
+            "DSAC2/pi_grad_norm": pi_grad_norm.item(),
             tb_tags["alg_time"]: (time.time() - start_time) * 1000,
         }
 
@@ -321,9 +329,18 @@ class DSACTPI(AlgorithmBase):
             -((torch.pow(q2.detach() - target_q2_bound, 2)- q2_std_detach.pow(2) )/ (torch.pow(q2_std_detach, 3) +bias)
             )*q2_std
         )
+        with torch.no_grad():
+            origin_q1_loss = (torch.pow(self.mean_std1, 2)) * torch.mean(
+                torch.pow((target_q1 - q1),2) / ( torch.pow(q1_std_detach, 2)+ 1e-6)  
+                + torch.log(q1_std_detach+1e-6)) # for numerical stability
+            origin_q2_loss = (torch.pow(self.mean_std2, 2)) * torch.mean(
+                torch.pow((target_q2 - q2),2) / ( torch.pow(q2_std_detach, 2)+ 1e-6)  
+                + torch.log(q2_std_detach+1e-6))
+            origin_q_loss = origin_q1_loss + origin_q2_loss
+        
 
 
-        return q1_loss +q2_loss, q1.detach().mean(), q2.detach().mean(), q1_std.detach().mean(), q2_std.detach().mean(), q1_std.min().detach(), q2_std.min().detach()
+        return q1_loss +q2_loss, q1.detach().mean(), q2.detach().mean(), q1_std.detach().mean(), q2_std.detach().mean(), q1_std.min().detach(), q2_std.min().detach(), origin_q_loss.detach()
 
     def __compute_target_q(self, r, done, q,q_std, q_next, q_next_sample, log_prob_a_next):
         target_q = r + (1 - done) * self.gamma * (
