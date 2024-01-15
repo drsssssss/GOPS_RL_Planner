@@ -106,3 +106,38 @@ class ReplayBuffer:
             else:
                 batch[k] = v[idxes].array2tensor()
         return batch
+
+    def sample_statistic(self, iteration, batch_size: int = 1024) -> dict:
+        idxes = np.random.randint(0, self.size, size=batch_size)
+        batch = {}
+        for k, v in self.buf.items():
+            if isinstance(v, np.ndarray):
+                batch[k] = torch.as_tensor(v[idxes], dtype=torch.float32)
+            else:
+                batch[k] = v[idxes].array2tensor()
+        vx,_ = torch.sort(batch["obs"][:, 0])
+        yref, _ = torch.sort(torch.abs(batch["obs"][:, 7 + 31]))
+        max_yref = np.max(self.buf["obs"][:, 7 + 31])
+        print(f'max yref = {max_yref}')
+        return {
+            'vx': (
+                f"{iteration:d},"
+                f"{vx.mean():.2f},"
+                f"{vx.std():.2f},"
+                f"{vx[0]:.2f},"
+                f"{vx[int(batch_size * 0.25)]:.2f},"
+                f"{vx[int(batch_size * 0.5)]:.2f},"
+                f"{vx[int(batch_size * 0.75)]:.2f},"
+                f"{vx[-1]:.2f}"
+            ),
+            'y_ref': (
+                f"{iteration:d},"
+                f"{yref.mean():.2f},"
+                f"{yref.std():.2f},"
+                f"{yref[0]:.2f},"
+                f"{yref[int(batch_size * 0.25)]:.2f},"
+                f"{yref[int(batch_size * 0.5)]:.2f},"
+                f"{yref[int(batch_size * 0.75)]:.2f},"
+                f"{yref[-1]:.2f}"
+            )
+        }
