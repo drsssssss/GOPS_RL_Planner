@@ -135,20 +135,20 @@ class IdsimIDCEvaluator(Evaluator):
             allowable_ref_index_list.append(selected_path_index)
         allowable_ref_value = []
         allowable_context_list = []
-        # if lc_cd < self.idc_config.lane_change_cooldown:
-        #     allowable_ref_index_list = [selected_path_index]
-        #     context = MultiLaneContext.from_env(self.env, self.env.model_config, selected_path_index)
-        #     context = stack_samples([context])
-        #     value = 999
-        #     allowable_ref_value.append(value)
-        #     allowable_context_list.append(context)
-        # else:
-        for ref_index in allowable_ref_index_list:
-            value, context = self.eval_ref_by_index(ref_index)
-            if ref_index == selected_path_index:
-                value += self.PATH_SELECTION_DIFF_THRESHOLD
+        if lc_cd < self.idc_config.lane_change_cooldown:
+            allowable_ref_index_list = [selected_path_index]
+            context = MultiLaneContext.from_env(self.env, self.env.model_config, selected_path_index)
+            context = stack_samples([context])
+            value = 999
             allowable_ref_value.append(value)
             allowable_context_list.append(context)
+        else:
+            for ref_index in allowable_ref_index_list:
+                value, context = self.eval_ref_by_index(ref_index)
+                if ref_index == selected_path_index:
+                    value += self.PATH_SELECTION_DIFF_THRESHOLD
+                allowable_ref_value.append(value)
+                allowable_context_list.append(context)
         # find optimal path: safe and max value, default selected path
         optimal_path_index = selected_path_index
         optimal_path_in_allowable = allowable_ref_index_list.index(optimal_path_index)

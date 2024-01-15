@@ -249,14 +249,15 @@ def get_repo_changes(repo, save_folder):
         print(f"\nChanges in Main Repository:\n{diff_summary}")
         diff_details = repo.git.diff("--minimal", "--patience", "--cached")
         patch.write(f"\nMain Repository Details:\n{diff_details}\n")
-    for submodule in repo.submodules:
-        submodule_path = submodule.path
-        submodule_repo = submodule.module()
-
-        submodule_diff_summary = submodule_repo.git.diff("--stat", "--cached")
-        changes.append((f"Submodule: {submodule_path}", submodule_diff_summary))
-        print(f"\nChanges in Submodule: {submodule_path}:\n{submodule_diff_summary}")
-        diff_details = submodule_repo.git.diff("--minimal", "--patience", "--cached")
+        for submodule in repo.submodules:
+            submodule_path = submodule.path
+            submodule_repo = submodule.module()
+            submodule_repo.git.add("-A", ".")
+            submodule_diff_summary = submodule_repo.git.diff("--stat", "--cached")
+            changes.append((f"Submodule: {submodule_path}", submodule_diff_summary))
+            print(f"\nChanges in Submodule: {submodule_path}:\n{submodule_diff_summary}")
+            diff_details = submodule_repo.git.diff("--minimal", "--patience", "--cached")
+            patch.write(f"\nSubmodule: {submodule_path} Details:\n{diff_details}\n")
     return changes
 
 def git_backup(save_folder, project_root, exp_discription, save_zip=True):
@@ -331,7 +332,11 @@ def git_backup(save_folder, project_root, exp_discription, save_zip=True):
                 submodule_path = submodule.path
                 submodule_repo = submodule.module()
                 for file_name in submodule_repo.git.ls_files().split():
-                    pkg.write(os.path.join(submodule_path, file_name), arcname=os.path.join(submodule_path, file_name))
+                    # exclude files that not exists
+                    if not os.path.exists(os.path.join(project_root,submodule_path, file_name)):
+                        warnings.warn(f"File {file_name} in submodule {submodule_path} does not exist! Skip it.")
+                        continue
+                    pkg.write(os.path.join(project_root,submodule_path, file_name), arcname=os.path.join(submodule_path, file_name))
 
             pkg.close()
         
