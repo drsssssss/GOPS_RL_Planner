@@ -246,12 +246,16 @@ class AnimationLane(AnimationBase):
 
     def adjust_lim(self, episode_data, eval_dict, step):
         index_min = max(0, step - 100)
-        index_max = min(len(episode_data.time_stamp_list) - 1, step + 100)
+        index_max = min(len(episode_data.time_stamp_list) - 1, step + 1)
         x_lim_min = episode_data.time_stamp_list[index_min]
         x_lim_max = episode_data.time_stamp_list[index_max]
         self.ax1_1.set_xlim(x_lim_min, x_lim_max)
-        self.ax1_1.set_ylim(min(eval_dict['vx_list'][index_min:index_max]) * 0.95,
-                            max(eval_dict['vx_list'][index_min:index_max]) * 1.05)
+        min_vx = min(eval_dict['vx_list'][index_min:index_max])
+        min_ref_v = min(eval_dict['ref_v_list'][index_min:index_max])
+        max_vx = max(eval_dict['vx_list'][index_min:index_max])
+        max_ref_v = max(eval_dict['ref_v_list'][index_min:index_max])
+        self.ax1_1.set_ylim(min(min_vx, min_ref_v) * 0.95,
+                            max(max_vx, max_ref_v) * 1.05)
         self.ax1_2.set_ylim(min(eval_dict['vy_list'][index_min:index_max]) * 0.95,
                             max(eval_dict['vy_list'][index_min:index_max]) * 1.05)
         self.ax1_3.set_ylim(min(eval_dict['r_list'][index_min:index_max]) * 0.95,
@@ -278,6 +282,7 @@ class AnimationLane(AnimationBase):
     def plot_figures(self, episode_data, fig, gs):
         eval_dict = {
             'vx_list': [x[0, 0].item() for x in episode_data.obs_list],
+            'ref_v_list': [(x[0, 0] - x[0, 7 + self.ref_points_num * 4]).item() for x in episode_data.obs_list],
             'vy_list': [x[0, 1].item() for x in episode_data.obs_list],
             'r_list': [x[0, 2].item() for x in episode_data.obs_list],
             'acc_list': [x[0, 5].item() for x in episode_data.obs_list],

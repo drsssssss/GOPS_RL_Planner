@@ -8,6 +8,8 @@ def plot_vx_vy_r(eval_dict, fig, gs):
     ax1_1.plot(eval_dict['step_list'], eval_dict['vx_list'], '.-', label='vx', color='b')
     ax1_1.set_ylabel('$v_x$', color='b')
     ax1_1.tick_params('y', colors='b')
+    ax1_1.plot(eval_dict['step_list'], eval_dict['ref_v_list'], '-', label='ref_v', color='k')
+    ax1_1.legend()
     ax1_2 = ax1_1.twinx()
     ax1_2.plot(eval_dict['step_list'], eval_dict['vy_list'], '.-', label='vy', color='r')
     ax1_2.set_ylabel('$v_y$', color='r')
