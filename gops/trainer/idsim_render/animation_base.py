@@ -6,8 +6,7 @@ from typing import Dict, List, Tuple
 from gops.trainer.idsim_idc_evaluator import EvalResult
 from gops.trainer.idsim_render.color import SUR_COLOR, SUR_COLOR_WITH_ALPHA, SUR_FOCUS_COLOR, SUR_FOCUS_COLOR_WITH_ALPHA
 from gops.trainer.idsim_render.process_fcd import FCDLog
-from gops.trainer.idsim_render.render_params import veh_length, veh_width, cyl_length, cyl_width, \
-    ped_length, ped_width, traffic_light_length, traffic_light_width, \
+from gops.trainer.idsim_render.render_params import multilane_surr_size_dict, crossroad_surr_size_dict, traffic_light_length, traffic_light_width, \
     sur_face_color, ego_face_color, ref_color_list
 from idsim.utils.coordinates_shift import convert_sumo_coord_to_ground_coord
 import matplotlib.pyplot as plt
@@ -60,7 +59,7 @@ def remove_veh(vehPatch: Rt):
 
 
 class AnimationBase:
-    def __init__(self, theme_style='light', fcd_file=None, config=None) -> None:
+    def __init__(self, theme_style='light', fcd_file=None, config=None, env_scenario=None) -> None:
         self.theme_style = theme_style
         self.fcd_log = FCDLog.from_file(fcd_file)
         self.config = config
@@ -75,6 +74,9 @@ class AnimationBase:
 
         self.REF_POINT_NUM = 31
         self.REF_LINEWIDTH = 2.0
+
+        self.env_scenario = env_scenario if env_scenario is not None else "multilane"
+        assert self.env_scenario in ["multilane", "crossroad"], ("invalid scenario type " + str(self.env_scenario))
 
     def plot_traffic(self, episode_data, fig, gs):
         pass
@@ -103,12 +105,22 @@ class AnimationBase:
     def update_sur_participants(self, ax, cur_time, episode_data, step):
         participants = self.fcd_log.at(cur_time).vehicles
         ego_veh_id = episode_data.ego_id
-        veh_id_list = [p.id for p in participants if p.id !=
-                       ego_veh_id and (p.type == 'v1' or p.type == 'v2')]
-        cyl_id_list = [p.id for p in participants if p.id !=
-                       ego_veh_id and p.type == 'v3']
-        ped_id_list = [p.id for p in participants if p.id !=
-                       ego_veh_id and p.type == 'person']
+        if self.env_scenario == "multilane": #TODO: update when change the scenario setting
+            veh_id_list = [p.id for p in participants if p.id !=
+                ego_veh_id and (p.type == 'v1' or p.type == 'v2')]
+            cyl_id_list = [p.id for p in participants if p.id !=
+                        ego_veh_id and p.type == 'v3']
+            ped_id_list = [p.id for p in participants if p.id !=
+                        ego_veh_id and p.type == 'person']
+        elif self.env_scenario == "crossroad":
+            veh_id_list = [p.id for p in participants if p.id !=
+                        ego_veh_id and p.type.startswith('v')]
+            cyl_id_list = [p.id for p in participants if p.id !=
+                        ego_veh_id and p.type == 'b1']
+            ped_id_list = [p.id for p in participants if p.id !=
+                        ego_veh_id and p.type == 'person']
+        else:
+            raise ValueError("invalid scenario type " + str(self.env_scenario))
         # veh
         to_add_veh = list(set(veh_id_list) - set(self.last_veh_id_list))
         to_update_veh = list(set(veh_id_list) - set(to_add_veh))
@@ -127,14 +139,14 @@ class AnimationBase:
         to_remove = to_remove_veh + to_remove_cyl + to_remove_ped
 
         for surr in participants:
-            if surr.type == 'v1' or surr.type == 'v2':
-                length, width = veh_length, veh_width
-            elif surr.type == 'v3':
-                length, width = cyl_length, cyl_width
-            elif surr.type == 'person':
-                length, width = ped_length, ped_width
+            if self.env_scenario == "multilane":  #TODO: update when change the scenario setting
+                assert surr.type in ['v1', 'v2', 'v3', 'person'], ('invalid traffic type ' + str(surr.type))
+                length, width = multilane_surr_size_dict[surr.type]
+            elif self.env_scenario == "crossroad":
+                assert surr.type in ['v1', 'v2', 'v3', 'b1', 'person'], ('invalid traffic type ' + str(surr.type))
+                length, width = crossroad_surr_size_dict[surr.type]
             else:
-                raise ValueError('invalid type')
+                raise ValueError("invalid scenario type " + str(self.env_scenario))
             x, y, phi = convert_sumo_coord_to_ground_coord(
                 surr.x, surr.y, surr.angle, length)
             if surr.id in to_add:
