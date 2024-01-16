@@ -19,6 +19,8 @@ import time
 
 import ray
 import torch
+
+from typing import Dict
 from torch.utils.tensorboard import SummaryWriter
 
 from gops.utils.common_utils import ModuleOnDevice
