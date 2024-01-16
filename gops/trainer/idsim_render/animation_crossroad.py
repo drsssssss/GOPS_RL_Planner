@@ -19,9 +19,10 @@ from gops.trainer.idsim_render.utils import get_line_points
 
 from idscene.scenario import ScenarioData
 from idscene.utils.geometry_utils import get_line_inclination
-from gops.trainer.idsim_render.render_params import veh_length, veh_width, traffic_light_length, traffic_light_width, \
+from gops.trainer.idsim_render.render_params import crossroad_surr_size_dict, traffic_light_length, traffic_light_width, \
     ego_face_color, ref_color_list
 
+ego_length, ego_width = crossroad_surr_size_dict['v1']
 
 def get_traffic_light_index(current_time: float, durations: np.ndarray) -> int:
     cycle_time = durations.sum()
@@ -35,7 +36,7 @@ def get_traffic_light_index(current_time: float, durations: np.ndarray) -> int:
 
 class AnimationCross(AnimationBase):
     def __init__(self, theme_style, fcd_file, config) -> None:
-        super().__init__(theme_style, fcd_file, config)
+        super().__init__(theme_style, fcd_file, config, "crossroad")
         self.task_name = "intersection"
         self.text_counter = 0
         self.fig: plt.Figure = None
@@ -103,10 +104,10 @@ class AnimationCross(AnimationBase):
         #                                  line_color=ref_color_list[0])
 
         # create ego veh and head
-        ego_veh = create_veh(ax, (0, 0), 0, veh_length,
-                             veh_width, facecolor=EGO_COLOR_WITH_ALPHA, edgecolor=EGO_COLOR, zorder=103)
+        ego_veh = create_veh(ax, (0, 0), 0, ego_length,
+                             ego_width, facecolor=EGO_COLOR_WITH_ALPHA, edgecolor=EGO_COLOR, zorder=103)
         # ego_veh_id = episode_data.ego_id
-        ego_head = ax.plot([0, 0+veh_length*0.8*np.cos(0)], [0, 0+veh_width *
+        ego_head = ax.plot([0, 0+ego_length*0.8*np.cos(0)], [0, 0+ego_width *
                            0.8*np.sin(0)], color=ego_face_color, linewidth=0.5, zorder=200)
 
         ref_lines = []
@@ -177,9 +178,9 @@ class AnimationCross(AnimationBase):
             ego_x, ego_y, _, _, ego_phi, _ = episode_data.ego_state_list[step]
             circle = Circle((ego_x, ego_y), 1.0, facecolor=TRAJ_COLOR_WITH_ALPHA, edgecolor='none')
             ax.add_patch(circle)
-            update_veh(ego_veh, (ego_x, ego_y), ego_phi, veh_length, veh_width)
-            ego_head[0].set_data([ego_x, ego_x+veh_length*0.8*np.cos(ego_phi)],
-                                 [ego_y, ego_y+veh_length*0.8*np.sin(ego_phi)])
+            update_veh(ego_veh, (ego_x, ego_y), ego_phi, ego_length, ego_width)
+            ego_head[0].set_data([ego_x, ego_x+ego_length*0.8*np.cos(ego_phi)],
+                                 [ego_y, ego_y+ego_length*0.8*np.sin(ego_phi)])
 
             # # ---------------- update ego detect range------------------
             ego_detect_circle.center = (ego_x, ego_y)
