@@ -72,7 +72,7 @@ class idSimEnv(CrossRoad, Env):
         if model_config.track_closest_ref_point:
             print('INFO: tracking closest reference point')
 
-        self.lc_cooldown = 30
+        self.lc_cooldown = self.env_config.random_ref_cooldown
         self.lc_cooldown_counter = 0
 
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
