@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, Generic, Optional, Tuple, Union
+from typing import Any, Dict, List, Generic, Optional, Tuple, Union
 from typing_extensions import Self
 
 import gym
@@ -39,10 +39,15 @@ class idSimContext(Context):
     
 
 class idSimEnv(CrossRoad, Env):
-    def __new__(cls, env_config: Config, model_config: Dict[str, Any], scenario: str) -> Self:
+    def __new__(cls, env_config: Config, model_config: Dict[str, Any], 
+                scenario: str, rou_config: Dict[str, Any]=None) -> Self:
         return super(idSimEnv, cls).__new__(cls, env_config)
     
-    def __init__(self, env_config: Config, model_config: ModelConfig, scenario: str):
+    def __init__(self, env_config: Config, model_config: ModelConfig, 
+                 scenario: str, rou_config: Dict[str, Any]=None):
+        self.rou_config = rou_config
+        self.env_config = env_config
+        self.rou_config = rou_config
         super(idSimEnv, self).__init__(env_config)
         self.model_config = model_config
         self.scenario = scenario
@@ -67,7 +72,7 @@ class idSimEnv(CrossRoad, Env):
         if model_config.track_closest_ref_point:
             print('INFO: tracking closest reference point')
 
-        self.lc_cooldown = env_config.random_ref_cooldown
+        self.lc_cooldown = 30
         self.lc_cooldown_counter = 0
 
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
@@ -77,6 +82,17 @@ class idSimEnv(CrossRoad, Env):
     
     def reset(self) -> Tuple[np.ndarray, dict]:
         self.lc_cooldown_counter = 0
+        if self.rou_config is not None:
+            if self.engine is None:
+                # first create engine
+                print("INFO: change rou")
+                self.change_rou_file()
+            else:
+                print(self.engine.context.episode_count, self.config.scenario_reuse)
+                if (self.engine.context.episode_count+1) % self.config.scenario_reuse == 0:
+                    # need to change new map
+                    print("INFO: change rou")
+                    self.change_rou_file()
         obs, info = super(idSimEnv, self).reset()
         env_context = self.engine.context
         vehicle = env_context.vehicle
@@ -224,6 +240,21 @@ class idSimEnv(CrossRoad, Env):
     def close(self) -> None:
         super(idSimEnv, self).close()
 
+    def change_rou_file(self):
+        surrounding_max_speed_range = self.rou_config["surrounding_max_speed_range"]
+        surrounding_max_speed_list = np.random.uniform(*surrounding_max_speed_range, size=5)
+        # surrounding_max_speed_list = [4.0, 5.0, 6.0]
+        print(f"INFO: change surrounding_max_speed to {surrounding_max_speed_list}")
+        change_dict = {"maxSpeed": surrounding_max_speed_list}
+        if self.env_config.scenario_selector is not None:
+            map_path = self.env_config.scenario_root / self.env_config.scenario_selector
+            map_path_list = [map_path]
+        else:
+            map_path_list = [map_path for map_path in self.env_config.scenario_root.iterdir() if map_path.is_dir()]
+        for map_path in map_path_list:
+            rou_path = map_path / "scene.rou.xml"
+            assert rou_path.exists(), f"rou_path {rou_path} does not exist"
+            change_rou(rou_path, change_dict)
 
 def get_idsimcontext(state: State, mode: str, scenario: str) -> BaseContext:
     if scenario == "crossroad":
@@ -274,6 +305,24 @@ def get_idsimcontext(state: State, mode: str, scenario: str) -> BaseContext:
         raise NotImplementedError
     return context
 
+def change_rou(rou_path: Path, change_dict: Dict[str, List[float]]) -> None:
+    """
+    change surrounding_max_speed in rou_path
+    """
+    import xml.etree.ElementTree as ET
+    tree = ET.parse(rou_path)
+    root = tree.getroot()
+    ind = -1
+    for child in root:
+        if child.tag == 'vType':
+            ind += 1
+            print(child.tag, child.attrib)
+            # change the attribute
+            for k, v in change_dict.items():
+                mod_int = ind % len(v)
+                child.attrib[k] = str(v[mod_int])
+    # write to file
+    tree.write(rou_path)
 
 def env_creator(**kwargs):
     """
@@ -293,5 +342,6 @@ def env_creator(**kwargs):
     model_config = deepcopy(kwargs["env_model_config"])
     model_config = ModelConfig.from_partial_dict(model_config)
 
-    env = idSimEnv(env_config, model_config, env_scenario)
+    rou_config = kwargs["rou_config"] if "rou_config" in kwargs.keys() else None
+    env = idSimEnv(env_config, model_config, env_scenario, rou_config)
     return env

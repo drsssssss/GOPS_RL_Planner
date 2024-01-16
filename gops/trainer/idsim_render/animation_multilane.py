@@ -32,7 +32,7 @@ VEH_WIDTH = 1.8
 
 class AnimationLane(AnimationBase):
     def __init__(self, theme_style, fcd_file, config) -> None:
-        super().__init__(theme_style, fcd_file, config)
+        super().__init__(theme_style, fcd_file, config, "multilane")
         self.ax1_1, self.ax1_2, self.ax1_3 = None, None, None
         self.ax2_1, self.ax2_2 = None, None
         self.ax3_1 = None
