@@ -2,7 +2,7 @@ from typing import Dict, Union, Tuple
 import numpy as np
 
 MAP_ROOT_CROSSROAD = '/root/idsim-scenarios/idsim-crossroad'
-MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-dense/'
+MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-dense-v20-period0dot5/'
 pre_horizon = 30
 delta_t = 0.1
 
@@ -17,7 +17,7 @@ env_config_param_base = {
     "scenario_root": MAP_ROOT_CROSSROAD,
     "scenario_selector": None,
     "extra_sumo_args": ("--start", "--delay", "200"),
-    "warmup_time": 5.0,
+    "warmup_time": 50.0,
     "max_steps": 200,
     "ignore_traffic_lights": False,
     "no_done_at_collision": False, 

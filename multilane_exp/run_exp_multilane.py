@@ -14,8 +14,8 @@ base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 script_path = os.path.join(base_path, 'example_train')
 save_folder = os.path.join(base_path, 'results/idsim')
 
-exp_name = 'idsim_multilane_exp_0115_4' 
-exp_discription = 'based on exp DSACT_240112_222750, add buffer max size from 2.5e5 -> 5e5, surronding veh 8->5, action repeats  =4, ref_points_num =4, random acc(already used in all exp within this week), random take over)'
+exp_name = 'idsim_multilane_exp_0117_1' 
+exp_discription = 'based on exp DSACT_exp0115_3, new map(random sur veh size and speed))'
 
 script_folder = "dsac"
 algs = ['dsact']
