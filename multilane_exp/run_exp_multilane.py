@@ -12,10 +12,10 @@ base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Experiment parameters
 script_path = os.path.join(base_path, 'example_train')
-save_folder = os.path.join(base_path, 'results')
+save_folder = os.path.join(base_path, 'results/idsim')
 
-exp_name = 'test'
-exp_discription = 'just a test'
+exp_name = 'idsim_multilane_exp_0115_4' 
+exp_discription = 'based on exp DSACT_240112_222750, add buffer max size from 2.5e5 -> 5e5, surronding veh 8->5, action repeats  =4, ref_points_num =4, random acc(already used in all exp within this week), random take over)'
 
 script_folder = "dsac"
 algs = ['dsact']
@@ -26,7 +26,7 @@ surfix_filter = 'offserial.py'
 run_config = {
     # 'env_id': ['gym_carracingraw'],
     'seed':[12345],
-    # 'buffer_max_size':[250000],
+    'buffer_max_size':[500000],
     # 'eval_interval':[2000],
     # 'sample_batch_size':[10],
     # 'sample_interval':[1],

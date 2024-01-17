@@ -72,6 +72,7 @@ if __name__ == "__main__":
         env_model_config=base_env_model_config
     )
     parser.add_argument("--obs_scale", type=dict, default=obs_scale)
+    parser.add_argument("--repeat_num", type=int, default=4, help="action repeat num")
 
     parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
@@ -238,6 +239,7 @@ if __name__ == "__main__":
     # Step 4: create evaluator in trainer
     eval_args = deepcopy(args)
     eval_args["env_config"].update(eval_env_config)
+    eval_args["repeat_num"] = None  
     evaluator = create_evaluator(**eval_args)
     # Step 5: create trainer
     trainer = create_trainer(alg, sampler, buffer, evaluator, **args)

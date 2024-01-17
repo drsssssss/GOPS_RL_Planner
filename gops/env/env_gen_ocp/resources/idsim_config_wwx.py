@@ -30,7 +30,7 @@ env_config_param_base = {
     "real_action_lower_bound": (-3.0, -0.571),
     "real_action_upper_bound": (0.8, 0.571),
     "obs_num_surrounding_vehicles": {
-        "passenger": 8,
+        "passenger": 5,
         "bicycle": 0,
         "pedestrian": 0,
     },
@@ -45,13 +45,13 @@ env_config_param_base = {
     "random_ref_cooldown":  80,
 
     "takeover_bias": False,
-    "takeover_bias_x": (0.0, 1.5),
-    "takeover_bias_y": (0.0, 1.5),
+    "takeover_bias_x": (0.0, 0.5),
+    "takeover_bias_y": (0.0, 0.5),
     "takeover_bias_phi": (0.0, 0.05),
-    "takeover_bias_vx": (3.0, 1.0),
+    "takeover_bias_vx": (0.0, 1.5),
     "takeover_bias_ax": (0.0, 0.25),
     "takeover_bias_steer": (0.0, 0.02),
-    
+    "minimum_clearance_when_takeover":5.0,
     # model free reward config
     "punish_sur_mode": "max",
     "enable_slow_reward": False,
@@ -93,7 +93,7 @@ model_config_base = {
     "ego_length": 5.0,
     "ego_width": 1.8,
     "safe_dist_incremental": 1.2,
-    "downsample_ref_point_index": (0, 1, 5, 10, 30),
+    "downsample_ref_point_index": (0, 1, 10, 30),
 
     "num_ref_points": pre_horizon + 1,
     "ego_feat_dim": 7,  # vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
