@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
     # 2.3 Parameters of shared approximate function
     pi_paras = cal_idsim_pi_paras(env_config=base_env_config, env_model_config=base_env_model_config)
-    parser.add_argument("--target_PI", type=bool, default=False)
+    parser.add_argument("--target_PI", type=bool, default=True)
     parser.add_argument("--pi_begin", type=int, default=pi_paras["pi_begin"])
     parser.add_argument("--pi_end", type=int, default=pi_paras["pi_end"])
     parser.add_argument("--enable_mask", type=bool, default=True)
@@ -150,7 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
     parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
     parser.add_argument("--pi_learning_rate", type=float, default=1e-4)
-    parser.add_argument("--alpha_learning_rate", type=float, default=3e-4)
+    parser.add_argument("--alpha_learning_rate", type=float, default=1e-5)
 
     # special parameter
     parser.add_argument("--gamma", type=float, default=0.99)

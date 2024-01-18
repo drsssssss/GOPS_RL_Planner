@@ -14,8 +14,8 @@ base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 script_path = os.path.join(base_path, 'example_train')
 save_folder = os.path.join(base_path, 'results/idsim')
 
-exp_name = 'idsim_multilane_exp_0117_1' 
-exp_discription = 'based on exp DSACT_exp0115_3, new map(random sur veh size and speed))'
+exp_name = 'idsim_multilane_exp_0118_1' 
+exp_discription = 'based on exp DSACT_exp0115_3, new map(random sur veh size and speed)), tar-pi, low alpha learning rate, random acc (small prob) and take over bias(small phi) '
 
 script_folder = "dsac"
 algs = ['dsact']
@@ -68,5 +68,6 @@ if __name__ == '__main__':
     exp_runner = BaseExpRunner(**args)
     with open(os.path.join(exp_runner.save_folder, 'exp_config.json'), 'w') as f:
         json.dump(args, f, indent=4)
+    os.chmod(os.path.join(exp_runner.save_folder, 'exp_config.json'), 0o444) # set the file to read only
     exp_runner.run()
     

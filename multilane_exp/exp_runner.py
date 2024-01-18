@@ -258,6 +258,7 @@ def get_repo_changes(repo, save_folder):
             print(f"\nChanges in Submodule: {submodule_path}:\n{submodule_diff_summary}")
             diff_details = submodule_repo.git.diff("--minimal", "--patience", "--cached")
             patch.write(f"\nSubmodule: {submodule_path} Details:\n{diff_details}\n")
+    os.chmod(patch_file, 0o444) # make it read only
     return changes
 
 def git_backup(save_folder, project_root, exp_discription, save_zip=True):
@@ -305,6 +306,7 @@ def git_backup(save_folder, project_root, exp_discription, save_zip=True):
             for change_detail in changes:
                 f.write(f"\n{change_detail[0]}:\n")
                 f.write(change_detail[1])
+        os.chmod(exp_summary, 0o444) # make it read only
         
         val = input("Press Enter to continue, or press 'esc' to exit: ")
         if val == '\x1b':
