@@ -107,7 +107,7 @@ class AnimationBase:
         ego_veh_id = episode_data.ego_id
         if self.env_scenario == "multilane": #TODO: update when change the scenario setting
             veh_id_list = [p.id for p in participants if p.id !=
-                ego_veh_id and (p.type == 'v1' or p.type == 'v2')]
+                ego_veh_id and (p.type.startswith('v'))]
             cyl_id_list = [p.id for p in participants if p.id !=
                         ego_veh_id and p.type == 'v3']
             ped_id_list = [p.id for p in participants if p.id !=
@@ -140,8 +140,10 @@ class AnimationBase:
 
         for surr in participants:
             if self.env_scenario == "multilane":  #TODO: update when change the scenario setting
-                assert surr.type in ['v1', 'v2', 'v3', 'person'], ('invalid traffic type ' + str(surr.type))
-                length, width = multilane_surr_size_dict[surr.type]
+                veh_type = surr.type.split('-')[0]
+                assert veh_type in ['v1', 'person','vm','vs'], ('invalid traffic type ' + str(surr.type))
+
+                length, width = multilane_surr_size_dict[veh_type]
             elif self.env_scenario == "crossroad":
                 assert surr.type in ['v1', 'v2', 'v3', 'b1', 'person'], ('invalid traffic type ' + str(surr.type))
                 length, width = crossroad_surr_size_dict[surr.type]
