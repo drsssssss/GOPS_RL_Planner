@@ -277,36 +277,55 @@ def git_backup(save_folder, project_root, exp_discription, save_zip=True):
         changes = get_repo_changes(repo, save_folder)
 
         exp_summary = os.path.join(save_folder, 'exp_summary.txt')
+        meta_data = {}
+        repo_dict = {}
+        repo_dict['path'] = project_root
 
         with open(exp_summary, 'w') as f:
             f.write(f"Experiment Discription: {exp_discription}\n")
             current_branch = repo.active_branch
+            repo_dict['branch'] = current_branch.name
             print(f"Current branch in main repository: {current_branch}")
             f.write(f"Current branch in main repository: {current_branch}\n")
 
             current_commit_id = repo.head.commit.hexsha
+            repo_dict['commit_id'] = current_commit_id
             print(f"Current commit ID in main repository: {current_commit_id}")
             f.write(f"Current commit ID in main repository: {current_commit_id}\n")
-
+            meta_data['main_repo'] = repo_dict
 
             submodules = repo.submodules
 
             for submodule in submodules:
+                repo_dict = {}
                 submodule_path = submodule.path
                 submodule_repo = submodule.module()
+                repo_dict['path'] = os.path.join(project_root, submodule_path)
+
 
                 submodule_branch = submodule_repo.active_branch
+                repo_dict['branch'] = submodule_branch.name
                 print(f"Branch in submodule '{submodule_path}': {submodule_branch}")
                 f.write(f"Branch in submodule '{submodule_path}': {submodule_branch}\n")
 
                 submodule_commit_id = submodule_repo.head.commit.hexsha
+                repo_dict['commit_id'] = submodule_commit_id
                 print(f"Commit ID in submodule '{submodule_path}': {submodule_commit_id}")
                 f.write(f"Commit ID in submodule '{submodule_path}': {submodule_commit_id}\n")
+
+                meta_data[submodule_path] = repo_dict
+        
+
 
             for change_detail in changes:
                 f.write(f"\n{change_detail[0]}:\n")
                 f.write(change_detail[1])
         os.chmod(exp_summary, 0o444) # make it read only
+        
+        meta_data_file = os.path.join(save_folder, 'meta_data.json')
+        with open(meta_data_file, 'w') as f:
+            json.dump(meta_data, f, indent=4, default=change_type)
+        os.chmod(meta_data_file, 0o444) # make it read only
         
         val = input("Press Enter to continue, or press 'esc' to exit: ")
         if val == '\x1b':
@@ -357,6 +376,43 @@ def git_backup(save_folder, project_root, exp_discription, save_zip=True):
         import traceback
         traceback.print_exc()
         print(f"Unknown error: {e}")
+
+def git_restore(project_root, restore_floder, method = 'from_zip'):
+    # restore to the state created by git_backup
+
+    try:
+        from git import Repo
+        from git.exc import InvalidGitRepositoryError
+
+        repo = Repo(project_root)
+        if method == 'from_zip':
+            zipfile = os.path.join(restore_floder, 'git_backup.zip')
+            print(f"Restore from zip file: {zipfile}")
+            from zipfile import ZipFile
+            pkg = ZipFile(zipfile, 'r')
+            pkg.extractall(project_root)
+            pkg.close()
+        elif method == 'from_patch':
+            meta_data_file = os.path.join(restore_floder, 'meta_data.json')
+            with open(meta_data_file, 'r') as f:
+                meta_data = json.load(f)
+            for submodule in repo.submodules:
+                submodule_path = submodule.path
+                submodule_repo = submodule.module()
+                submodule_repo.git.checkout(meta_data[submodule_path]['branch'])
+                submodule_repo.git.checkout(meta_data[submodule_path]['commit_id'])
+            repo.git.checkout(meta_data['main_repo']['branch'])
+            repo.git.checkout(meta_data['main_repo']['commit_id'])
+            patch_file = os.path.join(restore_floder, 'changes.patch')
+            print(f"Restore from patch file: {patch_file}")
+            repo.git.apply(patch_file)
+
+
+
+    except ImportError as e:
+        print(f"Can't import `git`: {e}")
+        return
+    
 
 def change_type(obj):
     if isinstance(
@@ -415,7 +471,4 @@ run_config = {
 
 
 if __name__ == "__main__":
-    exp_runner = BaseExpRunner(script_path, script_floder, algs, apprfuncs, envs, repeats_num, run_config, surfix_filter = 'serial.py',
-                 max_subprocess = 1, max_waiting_time = 48 * 3600,
-                  log_level = logging.INFO, save_folder= save_path, exp_name=None,exp_discription='')
-    exp_runner.run()
+    git_restore(base_path, os.path.join(base_path, 'results/idsim_multilane_exp_0118_1/idsim_multilane_vec/dsac_mlp/12345_500000_run0'), method='from_patch')
