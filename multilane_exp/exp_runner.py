@@ -388,21 +388,37 @@ def git_restore(project_root, restore_floder, method = 'from_zip'):
         if method == 'from_zip':
             zipfile = os.path.join(restore_floder, 'git_backup.zip')
             print(f"Restore from zip file: {zipfile}")
+            warnings.warn(f"Not saved changes in git repository will be lost!")
+            val = input("Press Enter to continue, or press 'esc' to exit: ")
+            if val == '\x1b':
+                print("Exit")
+                return
+
             from zipfile import ZipFile
             pkg = ZipFile(zipfile, 'r')
             pkg.extractall(project_root)
             pkg.close()
         elif method == 'from_patch':
+
             meta_data_file = os.path.join(restore_floder, 'meta_data.json')
+            warnings.warn(f"Not saved changes in git repository will be lost!")
+            val = input("Press Enter to continue, or press 'esc' to exit: ")
+            if val == '\x1b':
+                print("Exit")
+                return
+            # stash changes
+            repo.git.stash('save', '-u')
+            repo.git.checkout(meta_data['main_repo']['branch'])
+            repo.git.checkout(meta_data['main_repo']['commit_id'])
             with open(meta_data_file, 'r') as f:
                 meta_data = json.load(f)
             for submodule in repo.submodules:
                 submodule_path = submodule.path
                 submodule_repo = submodule.module()
+                submodule_repo.git.stash('save', '-u')
                 submodule_repo.git.checkout(meta_data[submodule_path]['branch'])
                 submodule_repo.git.checkout(meta_data[submodule_path]['commit_id'])
-            repo.git.checkout(meta_data['main_repo']['branch'])
-            repo.git.checkout(meta_data['main_repo']['commit_id'])
+
             patch_file = os.path.join(restore_floder, 'changes.patch')
             print(f"Restore from patch file: {patch_file}")
             repo.git.apply(patch_file)
@@ -471,4 +487,4 @@ run_config = {
 
 
 if __name__ == "__main__":
-    git_restore(base_path, os.path.join(base_path, 'results/idsim_multilane_exp_0118_1/idsim_multilane_vec/dsac_mlp/12345_500000_run0'), method='from_patch')
+    git_restore(base_path, os.path.join(base_path, '/root/gops/results/test/idsim_multilane_exp_0118_1'), method='from_patch')
