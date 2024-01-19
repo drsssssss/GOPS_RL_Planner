@@ -401,17 +401,19 @@ def git_restore(project_root, restore_floder, method = 'from_zip'):
         elif method == 'from_patch':
 
             meta_data_file = os.path.join(restore_floder, 'meta_data.json')
+
             warnings.warn(f"Not saved changes in git repository will be lost!")
             val = input("Press Enter to continue, or press 'esc' to exit: ")
             if val == '\x1b':
                 print("Exit")
                 return
+            with open(meta_data_file, 'r') as f:
+                meta_data = json.load(f)
             # stash changes
             repo.git.stash('save', '-u')
             repo.git.checkout(meta_data['main_repo']['branch'])
             repo.git.checkout(meta_data['main_repo']['commit_id'])
-            with open(meta_data_file, 'r') as f:
-                meta_data = json.load(f)
+
             for submodule in repo.submodules:
                 submodule_path = submodule.path
                 submodule_repo = submodule.module()
