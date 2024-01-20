@@ -456,6 +456,7 @@ class IdsimIDCEvaluator(Evaluator):
             }
         for k, v in avg_idsim_tb_eval_dict.items():
             print(k, v)
+            print('/n')
         return avg_idsim_tb_eval_dict
     
     def filter_episode(self, eval_result: EvalResult):

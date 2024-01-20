@@ -65,6 +65,7 @@ class AnimationLane(AnimationBase):
         episode_data: EvalResult,
         save_path: Path,
         episode_index: int,
+        test_scene: str = None,
         frame_skip=1,
         fps=20,
         mode='debug',
@@ -104,9 +105,18 @@ class AnimationLane(AnimationBase):
         # create ego vehicle
         ego_veh = create_veh(ax, (0, 0), 0, VEH_LENGTH,
                              VEH_WIDTH, facecolor=EGO_COLOR_WITH_ALPHA, edgecolor=EGO_COLOR)
+        if test_scene is not None:
+            ax.text( # test_scene
+                0.01, 0.95, f'test_scene: {test_scene}', fontsize=10,
+                horizontalalignment='left', verticalalignment='top',
+                transform=ax.transAxes
+            )
+            video_name = f'{self.task_name}_{episode_index}_{test_scene}_frame_skip_{frame_skip}.mp4'
+        else:
+            video_name = f'{self.task_name}_{episode_index}_frame_skip_{frame_skip}.mp4'
+        
+        writer.setup(fig, os.path.join(save_video_path, video_name), dpi=dpi)
 
-        writer.setup(fig, os.path.join(save_video_path,
-                     f'{self.task_name}_{episode_index}_frame_skip_{frame_skip}.mp4'), dpi=dpi)
 
         value = episode_data.paths_value_list
         value = np.array(value) if value else None

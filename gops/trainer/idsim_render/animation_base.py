@@ -141,7 +141,7 @@ class AnimationBase:
         for surr in participants:
             if self.env_scenario == "multilane":  #TODO: update when change the scenario setting
                 veh_type = surr.type.split('-')[0]
-                assert veh_type in ['v1', 'person','vm','vs'], ('invalid traffic type ' + str(surr.type))
+                assert veh_type in ['v1','v2','v3', 'person','vm','vs'], ('invalid traffic type ' + str(surr.type))
 
                 length, width = multilane_surr_size_dict[veh_type]
             elif self.env_scenario == "crossroad":

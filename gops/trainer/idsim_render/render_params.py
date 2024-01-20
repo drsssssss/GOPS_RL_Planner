@@ -33,6 +33,7 @@ lane_width = 3.75
 multilane_surr_size_dict = {
     "v1": (5.0, 1.8),
     'v2': (5.0, 1.8),
+    'v3': (5.0, 1.8),
     'vs': (6.0, 2.2),
     'vm': (10,2.5),
     'v3': (2.0 * cyl_scale, 0.65 * cyl_scale),
