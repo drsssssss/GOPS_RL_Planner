@@ -34,7 +34,7 @@ env_config_param_base = {
         "bicycle": 0,
         "pedestrian": 0,
     },
-    "ref_v": 15.0,
+    "ref_v": 10.0,
     "ref_length": 48.0,
     "obs_num_ref_points": 2 * pre_horizon + 1,
     "obs_ref_interval": 0.8,
@@ -44,13 +44,13 @@ env_config_param_base = {
     "use_multiple_path_for_multilane": True,
     "random_ref_cooldown":  80,
 
-    "takeover_bias": True,
+    "takeover_bias": False,
     "takeover_bias_x": (0.0, 0.5),
     "takeover_bias_y": (0.0, 0.5),
-    "takeover_bias_phi": (0.0, 0.01),
-    "takeover_bias_vx": (3.0, 1.5),
-    "takeover_bias_ax": (0.0, 0.1),
-    "takeover_bias_steer": (0.0, 0.01),
+    "takeover_bias_phi": (0.0, 0.05),
+    "takeover_bias_vx": (0.0, 1.5),
+    "takeover_bias_ax": (0.0, 0.25),
+    "takeover_bias_steer": (0.0, 0.02),
     "minimum_clearance_when_takeover":5.0,
     # model free reward config
     "punish_sur_mode": "max",
@@ -141,7 +141,7 @@ model_config_base = {
         1.0  # surr is in front of ego
     ),
     "C_road": 300.0,
-    "ref_v_lane": 15.0,
+    "ref_v_lane": 10.0,
     "filter_num": 5
 }
 
@@ -157,7 +157,7 @@ env_config_param_multilane = {
     "real_action_upper_bound": (0.8, 0.065),
     "use_random_acc": True,
     "random_acc_cooldown": (30, 30, 50), # cooldown for acceleration, deceleration and ref_v, respectively
-    "random_acc_prob": (0.1, 0.1), # probability to accelerate and decelerate, respectively
+    "random_acc_prob": (0.3, 0.3), # probability to accelerate and decelerate, respectively
     "random_acc_range": (0.2, 0.8), # (m/s^2), used for acceleration
     "random_dec_range": (-1.5, -0.5), # (m/s^2), used for deceleration
 }
