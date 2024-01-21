@@ -112,6 +112,7 @@ class IdsimIDCEvaluator(Evaluator):
             self.PATH_SELECTION_EVIDENCE = self.kwargs["PATH_SELECTION_EVIDENCE"]
             self.idc_config = IDCConfig()
             self.PATH_SELECTION_DIFF_THRESHOLD = self.kwargs["PATH_SELECTION_DIFF_THRESHOLD"]
+            self.fast_mode = self.kwargs.get("fast_mode", True)
         self.eval_PODAR = self.kwargs.get("eval_PODAR", False)
         self.num_eval_episode = self.kwargs["num_eval_episode"]
         self.eval_save = self.kwargs.get("eval_save", True)
@@ -139,7 +140,7 @@ class IdsimIDCEvaluator(Evaluator):
             allowable_ref_index_list.append(selected_path_index)
         allowable_ref_value = []
         allowable_context_list = []
-        if lc_cd < self.idc_config.lane_change_cooldown:
+        if lc_cd < self.idc_config.lane_change_cooldown and self.fast_mode:
             allowable_ref_index_list = [selected_path_index]
             context = MultiLaneContext.from_env(self.env, self.env.model_config, selected_path_index)
             context = stack_samples([context])
