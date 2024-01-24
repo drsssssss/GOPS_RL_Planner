@@ -50,11 +50,11 @@ class PINet(nn.Module):
         self.kwargs = kwargs
         self.begin = kwargs["pi_begin"]
         self.end = kwargs["pi_end"]
-        self.d_others = self.end - self.begin
+        self.d_encodings = self.end - self.begin
         self.enable_mask = kwargs["enable_mask"]
         self.d_obj = kwargs["obj_dim"]
-        assert self.d_others % self.d_obj == 0
-        self.num_objs = int(self.d_others / self.d_obj)
+        assert self.d_encodings % self.d_obj == 0
+        self.num_objs = int(self.d_encodings / self.d_obj)
         if self.enable_mask:
             self.pi_in_dim = self.d_obj -1 # the last dimension is mask
         else:
@@ -64,7 +64,7 @@ class PINet(nn.Module):
 
         self.encoding_others = kwargs["encoding_others"]
         obs_dim = kwargs["obs_dim"]
-        self.others_in_dim = obs_dim - self.d_others
+        self.others_in_dim = obs_dim - self.d_encodings
         if self.encoding_others:
             self.others_out_dim = kwargs["others_out_dim"]
         else: 
@@ -87,8 +87,8 @@ class PINet(nn.Module):
             self.others_encoder = nn.Identity()
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
-        objs = obs[:, self.begin:self.end + 1]
-        others = torch.cat([obs[:, :self.begin], obs[:, self.end + 1:]], dim=1)
+        objs = obs[:, self.begin:self.end]
+        others = torch.cat([obs[:, :self.begin], obs[:, self.end:]], dim=1)
         objs = objs.reshape(-1, self.num_objs, self.d_obj)
         others = self.others_encoder(others)
 

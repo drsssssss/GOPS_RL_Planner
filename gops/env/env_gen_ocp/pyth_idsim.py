@@ -24,6 +24,7 @@ from idsim_model.params import ModelConfig
 class idSimContextState(ContextState[stateType], Generic[stateType]):
     light_param: Optional[stateType] = None
     ref_index_param: Optional[stateType] = None
+    boundary_param: Optional[stateType] = None
     real_t: Union[int, stateType] = 0
 
 
@@ -217,6 +218,7 @@ class idSimEnv(CrossRoad, Env):
                 constraint=idsim_context.p.sur_param,
                 light_param=idsim_context.p.light_param, 
                 ref_index_param=idsim_context.p.ref_index_param,
+                boundary_param=idsim_context.p.boundary_param,
                 real_t = torch.tensor(idsim_context.t).int(),
                 t = torch.tensor(idsim_context.i).int()
             )
@@ -233,6 +235,7 @@ class idSimEnv(CrossRoad, Env):
                 t=np.zeros_like(self._state.context_state.t, dtype=np.int64),
                 light_param=np.zeros_like(self._state.context_state.light_param, dtype=np.float32),
                 ref_index_param=np.zeros_like(self._state.context_state.ref_index_param, dtype=np.int64),
+                boundary_param=np.zeros_like(self._state.context_state.boundary_param, dtype=np.float32),
                 real_t=np.zeros_like(self._state.context_state.real_t, dtype=np.int64)
             )
         )
@@ -274,7 +277,8 @@ def get_idsimcontext(state: State, mode: str, scenario: str) -> BaseContext:
                 ref_param = state.context_state.reference,
                 sur_param = state.context_state.constraint,
                 light_param = state.context_state.light_param,
-                ref_index_param = state.context_state.ref_index_param
+                ref_index_param = state.context_state.ref_index_param,
+                boundary_param=state.context_state.boundary_param
             ),
             t = state.context_state.real_t,
             i = state.context_state.t[0]
@@ -296,7 +300,8 @@ def get_idsimcontext(state: State, mode: str, scenario: str) -> BaseContext:
                 ref_param = state.context_state.reference,
                 sur_param = state.context_state.constraint,
                 light_param = state.context_state.light_param,
-                ref_index_param = state.context_state.ref_index_param
+                ref_index_param = state.context_state.ref_index_param,
+                boundary_param=state.context_state.boundary_param
             ),
             t = state.context_state.real_t,
             i = state.context_state.t[0]

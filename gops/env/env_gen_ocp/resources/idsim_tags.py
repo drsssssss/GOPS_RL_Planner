@@ -53,6 +53,7 @@ reward_tags = (
     "env_scaled_pun2side",
     "env_scaled_pun2space",
     "env_scaled_pun2rear",
+    "env_scaled_punish_boundary",
 )
 
 
@@ -125,6 +126,7 @@ idsim_tb_tags = (
     "Evaluation/env_scaled_pun2side",
     "Evaluation/env_scaled_pun2space",
     "Evaluation/env_scaled_pun2rear",
+    "Evaluation/env_scaled_punish_boundary",
 )
 
 idsim_tb_keys = (*done_tags, *reward_tags)

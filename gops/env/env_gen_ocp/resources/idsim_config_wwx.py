@@ -30,7 +30,7 @@ env_config_param_base = {
     "real_action_lower_bound": (-3.0, -0.571),
     "real_action_upper_bound": (0.8, 0.571),
     "obs_num_surrounding_vehicles": {
-        "passenger": 5,
+        "passenger": 8,
         "bicycle": 0,
         "pedestrian": 0,
     },
@@ -68,7 +68,8 @@ env_config_param_base = {
     "P_acc": 0.1,
     "P_delta_steer": 0.05,
     "P_jerk": 0.1,
-    "safety_lat_margin_front": 0.0,
+    "P_done": 2000.0,
+    "safety_lat_margin_front": 1.0,
     "safety_long_margin_front": 0.0,
     "safety_long_margin_side": 0.0,
     "front_dist_thd": 50.0,
@@ -81,6 +82,7 @@ env_config_param_base = {
 model_config_base = {
     "N": pre_horizon,
     "sur_obs_padding": "rule",
+    "add_boundary_obs": False,
     "full_horizon_sur_obs": False,
     "ahead_lane_length_min": 6.0,
     "ahead_lane_length_max": 60.0,
@@ -97,6 +99,7 @@ model_config_base = {
 
     "num_ref_points": pre_horizon + 1,
     "ego_feat_dim": 7,  # vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
+    "ego_bound_dim": 2,  # left, right
     "per_sur_state_dim": 6,  # x, y, phi, speed, length, width
     "per_sur_state_withinfo_dim": 7,  # x, y, phi, speed, length, width, mask
     "per_sur_feat_dim": 5,  # x, y, cos(phi), sin(phi), speed
@@ -230,12 +233,14 @@ def cal_idsim_obs_scale(
         ego_scale: Union[float, list] = 1.0,
         sur_scale: Union[float, list] = 1.0,
         ref_scale: Union[float, list] = 1.0,
+        bound_scale: Union[float, list] = 1.0,
         env_config: Dict = None,
         env_model_config: Dict = None,
 ):
     ego_dim = env_model_config["ego_feat_dim"]
     sur_dim = env_model_config["per_sur_feat_dim"] + 3 # +3 for length, width, mask
     ref_dim = env_model_config["per_ref_feat_dim"]
+    bound_dim = env_model_config["ego_bound_dim"]
     sur_num = int(sum(i for i in env_config["obs_num_surrounding_vehicles"].values()))
     full_horizon_sur_obs = env_model_config["full_horizon_sur_obs"]
     num_ref_points = len(env_model_config["downsample_ref_point_index"]) 
@@ -246,10 +251,13 @@ def cal_idsim_obs_scale(
         sur_scale = [sur_scale] * sur_dim
     if isinstance (ref_scale, float):
         ref_scale = [ref_scale] * ref_dim
+    if isinstance (bound_scale, float):
+        bound_scale = [bound_scale] * bound_dim
 
     assert len(ego_scale) == ego_dim, f"len(ego_scale)={len(ego_scale)}, ego_dim={ego_dim}"
     assert len(sur_scale) == sur_dim, f"len(sur_scale)={len(sur_scale)}, sur_dim={sur_dim}"
     assert len(ref_scale) == ref_dim, f"len(ref_scale)={len(ref_scale)}, ref_dim={ref_dim}"
+    assert len(bound_scale) == bound_dim, f"len(boundary_scale)={len(bound_scale)}, bound_dim={bound_dim}"
     
     obs_scale = []
     obs_scale += ego_scale
@@ -261,6 +269,8 @@ def cal_idsim_obs_scale(
         obs_scale += (sur_scale * sur_num * num_ref_points)
     else:
         obs_scale += sur_scale * sur_num
+    if env_model_config["add_boundary_obs"]:
+        obs_scale += bound_scale
 
     obs_scale = np.array(obs_scale, dtype=np.float32)
     return obs_scale

@@ -236,6 +236,7 @@ class IdsimIDCEvaluator(Evaluator):
                 constraint=idsim_context.p.sur_param,
                 light_param=idsim_context.p.light_param, 
                 ref_index_param=idsim_context.p.ref_index_param,
+                boundary_param=idsim_context.p.boundary_param,
                 real_t = torch.tensor(idsim_context.t).int(),
                 t = torch.tensor(idsim_context.i).int()
             )
