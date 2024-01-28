@@ -36,6 +36,7 @@ run_config = {
 }
 
 project_root = None
+save_meta_data = True
 save_zip = True
 max_subprocess = 1
 max_waiting_time = 48 * 3600  # seconds
@@ -55,6 +56,7 @@ paser.add_argument('--script_path', type=str, default=script_path)
 paser.add_argument('--run_config', type=dict, default=run_config)
 paser.add_argument('--exp_name', type=str, default=exp_name)
 paser.add_argument('--exp_discription', type=str, default=exp_discription)
+paser.add_argument('--save_meta_data', type=bool, default=save_meta_data)
 paser.add_argument('--save_zip', type=bool, default=save_zip)
 paser.add_argument('--project_root', type=str, default=project_root)
 paser.add_argument('--surfix_filter', type=str, default=surfix_filter)

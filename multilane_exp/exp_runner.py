@@ -15,7 +15,7 @@ import numpy as np
 class BaseExpRunner:
     def __init__(self, script_path, script_folder, algs, apprfuncs, envs, repeats_num, run_config, surfix_filter = 'serial.py',
                  max_subprocess = 1, max_waiting_time = 48 * 3600,
-                  log_level = 'DEBUG', save_folder= './exp_results', exp_name=None,exp_discription='', project_root=None, save_zip=True, **kwargs):
+                  log_level = 'DEBUG', save_folder= './exp_results', exp_name=None,exp_discription='', project_root=None,save_meta_data= True, save_zip=True, **kwargs):
         
         self.script_path = script_path
         if exp_name is None:
@@ -37,6 +37,7 @@ class BaseExpRunner:
         self.max_subprocess = max_subprocess
         self.max_waiting_time = max_waiting_time
         self.project_root = project_root
+        self.save_meta_data = save_meta_data
         self.save_zip = save_zip
 
 
@@ -127,7 +128,7 @@ class BaseExpRunner:
         configs = []
         repeats = []
         num_subprocess = 0
-        ruturn_val = git_backup(self.save_folder, self.project_root, self.exp_discription, self.save_zip)
+        ruturn_val = git_backup(self.save_folder, self.project_root, self.exp_discription, self.save_meta_data, self.save_zip)
         if not ruturn_val:
             return
         else:
@@ -261,7 +262,7 @@ def get_repo_changes(repo, save_folder):
     os.chmod(patch_file, 0o444) # make it read only
     return changes
 
-def git_backup(save_folder, project_root, exp_discription, save_zip=True):
+def git_backup(save_folder, project_root, exp_discription,save_meta_data= True, save_zip=True):
     try:
         from git import Repo
         from git.exc import InvalidGitRepositoryError
@@ -274,58 +275,59 @@ def git_backup(save_folder, project_root, exp_discription, save_zip=True):
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
             print(f"Use default project root: {project_root}")
         repo = Repo(project_root)
-        changes = get_repo_changes(repo, save_folder)
+        if save_meta_data:
+            changes = get_repo_changes(repo, save_folder)
 
-        exp_summary = os.path.join(save_folder, 'exp_summary.txt')
-        meta_data = {}
-        repo_dict = {}
-        repo_dict['path'] = project_root
+            exp_summary = os.path.join(save_folder, 'exp_summary.txt')
+            meta_data = {}
+            repo_dict = {}
+            repo_dict['path'] = project_root
 
-        with open(exp_summary, 'w') as f:
-            f.write(f"Experiment Discription: {exp_discription}\n")
-            current_branch = repo.active_branch
-            repo_dict['branch'] = current_branch.name
-            print(f"Current branch in main repository: {current_branch}")
-            f.write(f"Current branch in main repository: {current_branch}\n")
+            with open(exp_summary, 'w') as f:
+                f.write(f"Experiment Discription: {exp_discription}\n")
+                current_branch = repo.active_branch
+                repo_dict['branch'] = current_branch.name
+                print(f"Current branch in main repository: {current_branch}")
+                f.write(f"Current branch in main repository: {current_branch}\n")
 
-            current_commit_id = repo.head.commit.hexsha
-            repo_dict['commit_id'] = current_commit_id
-            print(f"Current commit ID in main repository: {current_commit_id}")
-            f.write(f"Current commit ID in main repository: {current_commit_id}\n")
-            meta_data['main_repo'] = repo_dict
+                current_commit_id = repo.head.commit.hexsha
+                repo_dict['commit_id'] = current_commit_id
+                print(f"Current commit ID in main repository: {current_commit_id}")
+                f.write(f"Current commit ID in main repository: {current_commit_id}\n")
+                meta_data['main_repo'] = repo_dict
 
-            submodules = repo.submodules
+                submodules = repo.submodules
 
-            for submodule in submodules:
-                repo_dict = {}
-                submodule_path = submodule.path
-                submodule_repo = submodule.module()
-                repo_dict['path'] = os.path.join(project_root, submodule_path)
-
-
-                submodule_branch = submodule_repo.active_branch
-                repo_dict['branch'] = submodule_branch.name
-                print(f"Branch in submodule '{submodule_path}': {submodule_branch}")
-                f.write(f"Branch in submodule '{submodule_path}': {submodule_branch}\n")
-
-                submodule_commit_id = submodule_repo.head.commit.hexsha
-                repo_dict['commit_id'] = submodule_commit_id
-                print(f"Commit ID in submodule '{submodule_path}': {submodule_commit_id}")
-                f.write(f"Commit ID in submodule '{submodule_path}': {submodule_commit_id}\n")
-
-                meta_data[submodule_path] = repo_dict
-        
+                for submodule in submodules:
+                    repo_dict = {}
+                    submodule_path = submodule.path
+                    submodule_repo = submodule.module()
+                    repo_dict['path'] = os.path.join(project_root, submodule_path)
 
 
-            for change_detail in changes:
-                f.write(f"\n{change_detail[0]}:\n")
-                f.write(change_detail[1])
-        os.chmod(exp_summary, 0o444) # make it read only
-        
-        meta_data_file = os.path.join(save_folder, 'meta_data.json')
-        with open(meta_data_file, 'w') as f:
-            json.dump(meta_data, f, indent=4, default=change_type)
-        os.chmod(meta_data_file, 0o444) # make it read only
+                    submodule_branch = submodule_repo.active_branch
+                    repo_dict['branch'] = submodule_branch.name
+                    print(f"Branch in submodule '{submodule_path}': {submodule_branch}")
+                    f.write(f"Branch in submodule '{submodule_path}': {submodule_branch}\n")
+
+                    submodule_commit_id = submodule_repo.head.commit.hexsha
+                    repo_dict['commit_id'] = submodule_commit_id
+                    print(f"Commit ID in submodule '{submodule_path}': {submodule_commit_id}")
+                    f.write(f"Commit ID in submodule '{submodule_path}': {submodule_commit_id}\n")
+
+                    meta_data[submodule_path] = repo_dict
+            
+
+
+                for change_detail in changes:
+                    f.write(f"\n{change_detail[0]}:\n")
+                    f.write(change_detail[1])
+            os.chmod(exp_summary, 0o444) # make it read only
+            
+            meta_data_file = os.path.join(save_folder, 'meta_data.json')
+            with open(meta_data_file, 'w') as f:
+                json.dump(meta_data, f, indent=4, default=change_type)
+            os.chmod(meta_data_file, 0o444) # make it read only
         
         val = input("Press Enter to continue, or press 'esc' to exit: ")
         if val == '\x1b':
