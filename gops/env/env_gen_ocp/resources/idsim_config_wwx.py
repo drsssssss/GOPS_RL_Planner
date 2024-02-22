@@ -40,7 +40,7 @@ env_config_param_base = {
     "obs_ref_interval": 0.8,
     "vehicle_spec": (1880.0, 1536.7, 1.13, 1.52, -128915.5, -85943.6, 20.0, 0.0),
     "singleton_mode": "reuse",
-    "random_ref_probability": 0.0,
+    "random_ref_probability": 0.01,
     "use_multiple_path_for_multilane": True,
     "random_ref_cooldown":  80,
 
@@ -56,7 +56,7 @@ env_config_param_base = {
     "punish_sur_mode": "max",
     "enable_slow_reward": False,
     "R_step": 10.0,
-    "P_lat": 5.0,
+    "P_lat": 12.0,
     "P_long": 5.0,
     "P_phi": 3.0,
     "P_yaw": 1.0,
@@ -160,7 +160,7 @@ env_config_param_multilane = {
     "real_action_upper_bound": (0.8, 0.065),
     "use_random_acc": True,
     "random_acc_cooldown": (30, 30, 50), # cooldown for acceleration, deceleration and ref_v, respectively
-    "random_acc_prob": (0.3, 0.3), # probability to accelerate and decelerate, respectively
+    "random_acc_prob": (0.1, 0.1), # probability to accelerate and decelerate, respectively
     "random_acc_range": (0.2, 0.8), # (m/s^2), used for acceleration
     "random_dec_range": (-1.5, -0.5), # (m/s^2), used for deceleration
 }

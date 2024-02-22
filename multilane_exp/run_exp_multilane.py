@@ -14,8 +14,8 @@ base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 script_path = os.path.join(base_path, 'example_train')
 save_folder = os.path.join(base_path, 'results/idsim')
 
-exp_name = 'idsim_multilane_exp_0119_4' 
-exp_discription = 'based on exp DSACT_exp0119_1, tar_pi'
+exp_name = 'idsim_multilane_exp_0221' 
+exp_discription = 'based on exp DSACT_exp0119_5, add noise to sur vehicle, increase position tracking punish(12) random select ref prob 0.1 random acc and dacc prob0.3->0.1'
 
 script_folder = "dsac"
 algs = ['dsact']
@@ -26,7 +26,7 @@ surfix_filter = 'offserial.py'
 run_config = {
     # 'env_id': ['gym_carracingraw'],
     'seed':[12345],
-    'buffer_max_size':[500000],
+    'buffer_max_size':[250000],
     # 'eval_interval':[2000],
     # 'sample_batch_size':[10],
     # 'sample_interval':[1],
