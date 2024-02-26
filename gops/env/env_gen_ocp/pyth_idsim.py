@@ -51,6 +51,7 @@ class idSimEnv(CrossRoad, Env):
         self.rou_config = rou_config
         super(idSimEnv, self).__init__(env_config)
         self.model_config = model_config
+        model_config = deepcopy(model_config)
         self.scenario = scenario
 
         self._state = None
@@ -61,6 +62,8 @@ class idSimEnv(CrossRoad, Env):
         obs_dim = self.model.obs_dim
         self.use_random_ref_param = env_config.use_multiple_path_for_multilane
         self.random_ref_probability = env_config.random_ref_probability
+        self.random_ref_v = env_config.random_ref_v
+        self.ref_v_range = env_config.ref_v_range
 
         if self.use_random_ref_param > 0.0:
             print(f'INFO: randomly choosing reference when resetting env')
@@ -81,7 +84,7 @@ class idSimEnv(CrossRoad, Env):
         self.set_scenario(scenario)
         self.ref_index = None
     
-    def reset(self) -> Tuple[np.ndarray, dict]:
+    def reset(self, **kwargs) -> Tuple[np.ndarray, dict]:
         self.lc_cooldown_counter = 0
         if self.rou_config is not None:
             if self.engine is None:
@@ -94,7 +97,7 @@ class idSimEnv(CrossRoad, Env):
                     # need to change new map
                     print("INFO: change rou")
                     self.change_rou_file()
-        obs, info = super(idSimEnv, self).reset()
+        obs, info = super(idSimEnv, self).reset(**kwargs)
         env_context = self.engine.context
         vehicle = env_context.vehicle
         self.ref_index = None
@@ -108,6 +111,11 @@ class idSimEnv(CrossRoad, Env):
             self.ref_index = np.random.choice(
                 np.arange(self.model_config.num_ref_lines)
             ) if self.use_random_ref_param else None
+        if self.random_ref_v:  # TODO: check if this is correct
+            ref_v = np.random.uniform(*self.ref_v_range)
+            self.model_config.ref_v_lane = float(ref_v)
+            # print(f"INFO: change ref_v to {ref_v}")
+            
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         self._info = self._get_info(info)
         return self._get_obs(), self._info

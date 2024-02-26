@@ -494,7 +494,7 @@ class IdsimIDCEvaluator(Evaluator):
                     **self.kwargs['env_config'], 
                     'logging_root': self.save_folder, 
                     'scenario_root' : scenario_root,
-                    'scenario_selector' : test_case['map_id'],
+                    'scenario_selector' : None,
                     'seed' : test_case['seed'],
                     'warmup_time' : test_case['warmup_time'],
                     'ego_id' : test_case['ego_id'],

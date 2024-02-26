@@ -37,7 +37,7 @@ multilane_surr_size_dict = {
     'vss': (1.8, 0.8),
     'vs': (6.0, 2.2),
     'vm': (10,2.5),
-    'v3': (2.0 * cyl_scale, 0.65 * cyl_scale),
+    'b1': (2.0 * cyl_scale, 0.65 * cyl_scale),
     'person': (0.21 * ped_scale, 0.48 * ped_scale)
 }
 crossroad_surr_size_dict = {

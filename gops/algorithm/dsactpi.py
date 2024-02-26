@@ -196,23 +196,24 @@ class DSACTPI(AlgorithmBase):
 
         self.networks.q1_optimizer.zero_grad()
         self.networks.q2_optimizer.zero_grad()
+        self.networks.policy_optimizer.zero_grad()
         self.networks.pi_optimizer.zero_grad()
         loss_q, q1, q2, std1, std2, min_std1, min_std2, origin_q_loss = self.__compute_loss_q(data)
         loss_q.backward()
 
-        for p in self.networks.q1.parameters():
+        for p in self.networks.q1.ego_paras():
             p.requires_grad = False
 
-        for p in self.networks.q2.parameters():
+        for p in self.networks.q2.ego_paras():
             p.requires_grad = False
 
-        self.networks.policy_optimizer.zero_grad()
+ 
         loss_policy, entropy = self.__compute_loss_policy(data)
         loss_policy.backward()
 
-        for p in self.networks.q1.parameters():
+        for p in self.networks.q1.ego_paras():
             p.requires_grad = True
-        for p in self.networks.q2.parameters():
+        for p in self.networks.q2.ego_paras():
             p.requires_grad = True
 
         if self.auto_alpha:
