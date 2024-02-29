@@ -14,8 +14,9 @@ base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 script_path = os.path.join(base_path, 'example_train')
 save_folder = os.path.join(base_path, 'results/idsim')
 
-exp_name = 'idsim_multilane_exp_0221' 
-exp_discription = 'based on exp DSACT_exp0119_5, add noise to sur vehicle, increase position tracking punish(12) random select ref prob 0.1 random acc and dacc prob0.3->0.1'
+exp_name = 'idsim_multilane_exp_0228_1' 
+exp_discription = 'based on exp DSACT_exp0221,mix_map, random ref_v, nominal acc, lane info in sur punish, increase speed punish and dacc range actor update pi, add small car in the front 10 scene period:0.5->0.75, per_buffer alpha0.8, LRdecay wide evluation range'
+
 
 script_folder = "dsac"
 algs = ['dsact']

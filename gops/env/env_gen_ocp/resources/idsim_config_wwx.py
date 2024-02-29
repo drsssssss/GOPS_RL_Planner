@@ -2,7 +2,7 @@ from typing import Dict, Union, Tuple
 import numpy as np
 
 MAP_ROOT_CROSSROAD = '/root/idsim-scenarios/idsim-crossroad'
-MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-dense-v20-period0dot5/'
+MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-dense-v20-mix-multi-size//'
 pre_horizon = 30
 delta_t = 0.1
 
@@ -11,7 +11,7 @@ env_config_param_base = {
     "seed": 1,
     "actuator": "ExternalActuator",
     "scenario_reuse": 4,
-    "num_scenarios": 10,
+    "num_scenarios": 19,
     "detect_range": 60,
     "choose_vehicle_retries": 10,
     "scenario_root": MAP_ROOT_CROSSROAD,
@@ -19,6 +19,9 @@ env_config_param_base = {
     "extra_sumo_args": ("--start", "--delay", "200"),
     "warmup_time": 50.0,
     "max_steps": 200,
+    "random_ref_v": True,
+    "ref_v_range": (3.0, 12.0),
+    "nonimal_acc": True,
     "ignore_traffic_lights": False,
     "no_done_at_collision": False, 
     "ignore_surrounding": False,
@@ -57,7 +60,7 @@ env_config_param_base = {
     "enable_slow_reward": False,
     "R_step": 10.0,
     "P_lat": 12.0,
-    "P_long": 5.0,
+    "P_long": 10.0,
     "P_phi": 3.0,
     "P_yaw": 1.0,
     "P_front": 10.0,
@@ -162,7 +165,7 @@ env_config_param_multilane = {
     "random_acc_cooldown": (30, 30, 50), # cooldown for acceleration, deceleration and ref_v, respectively
     "random_acc_prob": (0.1, 0.1), # probability to accelerate and decelerate, respectively
     "random_acc_range": (0.2, 0.8), # (m/s^2), used for acceleration
-    "random_dec_range": (-1.5, -0.5), # (m/s^2), used for deceleration
+    "random_dec_range": (-1.5, -0.1), # (m/s^2), used for deceleration
 }
 
 model_config_multilane = {

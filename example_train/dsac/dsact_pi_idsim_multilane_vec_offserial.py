@@ -138,13 +138,41 @@ if __name__ == "__main__":
     parser.add_argument("--pi_hidden_sizes", type=list, default=[256, 256,256])
     parser.add_argument("--pi_hidden_activation", type=str, default="gelu")
     parser.add_argument("--pi_output_activation", type=str, default="linear")
-    parser.add_argument("--freeze_pi_net", type=str, default="actor")
+    parser.add_argument("--freeze_pi_net", type=str, default="critic")
     parser.add_argument("--encoding_others", type=bool, default=False)
+    max_iter = 1_000_000
+    parser.add_argument("--policy_scheduler", type=json.loads, default={
+        "name": "CosineAnnealingLR",
+        "params": {
+                "T_max": max_iter,
+            }
+    })
 
+    parser.add_argument("--q1_scheduler", type=json.loads, default={
+        "name": "CosineAnnealingLR",
+        "params": {
+                "T_max": max_iter,
+            }
+    })
+    parser.add_argument("--q2_scheduler", type=json.loads, default={
+        "name": "CosineAnnealingLR",
+        "params": {
+                "T_max": max_iter,
+            }
+    })
+    parser.add_argument("--pi_scheduler", type=json.loads, default={
+        "name": "CosineAnnealingLR",
+        "params": {
+                "T_max": max_iter,
+            }
+    })
 
-
-
-
+    parser.add_argument("--alpha_scheduler", type=json.loads, default={
+        "name": "CosineAnnealingLR",
+        "params": {
+                "T_max": max_iter,
+            }
+    })
     ################################################
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
@@ -170,7 +198,7 @@ if __name__ == "__main__":
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
     # Maximum iteration number
-    parser.add_argument("--max_iteration", type=int, default=1000000)
+    parser.add_argument("--max_iteration", type=int, default=max_iter)
     parser.add_argument(
         "--ini_network_dir",
         type=str,
@@ -179,7 +207,7 @@ if __name__ == "__main__":
     trainer_type = parser.parse_known_args()[0].trainer
     # 4.1. Parameters for off_serial_trainer
     parser.add_argument(
-        "--buffer_name", type=str, default="replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
+        "--buffer_name", type=str, default="prioritized_replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
     )
     # Size of collected samples before training
     parser.add_argument("--buffer_warm_size", type=int, default=1000)

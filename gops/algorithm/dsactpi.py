@@ -87,6 +87,16 @@ class ApproxContainer(ApprBase):
         self.pi_optimizer = Adam(self.pi_net.parameters(), lr=kwargs["pi_learning_rate"])
         self.alpha_optimizer = Adam([self.log_alpha], lr=kwargs["alpha_learning_rate"])
 
+        self.optimizer_dict = {
+            "policy": self.policy_optimizer,
+            "q1": self.q1_optimizer,
+            "q2": self.q2_optimizer,
+            "pi": self.pi_optimizer,
+            "alpha": self.alpha_optimizer,
+        }
+        self.init_scheduler(**kwargs)
+
+
     def create_action_distributions(self, logits):
         return self.policy.get_act_dist(logits)
 
@@ -118,6 +128,7 @@ class DSACTPI(AlgorithmBase):
         self.mean_std2= None
         self.tau_b = kwargs.get("tau_b", self.tau)
         self.target_PI = kwargs["target_PI"]
+        self.per_flag = kwargs["buffer_name"] == "prioritized_replay_buffer"
 
     @property
     def adjustable_parameters(self):
@@ -198,7 +209,7 @@ class DSACTPI(AlgorithmBase):
         self.networks.q2_optimizer.zero_grad()
         self.networks.policy_optimizer.zero_grad()
         self.networks.pi_optimizer.zero_grad()
-        loss_q, q1, q2, std1, std2, min_std1, min_std2, origin_q_loss = self.__compute_loss_q(data)
+        loss_q, q1, q2, std1, std2, min_std1, min_std2, origin_q_loss, idx, td_err  = self.__compute_loss_q(data)
         loss_q.backward()
 
         for p in self.networks.q1.ego_paras():
@@ -246,8 +257,10 @@ class DSACTPI(AlgorithmBase):
             "DSAC2/pi_grad_norm": pi_grad_norm.item(),
             tb_tags["alg_time"]: (time.time() - start_time) * 1000,
         }
-
-        return tb_info
+        if self.per_flag:
+            return tb_info, idx, td_err
+        else:
+            return tb_info
 
     def __q_evaluate(self, obs, act, qnet):
         StochaQ = qnet(obs, act)
@@ -266,6 +279,10 @@ class DSACTPI(AlgorithmBase):
             data["obs2"],
             data["done"],
         )
+        if self.per_flag:
+            weight = data["weight"]
+        else:
+            weight = 1.0
         with torch.no_grad():
             logits_2 = self.networks.policy_target(obs2)
             act2_dist = self.networks.create_action_distributions(logits_2)
@@ -319,16 +336,16 @@ class DSACTPI(AlgorithmBase):
         q2_std_detach = torch.clamp(q2_std, min=0.).detach()
         bias = 0.1
 
-        q1_loss = (torch.pow(self.mean_std1, 2) + bias) * torch.mean(
+        q1_loss = (torch.pow(self.mean_std1, 2) + bias) * torch.mean(weight*(
             -(target_q1 - q1).detach() / ( torch.pow(q1_std_detach, 2)+ bias)*q1
             -((torch.pow(q1.detach() - target_q1_bound, 2)- q1_std_detach.pow(2) )/ (torch.pow(q1_std_detach, 3) +bias)
-            )*q1_std
+            )*q1_std)
         )
 
-        q2_loss = (torch.pow(self.mean_std2, 2) + bias)*torch.mean(
+        q2_loss = (torch.pow(self.mean_std2, 2) + bias)*torch.mean(weight*(
             -(target_q2 - q2).detach() / ( torch.pow(q2_std_detach, 2)+ bias)*q2
             -((torch.pow(q2.detach() - target_q2_bound, 2)- q2_std_detach.pow(2) )/ (torch.pow(q2_std_detach, 3) +bias)
-            )*q2_std
+            )*q2_std)
         )
         with torch.no_grad():
             origin_q1_loss = (torch.pow(self.mean_std1, 2)) * torch.mean(
@@ -340,8 +357,14 @@ class DSACTPI(AlgorithmBase):
             origin_q_loss = origin_q1_loss + origin_q2_loss
         
 
+        if self.per_flag:
+            idx = data["idx"]
+            td_err = (torch.abs(target_q1 - q1) + torch.abs(target_q2 - q2)) / 2
+            # print("td_err_max", td_err.max().item())
+            # print("td_err_min", td_err.min().item())
+            per = td_err/2000 # TODO: 2000 is a hyperparameter
 
-        return q1_loss +q2_loss, q1.detach().mean(), q2.detach().mean(), q1_std.detach().mean(), q2_std.detach().mean(), q1_std.min().detach(), q2_std.min().detach(), origin_q_loss.detach()
+        return q1_loss +q2_loss, q1.detach().mean(), q2.detach().mean(), q1_std.detach().mean(), q2_std.detach().mean(), q1_std.min().detach(), q2_std.min().detach(), origin_q_loss.detach(), idx, per
 
     def __compute_target_q(self, r, done, q,q_std, q_next, q_next_sample, log_prob_a_next):
         target_q = r + (1 - done) * self.gamma * (
