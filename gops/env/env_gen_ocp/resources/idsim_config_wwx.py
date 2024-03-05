@@ -2,7 +2,7 @@ from typing import Dict, Union, Tuple
 import numpy as np
 
 MAP_ROOT_CROSSROAD = '/root/idsim-scenarios/idsim-crossroad'
-MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-dense-v20-mix-multi-size//'
+MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-cross-dense-v20-mix-multi-size/'
 pre_horizon = 30
 delta_t = 0.1
 
@@ -11,11 +11,12 @@ env_config_param_base = {
     "seed": 1,
     "actuator": "ExternalActuator",
     "scenario_reuse": 4,
-    "num_scenarios": 19,
+    "num_scenarios": 28,
     "detect_range": 60,
     "choose_vehicle_retries": 10,
     "scenario_root": MAP_ROOT_CROSSROAD,
     "scenario_selector": None,
+     "direction_selector": 's',
     "extra_sumo_args": ("--start", "--delay", "200"),
     "warmup_time": 50.0,
     "max_steps": 200,
@@ -25,7 +26,7 @@ env_config_param_base = {
     "ignore_traffic_lights": False,
     "no_done_at_collision": False, 
     "ignore_surrounding": False,
-    "ignore_opposite_direction": True,
+    "ignore_opposite_direction": False,
     "penalize_collision": True,
     "incremental_action": True,
     "action_lower_bound": (-4.0 * delta_t, -0.25 * delta_t),
@@ -34,8 +35,8 @@ env_config_param_base = {
     "real_action_upper_bound": (0.8, 0.571),
     "obs_num_surrounding_vehicles": {
         "passenger": 8,
-        "bicycle": 0,
-        "pedestrian": 0,
+        "bicycle": 2,
+        "pedestrian": 2,
     },
     "ref_v": 10.0,
     "ref_length": 48.0,
@@ -54,10 +55,10 @@ env_config_param_base = {
     "takeover_bias_vx": (0.0, 1.5),
     "takeover_bias_ax": (0.0, 0.25),
     "takeover_bias_steer": (0.0, 0.02),
-    "minimum_clearance_when_takeover":5.0,
+    "minimum_clearance_when_takeover":-1,
     # model free reward config
     "punish_sur_mode": "max",
-    "enable_slow_reward": False,
+    "enable_slow_reward": True,
     "R_step": 10.0,
     "P_lat": 12.0,
     "P_long": 10.0,

@@ -101,7 +101,7 @@ class idSimEnv(CrossRoad, Env):
         env_context = self.engine.context
         vehicle = env_context.vehicle
         self.ref_index = None
-        if self.scenario == "multilane" and self.use_random_ref_param:
+        if self.scenario == "multilane" and self.use_random_ref_param and not env_context.vehicle.in_junction:
             lane_list = env_context.scenario.network.get_edge_lanes(
                 vehicle.edge, vehicle.v_class)
             cur_index = lane_list.index(vehicle.lane)
@@ -111,7 +111,7 @@ class idSimEnv(CrossRoad, Env):
             self.ref_index = np.random.choice(
                 np.arange(self.model_config.num_ref_lines)
             ) if self.use_random_ref_param else None
-        if self.random_ref_v:  # TODO: check if this is correct
+        if self.random_ref_v and not env_context.vehicle.in_junction:  # TODO: check if this is correct
             ref_v = np.random.uniform(*self.ref_v_range)
             self.model_config.ref_v_lane = float(ref_v)
             # print(f"INFO: change ref_v to {ref_v}")
@@ -127,7 +127,7 @@ class idSimEnv(CrossRoad, Env):
         self.lc_cooldown_counter += 1
         if self.lc_cooldown_counter > self.lc_cooldown:
             # lane change is allowable
-            if self.use_random_ref_param and np.random.rand() < self.random_ref_probability :
+            if not self.engine.context.vehicle.in_junction and self.use_random_ref_param and np.random.rand() < self.random_ref_probability :
                 new_ref_index = np.random.choice(np.arange(self.model_config.num_ref_lines))
                 if new_ref_index != self.ref_index:
                     # lane change
@@ -146,7 +146,11 @@ class idSimEnv(CrossRoad, Env):
             info["TimeLimit.truncated"] = True # for gym
 
         self._info = self._get_info(info)
-        return self._get_obs(), reward + reward_model_free, done, self._info
+        total_reward = reward + reward_model_free
+        # if not terminated:
+        #     total_reward = np.maximum(total_reward, 0.05)
+
+        return self._get_obs(), total_reward, done, self._info
 
     def set_ref_index(self, ref_index: int):
         self.ref_index = ref_index

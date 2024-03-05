@@ -210,7 +210,7 @@ if __name__ == "__main__":
         "--buffer_name", type=str, default="prioritized_replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
     )
     # Size of collected samples before training
-    parser.add_argument("--buffer_warm_size", type=int, default=1000)
+    parser.add_argument("--buffer_warm_size", type=int, default=10000)
     # Max size of reply buffer
     parser.add_argument("--buffer_max_size", type=int, default=250000)
     # Batch size of replay samples from buffer
@@ -229,8 +229,8 @@ if __name__ == "__main__":
     ################################################
     # 6. Parameters for evaluator
     parser.add_argument("--evaluator_name", type=str, default="idsim_train_evaluator")
-    parser.add_argument("--num_eval_episode", type=int, default=20)
-    parser.add_argument("--eval_interval", type=int, default=2000)
+    parser.add_argument("--num_eval_episode", type=int, default=10)
+    parser.add_argument("--eval_interval", type=int, default=5000)
     parser.add_argument("--eval_save", type=str, default=False, help="save evaluation data")
 
     ################################################
