@@ -320,12 +320,19 @@ class IdsimIDCEvaluator(Evaluator):
 
         # if self.IDC_MODE:  # IDC mode may extremely slow down the evaluation
         if self.env.scenario == "multilane":
-            lane_list = env_context.scenario.network.get_edge_lanes(
-                vehicle.edge, vehicle.v_class)
-            cur_index = lane_list.index(vehicle.lane)
-            lc_cd, lc_cl = 0, 0
-            last_optimal_path_index = cur_index
-            selected_path_index = cur_index
+            try:  # temporary solution 
+                lane_list = env_context.scenario.network.get_edge_lanes(
+                    vehicle.edge, vehicle.v_class)
+                cur_index = lane_list.index(vehicle.lane)
+                lc_cd, lc_cl = 0, 0
+                last_optimal_path_index = cur_index
+                selected_path_index = cur_index
+            except:
+                cur_index = 0
+                lane_list = [0, 1, 2]
+                lc_cd, lc_cl = 0, 0
+                last_optimal_path_index = cur_index
+                selected_path_index = cur_index
         else:
             cur_index = 0
             lane_list = [0, 1, 2]
@@ -339,7 +346,10 @@ class IdsimIDCEvaluator(Evaluator):
             if self.IDC_MODE:
                 # idc env info
                 if self.env.scenario == "multilane":
-                    cur_index = lane_list.index(vehicle.lane)
+                    try:  # temporary solution
+                        cur_index = lane_list.index(vehicle.lane)
+                    except:
+                        cur_index = 0
                 else:
                     cur_index = selected_path_index
                 idc_env_info = (cur_index, lane_list)
@@ -353,7 +363,10 @@ class IdsimIDCEvaluator(Evaluator):
                 selected_path_index = new_selected_path_index
             else:
                 if self.env.scenario == "multilane":
-                    selected_path_index = lane_list.index(vehicle.lane)
+                    try:  # temporary solution
+                        selected_path_index = lane_list.index(vehicle.lane)
+                    except:
+                        selected_path_index = 0
                 else:
                     selected_path_index = 0
 
@@ -406,7 +419,7 @@ class IdsimIDCEvaluator(Evaluator):
             if "TimeLimit.truncated" not in info.keys():
                 info["TimeLimit.truncated"] = False
             for eval_key in idsim_tb_eval_dict.keys():
-                if eval_key in info.keys() and eval_key.startswith("env_scaled") or eval_key in ["env_speed_error","env_tracking_error","env_delta_phi"]:
+                if eval_key in info.keys() and (eval_key.startswith("env_scaled") or eval_key in ["env_speed_error","env_tracking_error","env_delta_phi"]):
                     idsim_tb_eval_dict[eval_key] += info[eval_key]
             # Draw environment animation
             if render:

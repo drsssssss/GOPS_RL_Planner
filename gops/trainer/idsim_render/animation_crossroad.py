@@ -65,8 +65,8 @@ class AnimationCross(AnimationBase):
     def clear_text(self):
         self.text_counter = 0
 
-    def generate_animation(self, episode_data: EvalResult, save_video_path: str, episode_index: int, fps=20, mode='debug'):
-        metadata = dict(title='Demo', artist='Guojian Zhan', comment='idsim')
+    def generate_animation(self, episode_data: EvalResult, save_video_path: str, episode_index: int, fps=20, mode='debug',dpi = 100, frame_skip=1,test_scene=None):
+        metadata = dict(title='Demo', artist='Guojian Zhan', comment='idsim',)
         writer = FFMpegWriter(fps=fps, metadata=metadata)
 
         # ------------------ initialization -------------------
@@ -163,12 +163,12 @@ class AnimationCross(AnimationBase):
             lane_list_list.append(lane_list)
 
         writer.setup(fig, os.path.join(save_video_path,
-                     f'{self.task_name}_{episode_index}.mp4'))
+                     f'{self.task_name}_{episode_index}.mp4'), dpi=dpi)
 
         self.text_list = []
         # ---------------------- update-----------------------
 
-        for step in range(len(episode_data.time_stamp_list)):
+        for step in range(0, len(episode_data.time_stamp_list), frame_skip):
             if mode == 'debug' and step % 10 == 0:
                 print(f'step={step}/{len(episode_data.time_stamp_list)}')
             cur_time = episode_data.time_stamp_list[step]
@@ -238,16 +238,16 @@ class AnimationCross(AnimationBase):
                 ego_action_str = ", ".join(ego_action_list)
                 self.put_text_on_ax(f'action: {ego_action_str}')
 
-                # reward
-                for k in episode_data.reward_info.keys():
-                        if k.startswith("reward"):
-                            self.put_text_on_ax(f'{k}: {episode_data.reward_info[k][step]:.4f}')
+                # # reward
+                # for k in episode_data.reward_info.keys():
+                #         if k.startswith("reward"):
+                #             self.put_text_on_ax(f'{k}: {episode_data.reward_info[k][step]:.4f}')
                 
-                # path value
-                path_value_list = ["{:.4f}".format(
-                    i) for i in episode_data.paths_value_list[step]]
-                path_value_str = ", ".join(path_value_list)
-                self.put_text_on_ax(f'path value: {path_value_str}')
+                # # path value
+                # path_value_list = ["{:.4f}".format(
+                #     i) for i in episode_data.paths_value_list[step]]
+                # path_value_str = ", ".join(path_value_list)
+                # self.put_text_on_ax(f'path value: {path_value_str}')
 
                 ## loss
                 # cur_obs = episode_data.obs_list[step]
