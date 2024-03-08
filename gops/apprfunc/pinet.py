@@ -53,6 +53,7 @@ class PINet(nn.Module):
         self.d_encodings = self.end - self.begin
         self.enable_mask = kwargs["enable_mask"]
         self.d_obj = kwargs["obj_dim"]
+        self.enable_self_attention = kwargs.get("enable_self_attention", False)
         assert self.d_encodings % self.d_obj == 0
         self.num_objs = int(self.d_encodings / self.d_obj)
         if self.enable_mask:
@@ -77,14 +78,30 @@ class PINet(nn.Module):
             get_activation_func(kwargs["pi_hidden_activation"]),
             get_activation_func(kwargs["pi_output_activation"]),
         )
+        init_weights(self.pi)
         if self.encoding_others:
+            warnings.warn("encoding_others is enabled")
             self.others_encoder = mlp(
                 [self.others_in_dim] + list(kwargs["others_hidden_sizes"]) + [self.others_out_dim],
                 get_activation_func(kwargs["others_hidden_activation"]),
                 get_activation_func(kwargs["others_output_activation"]),
             )
+            init_weights(self.others_encoder)
         else:
             self.others_encoder = nn.Identity()
+
+        if self.enable_self_attention:
+            warnings.warn("self_attention is enabled")
+            if kwargs.get("attn_dim") is not None:
+                self.attn_dim = kwargs["attn_dim"]
+            else:
+                self.attn_dim = self.pi_in_dim  # NOTE: default attn_dim is the real obj_dim (without mask)
+                warnings.warn("attn_dim is not specified, using obj_dim as attn_dim.")
+            self.Uq = nn.Linear(self.pi_out_dim, self.attn_dim, bias=False, dtype=torch.float32)
+            self.Ur = nn.Linear(self.pi_in_dim, self.attn_dim, bias=False, dtype=torch.float32)
+
+            init_weights(self.Uq)
+            init_weights(self.Ur)
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         objs = obs[:, self.begin:self.end]
@@ -93,13 +110,24 @@ class PINet(nn.Module):
         others = self.others_encoder(others)
 
         if self.enable_mask:
-            mask = objs[:, :, -1:]
-            objs = objs[:, :, :-1]*mask
-
-        pi = self.pi(objs)
-        pi = pi.sum(dim=1, keepdim=False)
+            mask = objs[:, :, -1]
+            objs = objs[:, :, :-1]
+        else:
+            mask = torch.ones_like(objs[:, :, 0]) # [B, N]
         
-        return torch.cat([others, pi], dim=1)
+        
+        embeddings = self.pi(objs)*mask.unsqueeze(-1) # [B, N, d_model]
+
+        if self.enable_self_attention:
+            query = embeddings.sum(axis=-2) / (mask.sum(axis=-1) + 1e-5).unsqueeze(axis=-1) # [b, d_model] / [B, 1] --> [B, d_model]
+            logits = torch.bmm(self.Uq(query).unsqueeze(1), self.Ur(objs).transpose(-1, -2)).squeeze(1)  # [B, N]
+            logits = logits + ((1 - mask) * -1e9)
+            attention_weights = torch.softmax(logits, axis=-1) # [B, N]
+            embeddings = torch.matmul(attention_weights.unsqueeze(axis=1),embeddings).squeeze(axis=-2) # [B, d_model]
+        else:
+            embeddings = embeddings.sum(dim=1, keepdim=False) # [B, d_model]
+        
+        return torch.cat([others, embeddings], dim=1)
     
 
 
@@ -281,12 +309,27 @@ class ActionValueDistri(nn.Module):
         hidden_sizes = kwargs["hidden_sizes"]
         self.pi_net = kwargs["pi_net"]
         self.freeze_pi_net = kwargs["freeze_pi_net"] == "critic"
+        self.std_type = kwargs["std_type"]
         input_dim = self.pi_net.output_dim + act_dim
-        self.q = mlp(
-            [input_dim] + list(hidden_sizes) + [2],
-            get_activation_func(kwargs["hidden_activation"]),
-            get_activation_func(kwargs["output_activation"]),
-        )
+        if self.std_type == "mlp_shared":
+            self.q = mlp(
+                [input_dim] + list(hidden_sizes) + [2],
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+        elif self.std_type == "mlp_separated":
+            self.q = mlp(
+                [input_dim] + list(hidden_sizes) + [1],
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            self.q_std = mlp(
+                [input_dim] + list(hidden_sizes) + [1],
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+        else:
+            raise NotImplementedError
         if "min_log_std"  in kwargs or "max_log_std" in kwargs:
             warnings.warn("min_log_std and max_log_std are deprecated in ActionValueDistri.")
 
@@ -300,10 +343,14 @@ class ActionValueDistri(nn.Module):
         
         with FreezeParameters([self.pi_net], self.freeze_pi_net):
             encoding = self.pi_net(obs)
-        
-        logits = self.q(torch.cat([encoding, act], dim=-1))
-        value_mean, value_std = torch.chunk(logits, chunks=2, dim=-1)
-        value_log_std = torch.nn.functional.softplus(value_std) 
+        if self.std_type == "mlp_shared":
+            logits = self.q(torch.cat([encoding, act], dim=-1))
+            value_mean, value_std = torch.chunk(logits, chunks=2, dim=-1)
+            value_log_std = torch.nn.functional.softplus(value_std) 
+
+        elif self.std_type == "mlp_separated":
+            value_mean = self.q(torch.cat([encoding, act], dim=-1))
+            value_log_std = torch.nn.functional.softplus(self.q_std(torch.cat([encoding, act], dim=-1)))
 
         return torch.cat((value_mean, value_log_std), dim=-1)
     
