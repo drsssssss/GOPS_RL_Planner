@@ -83,6 +83,10 @@ class idSimEnv(CrossRoad, Env):
         self.context = idSimContext() # fake idsim context
         self.set_scenario(scenario)
         self.ref_index = None
+
+    def seed(self, seed=None):
+        super(idSimEnv, self).seed(seed)
+        
     
     def reset(self, **kwargs) -> Tuple[np.ndarray, dict]:
         self.lc_cooldown_counter = 0
