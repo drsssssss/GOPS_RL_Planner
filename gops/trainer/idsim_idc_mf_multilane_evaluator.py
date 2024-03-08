@@ -73,6 +73,7 @@ class EvalResult:
         self.action_list: List[np.ndarray] = []
         self.action_real_list: List[np.ndarray] = []
         self.reward_list: List[float] = []
+        self.value_list: List[float] = []
         ## IDC
         self.selected_path_index_list: List[int] = []
         self.optimal_path_index_list: List[int] = []
@@ -387,6 +388,10 @@ class IdsimIDCEvaluator(Evaluator):
             logits = self.networks.policy(scaled_obs)
             action_distribution = self.networks.create_action_distributions(logits)
             action = action_distribution.mode()
+            if self.kwargs["algorithm"].startswith("DSACT"):
+                q_value = min(self.networks.q1(scaled_obs, action.float())[:, 0], self.networks.q2(scaled_obs, action.float())[:, 0]).item()
+            else:
+                q_value = -999  # TODO: fix this
             action = action.detach().numpy()[0]
 
             # ----------- use mpc to get action ------------
@@ -402,6 +407,7 @@ class IdsimIDCEvaluator(Evaluator):
             eval_result.obs_list.append(raw_obs)
             eval_result.action_list.append(action)
             eval_result.action_real_list.append(info['state'].robot_state[..., -2:])
+            eval_result.value_list.append(q_value)
 
             eval_result.ego_state_list.append(
             idsim_context.x.ego_state.numpy())

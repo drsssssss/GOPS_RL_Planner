@@ -73,6 +73,7 @@ class EvalResult:
         self.action_list: List[np.ndarray] = []
         self.action_real_list: List[np.ndarray] = []
         self.reward_list: List[float] = []
+        self.value_list: List[float] = []
         ## IDC
         self.selected_path_index_list: List[int] = []
         self.optimal_path_index_list: List[int] = []

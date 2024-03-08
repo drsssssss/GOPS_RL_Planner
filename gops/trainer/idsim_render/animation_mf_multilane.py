@@ -117,8 +117,10 @@ class AnimationLane(AnimationBase):
         
         writer.setup(fig, os.path.join(save_video_path, video_name), dpi=dpi)
 
-
-        value = episode_data.paths_value_list
+        if episode_data.paths_value_list:    
+            value = episode_data.paths_value_list
+        else:
+            value = episode_data.value_list
         value = np.array(value) if value else None
         min_value = np.min(value) if value is not None else 0.0
         max_value = np.max(value) if value is not None else 0.0
@@ -231,6 +233,19 @@ class AnimationLane(AnimationBase):
                     xy=(center_x + 28, center_y - screen_height / 2 + 6),
                     value=value,
                     allowable=ref_allowable,
+                    min_value=min_value,
+                    max_value=max_value,
+                    zorder=3,
+                )
+            elif episode_data.value_list:
+                value = episode_data.value_list[step]
+                for artist in self.value_bar_artist_list:
+                    artist.remove()
+                self.value_bar_artist_list = plot_value_bar(
+                    ax=ax,
+                    xy=(center_x + 28, center_y - screen_height / 2 + 6),
+                    value=[value],
+                    allowable=[1],
                     min_value=min_value,
                     max_value=max_value,
                     zorder=3,
