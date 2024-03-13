@@ -35,7 +35,7 @@ class OffSerialIdsimTrainer(OffSerialTrainer):
         self.alg = alg
         self.sampler = sampler
         self.buffer = buffer
-        self.per_flag = kwargs["buffer_name"] == "prioritized_replay_buffer"
+        self.per_flag = kwargs["buffer_name"].startswith("prioritized") # FIXME: hard code
         self.evaluator = evaluator
 
         # create center network

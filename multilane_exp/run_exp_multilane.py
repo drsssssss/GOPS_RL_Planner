@@ -14,8 +14,8 @@ base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 script_path = os.path.join(base_path, 'example_train')
 save_folder = os.path.join(base_path, 'results/idsim')
 
-exp_name = 'idsim_multilane_exp_0307_1' 
-exp_discription = 'based on exp DSACT_exp0221,mix_map, random ref_v, nominal acc(-2.5m/s^2, when samall ref_v or bracking or close front car), lane info in sur punish, increase random dacc range(-1.5m/s^2,-0.1m/s^2), use actor to update pi, add small car in the front 10 scene, period:0.5->0.75, per_buffer alpha0.6, LRdecay, full scene evluation, max_step 200, enable slow reward, with opposite direct cars, random takeover acc and steer, fix rear veh punish threshold, random seed in vecenv,change nomimal acc reward design, change breaking mode condition, increase random dacc time expand ref_v eange to (1.5-12)'
+exp_name = 'idsim_multilane_exp_0308_6' 
+exp_discription = 'based on exp DSACT_exp0221,mix_map, random ref_v, nominal acc(-2.5m/s^2, when close front car), lane info in sur punish, increase random dacc range(-1.5m/s^2,-0.1m/s^2), use actor to update pi, add small car in the front 10 scene, period:0.5->0.75, per_buffer alpha0.6, LRdecay, full scene evluation, max_step 200, enable slow reward, with opposite direct cars, random takeover acc and steer, fix rear veh punish threshold, random seed in vecenv,change nomimal acc reward design (6->3), increase random dacc time expand ref_v eange to (1.5-12), fix per buffer decrease dacc action rate, overspead punish, dynamic living reward, sifety margin 1, explore action noise std 0.1'
 
 
 script_folder = "dsac"

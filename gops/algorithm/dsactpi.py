@@ -128,7 +128,7 @@ class DSACTPI(AlgorithmBase):
         self.mean_std2= None
         self.tau_b = kwargs.get("tau_b", self.tau)
         self.target_PI = kwargs["target_PI"]
-        self.per_flag = kwargs["buffer_name"] == "prioritized_replay_buffer"
+        self.per_flag = kwargs["buffer_name"].startswith("prioritized") # FIXME: hard code
 
     @property
     def adjustable_parameters(self):
@@ -363,6 +363,9 @@ class DSACTPI(AlgorithmBase):
             # print("td_err_max", td_err.max().item())
             # print("td_err_min", td_err.min().item())
             per = td_err/2000 # TODO: 2000 is a hyperparameter
+        else:
+            idx = None
+            per = None
 
         return q1_loss +q2_loss, q1.detach().mean(), q2.detach().mean(), q1_std.detach().mean(), q2_std.detach().mean(), q1_std.min().detach(), q2_std.min().detach(), origin_q_loss.detach(), idx, per
 
