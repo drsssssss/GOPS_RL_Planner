@@ -120,12 +120,15 @@ class OffSerialIdsimTrainer(OffSerialTrainer):
             add_scalars(alg_tb_dict, self.writer, step=self.iteration)
             add_scalars(self.sampler_tb_dict.pop(), self.writer, step=self.iteration)
             
-        if self.iteration % 10000 == 0:  # TODO: Hard code
+        if self.iteration % (self.max_iteration//100) == 0:  # TODO: Hard code
             stat_dict: Dict = self.buffer.sample_statistic(self.iteration)
             with open(self.save_folder + "/buffer_vx_stat.csv", "a") as f:
                 f.write(stat_dict["vx"] + "\n")
             with open(self.save_folder + "/buffer_y_ref_stat.csv", "a") as f:
                 f.write(stat_dict["y_ref"] + "\n")
+        if self.per_flag and self.iteration % (self.max_iteration//20) == 0:  # TODO: Hard code
+            self.buffer.save_data_dist(self.save_folder, self.iteration, replay_samples)
+
         # save
         if self.iteration % self.apprfunc_save_interval == 0:
             self.save_apprfunc()

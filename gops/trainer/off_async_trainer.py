@@ -36,7 +36,7 @@ class OffAsyncTrainer:
         self.algs = alg
         self.samplers = sampler
         self.buffers = buffer
-        self.per_flag = kwargs["buffer_name"] == "prioritized_replay_buffer"
+        self.per_flag = kwargs["buffer_name"].startswith("prioritized") # FIXME: hard code
         if self.per_flag and kwargs["num_buffers"] > 1:
             raise RuntimeError(
                 "Using multiple prioritized_replay_buffers is not supported!"

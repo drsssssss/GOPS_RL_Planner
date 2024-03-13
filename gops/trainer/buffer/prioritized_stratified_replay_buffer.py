@@ -123,7 +123,7 @@ class PrioritizedStratifiedReplayBuffer(PrioritizedReplayBuffer):
         self.alpha = min(self.alpha + self.alpha_increment, 0.8)
 
     def save_data_dist(self, path, iteration, replay_samples):
-
+        import os   
         from matplotlib import pyplot as plt
 
         for folder in ["buffer", "sample"]:
@@ -139,5 +139,6 @@ class PrioritizedStratifiedReplayBuffer(PrioritizedReplayBuffer):
             plt.bar_label(bar, [f'$N_0={int(category[0])}$', f'$N_1={int(category[1])}$', f'$N_2={int(category[2])}$', f'$N_3={int(category[3])}$', f'$N_4={int(category[4])}$'], fmt='%d')
             plt.yscale(yscale)
             plt.title(r"Category distribution")
+            os.makedirs(path + f"/{folder}", exist_ok=True)
             plt.savefig(path + f"/{folder}/category dist_{iteration}.png")
             plt.close()
