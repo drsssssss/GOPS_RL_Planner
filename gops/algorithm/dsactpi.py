@@ -140,7 +140,7 @@ class DSACTPI(AlgorithmBase):
             "delay_update",
         )
 
-    def local_update(self, data: DataDict, iteration: int) -> dict:
+    def _local_update(self, data: DataDict, iteration: int) -> dict:
         tb_info = self.__compute_gradient(data, iteration)
         self.__update(iteration)
         return tb_info
@@ -162,7 +162,7 @@ class DSACTPI(AlgorithmBase):
 
         return tb_info, update_info
 
-    def remote_update(self, update_info: dict):
+    def _remote_update(self, update_info: dict):
         iteration = update_info["iteration"]
         q1_grad = update_info["q1_grad"]
         q2_grad = update_info["q2_grad"]
