@@ -134,7 +134,8 @@ def create_env(
     else:
         raise RuntimeError(f"{spec_.env_id} registered but entry_point is not specified")
 
-    def env_fn():
+    def env_fn(env_idx: Optional[int] = None):
+        _kwargs["env_idx"] = env_idx
         env = env_creator(**_kwargs)
 
         env = ResetInfoData(env)

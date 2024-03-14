@@ -41,14 +41,17 @@ class idSimContext(Context):
 
 class idSimEnv(CrossRoad, Env):
     def __new__(cls, env_config: Config, model_config: Dict[str, Any], 
-                scenario: str, rou_config: Dict[str, Any]=None) -> Self:
+                scenario: str, rou_config: Dict[str, Any]=None, env_idx: int=None, scenerios_list: List[str]=None):
         return super(idSimEnv, cls).__new__(cls, env_config)
     
     def __init__(self, env_config: Config, model_config: ModelConfig, 
-                 scenario: str, rou_config: Dict[str, Any]=None):
+                 scenario: str, rou_config: Dict[str, Any]=None,env_idx: int=None, scenerios_list: List[str]=None):
+        self.env_idx = env_idx  
+        print('env_idx:', env_idx)
         self.rou_config = rou_config
         self.env_config = env_config
         self.rou_config = rou_config
+        self.change_scenarios(env_idx, scenerios_list)
         super(idSimEnv, self).__init__(env_config)
         self.model_config = model_config
         model_config = deepcopy(model_config)
@@ -259,6 +262,14 @@ class idSimEnv(CrossRoad, Env):
     def close(self) -> None:
         super(idSimEnv, self).close()
 
+    def change_scenarios(self, idx: int, scenario_list: List[str]) -> None:
+        if idx is None  or  scenario_list is None: # TODO: more elegant way to handle this
+            print(f"INFO: no change in scenario")
+            return
+        scenarios = scenario_list[idx% len(scenario_list)]
+        self.env_config.scenario_selector = scenarios
+        print(f"INFO: change current scenario to {scenarios}")
+
     def change_rou_file(self):
         surrounding_max_speed_range = self.rou_config["surrounding_max_speed_range"]
         surrounding_max_speed_list = np.random.uniform(*surrounding_max_speed_range, size=5)
@@ -364,5 +375,9 @@ def env_creator(**kwargs):
     model_config = ModelConfig.from_partial_dict(model_config)
 
     rou_config = kwargs["rou_config"] if "rou_config" in kwargs.keys() else None
-    env = idSimEnv(env_config, model_config, env_scenario, rou_config)
+
+    env_idx = kwargs["env_idx"] if "env_idx" in kwargs.keys() else 0
+
+    scenerios_list = kwargs["scenerios_list"] if "scenerios_list" in kwargs.keys() else None
+    env = idSimEnv(env_config, model_config, env_scenario, rou_config, env_idx, scenerios_list)
     return env

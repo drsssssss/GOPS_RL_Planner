@@ -31,7 +31,6 @@ from gymnasium.error import (
     NoAsyncCallError,
 )
 from gymnasium.vector.utils import (
-    CloudpickleWrapper,
     clear_mpi_env_vars,
     concatenate,
     create_empty_array,
@@ -53,7 +52,29 @@ class AsyncState(Enum):
     WAITING_CALL = "call"
     WAITING_SEED = "seed"
 
+class CloudpickleWrapper:
+    """Wrapper that uses cloudpickle to pickle and unpickle the result."""
 
+    def __init__(self, fn: Callable[[], Env]):
+        """Cloudpickle wrapper for a function."""
+        self.fn = fn
+
+    def __getstate__(self):
+        """Get the state using `cloudpickle.dumps(self.fn)`."""
+        import cloudpickle
+
+        return cloudpickle.dumps(self.fn)
+
+    def __setstate__(self, ob):
+        """Sets the state with obs."""
+        import pickle
+
+        self.fn = pickle.loads(ob)
+
+    def __call__(self, *args, **kwargs):
+        """Calls the function `self.fn` with arguments."""
+        return self.fn(*args, **kwargs)
+    
 class AsyncVectorEnv(VectorEnv):
     """Vectorized environment that runs multiple environments in parallel.
 
@@ -613,7 +634,7 @@ class AsyncVectorEnv(VectorEnv):
 
 def _worker(index, env_fn, pipe, parent_pipe, shared_memory, error_queue):
     assert shared_memory is None
-    env = env_fn()
+    env = env_fn(index)
     parent_pipe.close()
     try:
         while True:
@@ -680,7 +701,7 @@ def _worker(index, env_fn, pipe, parent_pipe, shared_memory, error_queue):
 
 def _worker_shared_memory(index, env_fn, pipe, parent_pipe, shared_memory, error_queue):
     assert shared_memory is not None
-    env = env_fn()
+    env = env_fn(index)
     observation_space = env.observation_space
     parent_pipe.close()
     try:
