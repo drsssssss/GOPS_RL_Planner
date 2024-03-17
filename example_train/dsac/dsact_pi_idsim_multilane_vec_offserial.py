@@ -53,6 +53,7 @@ if __name__ == "__main__":
     base_env_model_config.update(extra_env_model_config)
     parser.add_argument("--env_config", type=dict, default=base_env_config)
     parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
+    parser.add_argument("--scenerios_list", type=list, default=[':19','19:'])
 
     parser.add_argument("--vector_env_num", type=int, default=10, help="Number of vector envs")
     parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
@@ -96,7 +97,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--value_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS")
     parser.add_argument("--value_hidden_sizes", type=list, default=[256, 256,256])
-    parser.add_argument("--value_std_type", type=str, default='mlp_shared', help="Options: mlp_separated/mlp_shared")
+    parser.add_argument("--value_std_type", type=str, default='mlp_separated', help="Options: mlp_separated/mlp_shared")
     parser.add_argument(
         "--value_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
@@ -212,24 +213,27 @@ if __name__ == "__main__":
     trainer_type = parser.parse_known_args()[0].trainer
     # 4.1. Parameters for off_serial_trainer
     parser.add_argument(
-        "--buffer_name", type=str, default="prioritized_replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
+        "--buffer_name", type=str, default="prioritized_stratified_replay_buffer", help="Options:replay_buffer/prioritized_replay_buffer"
     )
+    parser.add_argument(
+        "--category_num", type=int, default=5, help="Number of categories for stratified replay buffer")
     # Size of collected samples before training
     parser.add_argument("--buffer_warm_size", type=int, default=10000)
     # Max size of reply buffer
-    parser.add_argument("--buffer_max_size", type=int, default=250000)
+    parser.add_argument("--buffer_max_size", type=int, default=225000)
     # Batch size of replay samples from buffer
     parser.add_argument("--replay_batch_size", type=int, default=256)
     # Period of sampling
-    parser.add_argument("--sample_interval", type=int, default=10)
+    parser.add_argument("--sample_interval", type=int, default=20)
 
     ################################################
     # 5. Parameters for sampler
     parser.add_argument("--sampler_name", type=str, default="off_sampler", help="Options: on_sampler/off_sampler")
     # Batch size of sampler for buffer store
-    parser.add_argument("--sample_batch_size", type=int, default=50)
+    parser.add_argument("--sample_batch_size", type=int, default=80)
     # Add noise to action for better exploration
-    parser.add_argument("--noise_params", type=dict, default=None)
+    parser.add_argument("--noise_params", type=dict, default={"mean": np.array([0,0], dtype=np.float32), "std": np.array([0.1,0.1], dtype=np.float32),},
+        help="used for continuous action space")
 
     ################################################
     # 6. Parameters for evaluator
@@ -261,8 +265,9 @@ if __name__ == "__main__":
     args["eval_env_config"] = eval_env_config
     env = create_env(**{**args, "vector_env_num": None})
     args = init_args(env, **args)
+    # env.close()
 
-    # start_tensorboard(args["save_folder"])
+    # start_tensorboarsd(args["save_folder"])
     # Step 1: create algorithm and approximate function
     alg = create_alg(**args)
     # Step 2: create sampler in trainer

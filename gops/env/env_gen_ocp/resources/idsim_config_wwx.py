@@ -21,7 +21,7 @@ env_config_param_base = {
     "warmup_time": 50.0,
     "max_steps": 200,
     "random_ref_v": True,
-    "ref_v_range": (1.5, 12.0),
+    "ref_v_range": (0, 10.0),
     "nonimal_acc": True,
     "ignore_traffic_lights": False,
     "no_done_at_collision": False, 
@@ -36,7 +36,7 @@ env_config_param_base = {
     "obs_num_surrounding_vehicles": {
         "passenger": 8,
         "bicycle": 2,
-        "pedestrian": 2,
+        "pedestrian": 4,
     },
     "ref_v": 10.0,
     "ref_length": 48.0,
@@ -74,20 +74,21 @@ env_config_param_base = {
     "P_delta_steer": 0.05,
     "P_jerk": 0.1,
     "P_done": 2000.0,
+    "P_boundary": 0,
     "safety_lat_margin_front": 1.0,
     "safety_long_margin_front": 0.0,
     "safety_long_margin_side": 0.0,
     "front_dist_thd": 50.0,
     "space_dist_thd": 12.0,
     "rel_v_thd": 1.0,
-    "rel_v_rear_thd": 1.0,
+    "rel_v_rear_thd": 3.0,
     "time_dist": 2.0,
 }
 
 model_config_base = {
     "N": pre_horizon,
     "sur_obs_padding": "rule",
-    "add_boundary_obs": False,
+    "add_boundary_obs": True,
     "full_horizon_sur_obs": False,
     "ahead_lane_length_min": 6.0,
     "ahead_lane_length_max": 60.0,
@@ -159,7 +160,7 @@ model_config_crossroad = model_config_base
 env_config_param_multilane = {
     **env_config_param_base,
     "scenario_root": MAP_ROOT_MULTILANE,
-    "action_lower_bound": (-4.0 * delta_t, -0.065 * delta_t),
+    "action_lower_bound": (-2.5 * delta_t, -0.065 * delta_t),
     "action_upper_bound": (2.5 * delta_t, 0.065 * delta_t),
     "real_action_lower_bound": (-3.0, -0.065),
     "real_action_upper_bound": (0.8, 0.065),
@@ -167,7 +168,7 @@ env_config_param_multilane = {
     "random_acc_cooldown": (30, 50, 50), # cooldown for acceleration, deceleration and ref_v, respectively
     "random_acc_prob": (0.1, 0.1), # probability to accelerate and decelerate, respectively
     "random_acc_range": (0.2, 0.8), # (m/s^2), used for acceleration
-    "random_dec_range": (-1.5, -0.1), # (m/s^2), used for deceleration
+    "random_dec_range": (-2.5, -0.5), # (m/s^2), used for deceleration
 }
 
 model_config_multilane = {

@@ -121,6 +121,7 @@ class idSimEnv(CrossRoad, Env):
         if self.random_ref_v and not env_context.vehicle.in_junction:  # TODO: check if this is correct
             ref_v = np.random.uniform(*self.ref_v_range)
             self.model_config.ref_v_lane = float(ref_v)
+            self.env_config.ref_v = float(ref_v)
             # print(f"INFO: change ref_v to {ref_v}")
             
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
