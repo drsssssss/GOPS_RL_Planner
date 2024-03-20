@@ -190,7 +190,7 @@ class AnimationBase:
             surr_states = surr_states.reshape(1, -1)
         for i in range(surr_states.shape[0]):
             x, y, phi, speed, length, width, mask = surr_states[i]
-            if episode_data.attn_weight_list is not None:
+            if episode_data.attn_weight_list != []:
                 attn_weight = episode_data.attn_weight_list[step][i]
             else:
                 attn_weight = 1.0

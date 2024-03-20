@@ -396,7 +396,7 @@ class IdsimIDCEvaluator(Evaluator):
             action = action.detach().numpy()[0]
 
             if hasattr(self.networks.policy, "pi_net"):
-                if hasattr(self.networks.policy.pi_net, "attn_weights"):
+                if hasattr(self.networks.policy.pi_net, "attn_weights") and self.networks.policy.pi_net.attn_weights is not None:
                     attn_weight = self.networks.policy.pi_net.attn_weights
                     eval_result.attn_weight_list.append(attn_weight.detach().numpy()[0])
 
