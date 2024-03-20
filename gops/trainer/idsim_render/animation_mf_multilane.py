@@ -2,7 +2,7 @@ import os
 import pickle
 from pathlib import Path
 
-from gops.trainer.idsim_idc_evaluator import EvalResult
+from gops.trainer.idsim_idc_mf_multilane_evaluator import EvalResult
 from gops.trainer.idsim_render.color import EGO_COLOR, SUR_COLOR, EGO_COLOR_WITH_ALPHA, SUR_COLOR_WITH_ALPHA, \
     TRAJ_COLOR_WITH_ALPHA
 from gops.trainer.idsim_render.multilane.info_bar import plot_scale, plot_speed_dashboard, plot_action_bar, \

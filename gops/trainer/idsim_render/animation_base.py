@@ -190,8 +190,14 @@ class AnimationBase:
             surr_states = surr_states.reshape(1, -1)
         for i in range(surr_states.shape[0]):
             x, y, phi, speed, length, width, mask = surr_states[i]
+            if episode_data.attn_weight_list is not None:
+                attn_weight = episode_data.attn_weight_list[step][i]
+            else:
+                attn_weight = 1.0
             if mask == 1:
-                self.surr_focus_list.append(create_veh(ax, (x,y), phi, length, width, facecolor=SUR_FOCUS_COLOR_WITH_ALPHA, edgecolor=SUR_FOCUS_COLOR, zorder=201))
+                facecolor_with_attn = SUR_FOCUS_COLOR_WITH_ALPHA[0:3] + (attn_weight,)
+                edgecolor_with_attn = SUR_FOCUS_COLOR[0:3] + (attn_weight,)
+                self.surr_focus_list.append(create_veh(ax, (x,y), phi, length, width, facecolor=facecolor_with_attn, edgecolor=edgecolor_with_attn, zorder=201))
                 self.surr_focus_ref_list.append(ax.add_line(Line2D(
                         surr_param[:, i, 0], surr_param[:, i, 1],
                         color=SUR_FOCUS_COLOR_WITH_ALPHA, linewidth=self.REF_LINEWIDTH, zorder=201

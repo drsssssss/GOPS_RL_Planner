@@ -70,6 +70,7 @@ class EvalResult:
         self.context_list: List[BaseContext] = []
         self.context_full_list: List[BaseContext] = []
         self.obs_list: List[np.ndarray] = []
+        self.attn_weight_list: List[np.ndarray] = []
         self.action_list: List[np.ndarray] = []
         self.action_real_list: List[np.ndarray] = []
         self.reward_list: List[float] = []
@@ -393,6 +394,11 @@ class IdsimIDCEvaluator(Evaluator):
             else:
                 q_value = -999  # TODO: fix this
             action = action.detach().numpy()[0]
+
+            if hasattr(self.networks.policy, "pi_net"):
+                if hasattr(self.networks.policy.pi_net, "attn_weights"):
+                    attn_weight = self.networks.policy.pi_net.attn_weights
+                    eval_result.attn_weight_list.append(attn_weight.detach().numpy()[0])
 
             # ----------- use mpc to get action ------------
             if self.use_mpc:
