@@ -95,10 +95,11 @@ class PINet(nn.Module):
             if kwargs.get("attn_dim") is not None:
                 self.attn_dim = kwargs["attn_dim"]
             else:
-                self.attn_dim = self.pi_in_dim  # NOTE: default attn_dim is the real obj_dim (without mask)
-                warnings.warn("attn_dim is not specified, using obj_dim as attn_dim.")
-            self.Uq = nn.Linear(self.pi_out_dim, self.attn_dim, bias=False, dtype=torch.float32)
-            self.Ur = nn.Linear(self.pi_in_dim, self.attn_dim, bias=False, dtype=torch.float32)
+                self.attn_dim = self.pi_out_dim # default attn_dim is pi_out_dim
+                warnings.warn("attn_dim is not specified, using pi_out_dim as attn_dim")
+            self.Uq = nn.Linear(self.pi_out_dim + self.others_out_dim, self.attn_dim, bias=False, dtype=torch.float32)
+            self.Ur = nn.Linear(self.pi_out_dim, self.attn_dim, bias=False, dtype=torch.float32)
+            self.attn_weights = None
 
             init_weights(self.Uq)
             init_weights(self.Ur)
@@ -120,10 +121,12 @@ class PINet(nn.Module):
 
         if self.enable_self_attention:
             query = embeddings.sum(axis=-2) / (mask.sum(axis=-1) + 1e-5).unsqueeze(axis=-1) # [b, d_model] / [B, 1] --> [B, d_model]
-            logits = torch.bmm(self.Uq(query).unsqueeze(1), self.Ur(objs).transpose(-1, -2)).squeeze(1)  # [B, N]
+            query = torch.concat([query, others], dim=1) # [B, d_model + d_others]
+            logits = torch.bmm(self.Uq(query).unsqueeze(1), self.Ur(embeddings).transpose(-1, -2)).squeeze(1) / np.sqrt(self.attn_dim) # [B, N]
             logits = logits + ((1 - mask) * -1e9)
-            attention_weights = torch.softmax(logits, axis=-1) # [B, N]
-            embeddings = torch.matmul(attention_weights.unsqueeze(axis=1),embeddings).squeeze(axis=-2) # [B, d_model]
+            self.attn_weights = torch.softmax(logits, axis=-1) # [B, N]
+            # print(self.attn_weights)
+            embeddings = torch.matmul(self.attn_weights.unsqueeze(axis=1),embeddings).squeeze(axis=-2) # [B, d_model]
         else:
             embeddings = embeddings.sum(dim=1, keepdim=False) # [B, d_model]
         
