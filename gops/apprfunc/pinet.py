@@ -125,6 +125,8 @@ class PINet(nn.Module):
             logits = torch.bmm(self.Uq(query).unsqueeze(1), self.Ur(embeddings).transpose(-1, -2)).squeeze(1) / np.sqrt(self.attn_dim) # [B, N]
             logits = logits + ((1 - mask) * -1e9)
             self.attn_weights = torch.softmax(logits, axis=-1) # [B, N]
+            self.attn_weights = (self.attn_weights + 1*mask)
+            self.attn_weights = self.attn_weights / (self.attn_weights.sum(axis=-1, keepdim=True) + 1e-5)
             # print(self.attn_weights)
             embeddings = torch.matmul(self.attn_weights.unsqueeze(axis=1),embeddings).squeeze(axis=-2) # [B, d_model]
         else:
@@ -349,13 +351,13 @@ class ActionValueDistri(nn.Module):
         if self.std_type == "mlp_shared":
             logits = self.q(torch.cat([encoding, act], dim=-1))
             value_mean, value_std = torch.chunk(logits, chunks=2, dim=-1)
-            value_log_std = torch.nn.functional.softplus(value_std) 
+            value_std = torch.nn.functional.softplus(value_std) 
 
         elif self.std_type == "mlp_separated":
             value_mean = self.q(torch.cat([encoding, act], dim=-1))
-            value_log_std = torch.nn.functional.softplus(self.q_std(torch.cat([encoding, act], dim=-1)))
+            value_std = torch.nn.functional.softplus(self.q_std(torch.cat([encoding, act], dim=-1)))
 
-        return torch.cat((value_mean, value_log_std), dim=-1)
+        return torch.cat((value_mean, value_std), dim=-1)
     
 
 

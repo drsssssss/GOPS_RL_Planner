@@ -389,8 +389,18 @@ class IdsimIDCEvaluator(Evaluator):
             logits = self.networks.policy(scaled_obs)
             action_distribution = self.networks.create_action_distributions(logits)
             action = action_distribution.mode()
+            # entropy = action_distribution.entropy()
+            # print(f"entropy: {entropy.item()}")
             if self.kwargs["algorithm"].startswith("DSACT"):
-                q_value = min(self.networks.q1(scaled_obs, action.float())[:, 0], self.networks.q2(scaled_obs, action.float())[:, 0]).item()
+                q1_value_std = self.networks.q1(scaled_obs, action.float())
+                q2_value_std = self.networks.q2(scaled_obs, action.float())
+                q1_value = q1_value_std[:, 0]
+                q2_value = q2_value_std[:, 0]
+                q1_std = q1_value_std[:, 1]
+                q2_std = q2_value_std[:, 1]
+                q_value = min(q1_value, q2_value).item()
+                # print(f"q1_std: {q1_std.item()} q2_std: {q2_std.item()}")
+
             else:
                 q_value = -999  # TODO: fix this
             action = action.detach().numpy()[0]
