@@ -55,9 +55,9 @@ if __name__ == "__main__":
     parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
     parser.add_argument("--scenerios_list", type=list, default=[':19','19:'])
 
-    parser.add_argument("--vector_env_num", type=int, default=10, help="Number of vector envs")
-    parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
-    parser.add_argument("--gym2gymnasium", type=bool, default=True, help="Convert Gym-style env to Gymnasium-style")
+    # parser.add_argument("--vector_env_num", type=int, default=10, help="Number of vector envs")
+    # parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
+    # parser.add_argument("--gym2gymnasium", type=bool, default=True, help="Convert Gym-style env to Gymnasium-style")
 
     parser.add_argument("--ego_scale", type=list, default=[1, 20, 20, 1, 4, 1, 4] ) #  vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
     parser.add_argument("--sur_scale", type=list, default=[0.2, 1, 1, 10, 1, 1, 1, 1] ) #  rel_x, rel_y , cos(phi), sin(phi), speed, length, width, mask
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     # 1. Parameters for environment
     parser.add_argument("--reward_scale", type=float, default=1, help="reward scale factor")
     parser.add_argument("--action_type", type=str, default="continu", help="Options: continu/discret")
-    parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
+    parser.add_argument("--is_render", type=bool, default=True, help="Draw environment animation")
     parser.add_argument("--is_adversary", type=bool, default=False, help="Adversary training")
     parser.add_argument("--is_constrained", type=bool, default=False, help="Adversary training")
 
@@ -219,9 +219,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--category_num", type=int, default=6, help="Number of categories for stratified replay buffer")
     # Size of collected samples before training
-    parser.add_argument("--buffer_warm_size", type=int, default=10000)
+    parser.add_argument("--buffer_warm_size", type=int, default=100)
     # Max size of reply buffer
-    parser.add_argument("--buffer_max_size", type=int, default=225000)
+    parser.add_argument("--buffer_max_size", type=int, default=2250)
     # Batch size of replay samples from buffer
     parser.add_argument("--replay_batch_size", type=int, default=256)
     # Period of sampling
