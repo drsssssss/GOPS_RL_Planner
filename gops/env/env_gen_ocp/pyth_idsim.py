@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Generic, Optional, Tuple, Union
 from typing_extensions import Self
 
 import gym
+import time
 import numpy as np
 import torch
 from gops.env.env_gen_ocp.pyth_base import (Context, ContextState, Env, State, stateType)
@@ -18,7 +19,24 @@ from idsim_model.multilane.context import MultiLaneContext
 from idsim_model.model_context import State as ModelState
 from idsim_model.params import ModelConfig
 
+def cal_ave_exec_time(print_interval=100):
+    def decorator(func):
+        total_time = 0
+        count = 0
 
+        def wrapper(*args, **kwargs):
+            nonlocal total_time, count
+            start_time = time.perf_counter()
+            result = func(*args, **kwargs)
+            end_time = time.perf_counter()
+            execution_time = end_time - start_time
+            total_time += execution_time
+            count += 1
+            if count % print_interval == 0:
+                print(f"Average execution time after {count} steps: {total_time / count:.9f} seconds")
+            return result
+        return wrapper
+    return decorator
 
 @dataclass
 class idSimContextState(ContextState[stateType], Generic[stateType]):
@@ -125,9 +143,36 @@ class idSimEnv(CrossRoad, Env):
             # print(f"INFO: change ref_v to {ref_v}")
             
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
+        self._fix_state()
         self._info = self._get_info(info)
         return self._get_obs(), self._info
     
+    def _fix_state(self,):  # FIXME: this is a hack
+        context = get_idsimcontext(
+            State.stack([self._state]), mode="batch", scenario=self.scenario)
+        ego_state = context.x.ego_state[0] # [6]: x, y, vx, vy, phi, r
+        ref_param = context.p.ref_param[0] # [R, 2N+1, 4] ref_x, ref_y, ref_phi, ref_v
+        ref_index = context.p.ref_index_param[0]
+        nominal_steer = self._get_nominal_steer_by_state(
+            ego_state, ref_param, ref_index)
+        if self.engine.context.vehicle.in_junction and np.abs(nominal_steer) > 5*np.pi/180:
+            # steer in gaussian distribution
+            random_steer = np.random.normal(loc=0.0, scale=3*np.pi/180)
+            init_steer = 0.3*nominal_steer+ np.sign(nominal_steer)*np.abs(random_steer)
+            steer_upper_bound = self.config.real_action_upper_bound[1]
+            steer_lower_bound = self.config.real_action_lower_bound[1]
+            init_steer = np.clip(init_steer, steer_lower_bound, steer_upper_bound)
+            
+            init_acc = np.random.normal(loc=0.0, scale=0.1)
+            init_action = np.array([init_acc, init_steer], dtype=np.float32)
+            self.engine.context.vehicle.init_act(init_action)
+
+            init_vx = np.random.uniform(0.5, 2.0)
+            self.engine.context.vehicle.init_vx(init_vx)
+            print(f"INFO: fix state, init_action: {init_action}")
+            self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
+    
+    # @cal_ave_exec_time(print_interval=1000)
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
 
@@ -180,7 +225,7 @@ class idSimEnv(CrossRoad, Env):
                 "dtype":np.float32
             }
         })
-        return info
+        return {}
     
     def _get_obs(self) -> np.ndarray:
         idsim_context = get_idsimcontext(
@@ -270,6 +315,9 @@ class idSimEnv(CrossRoad, Env):
         scenarios = scenario_list[idx% len(scenario_list)]
         self.env_config.scenario_selector = scenarios
         print(f"INFO: change current scenario to {scenarios}")
+        # direction_list = ["r", "s"]
+        # self.env_config.direction_selector = direction_list[idx % len(direction_list)] # FIXME: this is a hack
+        # print(f"INFO: change current direction to {self.env_config.direction_selector}")
 
     def change_rou_file(self):
         surrounding_max_speed_range = self.rou_config["surrounding_max_speed_range"]
