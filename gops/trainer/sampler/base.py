@@ -130,7 +130,9 @@ class BaseSampler(metaclass=ABCMeta):
         
         # interact with environment
         if self._is_vector:
+            curr_obs = self.obs.copy()
             next_obs, reward, terminated, truncated, next_info = self.env.step(action_clip)
+            self.obs = next_obs.copy()
             # For vector env, next_obs, reward, terminated, truncated, and next_info are batched data,
             # and vector env will automatically reset the environment when terminated or truncated is True,
             # So we need to get real final observation and info from next_info.
@@ -153,9 +155,9 @@ class BaseSampler(metaclass=ABCMeta):
                 for i in index:
                     unbatched_infos[i] = next_info["final_info"][i]
 
-            experiences = [Experience(*e) for e in zip(self.obs, action, reward, terminated, self.info, next_obs, unbatched_infos, logp)]
+            experiences = [Experience(*e) for e in zip(curr_obs, action, reward, terminated, self.info, next_obs, unbatched_infos, logp)]
 
-            self.obs = next_obs
+            # self.obs = next_obs
             self.info = unbatched_infos
 
             return experiences
