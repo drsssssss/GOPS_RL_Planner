@@ -97,12 +97,11 @@ class PINet(nn.Module):
             else:
                 self.attn_dim = self.pi_out_dim # default attn_dim is pi_out_dim
                 warnings.warn("attn_dim is not specified, using pi_out_dim as attn_dim")
-            self.Uq = nn.Linear(self.pi_out_dim + self.others_out_dim, self.attn_dim, bias=False, dtype=torch.float32)
-            self.Ur = nn.Linear(self.pi_out_dim, self.attn_dim, bias=False, dtype=torch.float32)
+            Uq_net_size = [self.pi_out_dim + self.others_out_dim] + [self.attn_dim]*2
+            Ur_net_size = [self.pi_out_dim] + [self.attn_dim]
+            self.Uq = mlp( Uq_net_size, get_activation_func(kwargs["pi_hidden_activation"]),)
+            self.Ur = mlp( Ur_net_size, get_activation_func(kwargs["pi_hidden_activation"]),) 
             self.attn_weights = None
-
-            init_weights(self.Uq)
-            init_weights(self.Ur)
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         objs = obs[:, self.begin:self.end]
@@ -125,8 +124,8 @@ class PINet(nn.Module):
             logits = torch.bmm(self.Uq(query).unsqueeze(1), self.Ur(embeddings).transpose(-1, -2)).squeeze(1) / np.sqrt(self.attn_dim) # [B, N]
             logits = logits + ((1 - mask) * -1e9)
             self.attn_weights = torch.softmax(logits, axis=-1) # [B, N]
-            self.attn_weights = (self.attn_weights + 1*mask)
-            self.attn_weights = self.attn_weights / (self.attn_weights.sum(axis=-1, keepdim=True) + 1e-5)
+            # self.attn_weights = (self.attn_weights + 0*mask)
+            # self.attn_weights = self.attn_weights / (self.attn_weights.sum(axis=-1, keepdim=True) + 1e-5)
             # print(self.attn_weights)
             embeddings = torch.matmul(self.attn_weights.unsqueeze(axis=1),embeddings).squeeze(axis=-2) # [B, d_model]
         else:

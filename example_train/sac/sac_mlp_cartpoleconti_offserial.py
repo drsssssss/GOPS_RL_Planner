@@ -34,9 +34,11 @@ if __name__ == "__main__":
     parser.add_argument("--env_id", type=str, default="gym_cartpoleconti", help="id of environment")
     parser.add_argument("--algorithm", type=str, default="SAC", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=False, help="Disable CUDA")
+    parser.add_argument("--seed", default=12345, help="seed")
 
     ################################################
     # 1. Parameters for environment
+    parser.add_argument("--reward_scale", type=float, default=1, help="reward scale factor")
     parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
     parser.add_argument("--is_adversary", type=bool, default=False, help="Adversary training")
 
@@ -96,7 +98,7 @@ if __name__ == "__main__":
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
     # Maximum iteration number
-    parser.add_argument("--max_iteration", type=int, default=6400)
+    parser.add_argument("--max_iteration", type=int, default=56400)
     parser.add_argument("--ini_network_dir", type=str, default=None)
     trainer_type = parser.parse_known_args()[0].trainer
 
@@ -115,7 +117,7 @@ if __name__ == "__main__":
     # 5. Parameters for sampler
     parser.add_argument("--sampler_name", type=str, default="off_sampler", help="Options: on_sampler/off_sampler")
     # Batch size of sampler for buffer store
-    parser.add_argument("--sample_batch_size", type=int, default=8)
+    parser.add_argument("--sample_batch_size", type=int, default=4)
     # Period of sampling
     parser.add_argument("--sample_interval", type=int, default=1)
     # Add noise to actions for better exploration
@@ -142,7 +144,7 @@ if __name__ == "__main__":
     env = create_env(**args)
     args = init_args(env, **args)
 
-    start_tensorboard(args["save_folder"])
+    # start_tensorboard(args["save_folder"])
     # Step 1: create algorithm and approximate function
     alg = create_alg(**args)
     alg.set_parameters({"tau": 0.2})
@@ -162,6 +164,6 @@ if __name__ == "__main__":
 
     ################################################
     # Plot and save training figures
-    plot_all(args["save_folder"])
+    # plot_all(args["save_folder"])
     save_tb_to_csv(args["save_folder"])
     print("Plot & Save are finished!")

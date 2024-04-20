@@ -23,6 +23,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Normal
 from torch.optim import Adam
+from torch.nn.functional import huber_loss
 
 from gops.algorithm.base import AlgorithmBase, ApprBase
 from gops.create_pkg.create_apprfunc import create_apprfunc
@@ -69,6 +70,14 @@ class ApproxContainer(ApprBase):
             self.policy.parameters(), lr=kwargs["policy_learning_rate"]
         )
         self.alpha_optimizer = Adam([self.log_alpha], lr=kwargs["alpha_learning_rate"])
+        self.optimizer_dict = {
+            "policy": self.policy_optimizer,
+            "q1": self.q1_optimizer,
+            "q2": self.q2_optimizer,
+            "alpha": self.alpha_optimizer,
+        }
+        self.init_scheduler(**kwargs)
+
 
     def create_action_distributions(self, logits):
         return self.policy.get_act_dist(logits)
@@ -111,7 +120,7 @@ class DSACT(AlgorithmBase):
             "delay_update",
         )
 
-    def local_update(self, data: DataDict, iteration: int) -> dict:
+    def _local_update(self, data: DataDict, iteration: int) -> dict:
         tb_info = self.__compute_gradient(data, iteration)
         self.__update(iteration)
         return tb_info
@@ -132,7 +141,7 @@ class DSACT(AlgorithmBase):
 
         return tb_info, update_info
 
-    def remote_update(self, update_info: dict):
+    def _remote_update(self, update_info: dict):
         iteration = update_info["iteration"]
         q1_grad = update_info["q1_grad"]
         q2_grad = update_info["q2_grad"]
@@ -174,7 +183,7 @@ class DSACT(AlgorithmBase):
 
         self.networks.q1_optimizer.zero_grad()
         self.networks.q2_optimizer.zero_grad()
-        loss_q, q1, q2, std1, std2, min_std1, min_std2, origin_q_loss = self.__compute_loss_q(data)
+        loss_q, q1, q2, std1, std2, origin_q_loss = self.__compute_loss_q(data)
         loss_q.backward()
 
         for p in self.networks.q1.parameters():
@@ -198,12 +207,14 @@ class DSACT(AlgorithmBase):
             loss_alpha.backward()
 
         tb_info = {
-            "DSAC2/critic_avg_q1-RL iter": q1.item(),
-            "DSAC2/critic_avg_q2-RL iter": q2.item(),
-            "DSAC2/critic_avg_std1-RL iter": std1.item(),
-            "DSAC2/critic_avg_std2-RL iter": std2.item(),
-            "DSAC2/critic_avg_min_std1-RL iter": min_std1.item(),
-            "DSAC2/critic_avg_min_std2-RL iter": min_std2.item(),
+            "DSAC2/critic_avg_q1-RL iter": q1.mean().detach().item(),
+            "DSAC2/critic_avg_q2-RL iter": q2.mean().detach().item(),
+            "DSAC2/critic_avg_std1-RL iter": std1.mean().detach().item(),
+            "DSAC2/critic_avg_std2-RL iter": std2.mean().detach().item(),
+            "DSAC2/critic_avg_min_std1-RL iter": std1.min().detach().item(),
+            "DSAC2/critic_avg_min_std2-RL iter": std2.min().detach().item(),
+            "DSAC2/critic_avg_max_std1-RL iter": std1.max().detach().item(),
+            "DSAC2/critic_avg_max_std2-RL iter": std2.max().detach().item(),
             tb_tags["loss_actor"]: loss_policy.item(),
             tb_tags["loss_critic"]: origin_q_loss.item(),
             "DSAC2/policy_mean-RL iter": policy_mean,
@@ -286,29 +297,76 @@ class DSACT(AlgorithmBase):
         q2_std_detach = torch.clamp(q2_std, min=0.).detach()
         bias = 0.1
 
-        q1_loss = (torch.pow(self.mean_std1, 2) + bias) * torch.mean(
-            -(target_q1 - q1).detach() / ( torch.pow(q1_std_detach, 2)+ bias)*q1
-            -((torch.pow(q1.detach() - target_q1_bound, 2)- q1_std_detach.pow(2) )/ (torch.pow(q1_std_detach, 3) +bias)
-            )*q1_std
-        )
+        ratio1 = torch.pow(self.mean_std1, 2) / (torch.pow(q1_std_detach, 2) + bias).clamp(min=0.1, max=10)
+        ratio2 = torch.pow(self.mean_std2, 2) / (torch.pow(q2_std_detach, 2) + bias).clamp(min=0.1, max=10)
 
-        q2_loss = (torch.pow(self.mean_std2, 2) + bias)*torch.mean(
-            -(target_q2 - q2).detach() / ( torch.pow(q2_std_detach, 2)+ bias)*q2
-            -((torch.pow(q2.detach() - target_q2_bound, 2)- q2_std_detach.pow(2) )/ (torch.pow(q2_std_detach, 3) +bias)
-            )*q2_std
-        )
+        # q1_loss = torch.mean(ratio1 *(huber_loss(q1, target_q1, delta = 30, reduction='none')) + torch.log(q1_std +bias)
+        #                               - q1_std * huber_loss(q1.detach(), target_q1_bound, delta = 30, reduction='none')/(q1_std_detach +bias).pow(3)
+        #                               )
+                            
+        # q2_loss = torch.mean(ratio2 *(huber_loss(q2, target_q2, delta = 30, reduction='none')) + torch.log(q2_std +bias)
+        #                               - q2_std * huber_loss(q2.detach(), target_q2_bound, delta = 30, reduction='none')/(q2_std_detach +bias).pow(3)
+        #                              )
+                            
+        # form3
+        q1_loss = torch.mean(ratio1 *(huber_loss(q1, target_q1, delta = 30, reduction='none')) 
+                                      + q1_std *(q1_std_detach.pow(2) - huber_loss(q1.detach(), target_q1_bound, delta = 30, reduction='none'))/(q1_std_detach.pow(3) +bias)
+                            )
+        q2_loss = torch.mean(ratio2 *(huber_loss(q2, target_q2, delta = 30, reduction='none'))
+                                      + q2_std *(q2_std_detach.pow(2) - huber_loss(q2.detach(), target_q2_bound, delta = 30, reduction='none'))/(q2_std_detach.pow(3) +bias)
+                            )
+        # form4 should similar to form 0
+        # q1_loss = torch.mean(ratio1 *(huber_loss(q1, target_q1, delta = 30, reduction='none') 
+        #                               + q1_std *(q1_std_detach.pow(2) - huber_loss(q1.detach(), target_q1_bound, delta = 30, reduction='none'))/(q1_std_detach.pow(3) +bias)
+        #                              )
+        #                     )
+        # q2_loss = torch.mean(ratio2 *(huber_loss(q2, target_q2, delta = 30, reduction='none')
+        #                               + q2_std *(q2_std_detach.pow(2) - huber_loss(q2.detach(), target_q2_bound, delta = 30, reduction='none'))/(q2_std_detach.pow(3) +bias)
+        #                             )
+        #                     )
+
+        # fix 2
+        # q1_loss = torch.mean(ratio1 *(huber_loss(q1, target_q1, delta = 30, reduction='none') 
+        #                               + q1_std *(q1_std_detach.pow(2) - huber_loss(q1.detach(), target_q1_bound, delta = 30, reduction='none'))/(q1_std_detach +bias)
+        #                               )
+        #                     )
+        # q2_loss = torch.mean(ratio2 *(huber_loss(q2, target_q2, delta = 30, reduction='none')
+        #                               + q2_std *(q2_std_detach.pow(2) - huber_loss(q2.detach(), target_q2_bound, delta = 30, reduction='none'))/(q2_std_detach +bias)
+        #                               )
+        #                     )
+        
+
+        # q1_loss = torch.mean(ratio1 * ((q1 - target_q1).pow(2) + torch.log(q1_std +bias) -q1_std * (q1.detach() - target_q1_bound).pow(2) / (q1_std_detach + bias)))
+        # q2_loss = torch.mean(ratio2 * ((q2 - target_q2).pow(2) + torch.log(q2_std +bias) -q2_std * (q2.detach() - target_q2_bound).pow(2) / (q2_std_detach + bias)))
+
+        # q1_loss = (torch.pow(self.mean_std1, 2) + bias) * torch.mean(
+        #     -(target_q1 - q1).detach() / ( torch.pow(q1_std_detach, 2)+ bias)*q1
+        #     -((torch.pow(q1.detach() - target_q1_bound, 2)- q1_std_detach.pow(2) )/ (torch.pow(q1_std_detach, 3) +bias)
+        #     )*q1_std
+        # )
+
+        # q2_loss = (torch.pow(self.mean_std2, 2) + bias)*torch.mean(
+        #     -(target_q2 - q2).detach() / ( torch.pow(q2_std_detach, 2)+ bias)*q2
+        #     -((torch.pow(q2.detach() - target_q2_bound, 2)- q2_std_detach.pow(2) )/ (torch.pow(q2_std_detach, 3) +bias)
+        #     )*q2_std
+        # )
         with torch.no_grad():
-            origin_q1_loss = (torch.pow(self.mean_std1, 2)) * torch.mean(
-                torch.pow((target_q1 - q1),2) / ( torch.pow(q1_std_detach, 2)+ 1e-6)  
-                + torch.log(q1_std_detach+1e-6)) # for numerical stability
-            origin_q2_loss = (torch.pow(self.mean_std2, 2)) * torch.mean(
-                torch.pow((target_q2 - q2),2) / ( torch.pow(q2_std_detach, 2)+ 1e-6)  
-                + torch.log(q2_std_detach+1e-6))
+            # origin_q_loss = 0.5 * (q1_loss + q2_loss).detach()
+            # form 0
+            origin_q1_loss = torch.mean(ratio1 *(huber_loss(q1, target_q1, delta = 30, reduction='none') + torch.log(q1_std +bias)
+                                      + 0.5 * huber_loss(q1.detach(), target_q1_bound, delta = 30, reduction='none')/(q1_std + bias).pow(2)
+                                      )
+                            )
+            
+            origin_q2_loss = torch.mean(ratio2 *(huber_loss(q2, target_q2, delta = 30, reduction='none') + torch.log(q2_std +bias)
+                                      + 0.5 * huber_loss(q2.detach(), target_q2_bound, delta = 30, reduction='none')/(q2_std + bias).pow(2)
+                                      )
+                            )   
             origin_q_loss = origin_q1_loss + origin_q2_loss
         
 
 
-        return q1_loss +q2_loss, q1.detach().mean(), q2.detach().mean(), q1_std.detach().mean(), q2_std.detach().mean(), q1_std.min().detach(), q2_std.min().detach(), origin_q_loss.detach()
+        return q1_loss +q2_loss, q1, q2, q1_std, q2_std, origin_q_loss
 
     def __compute_target_q(self, r, done, q,q_std, q_next, q_next_sample, log_prob_a_next):
         target_q = r + (1 - done) * self.gamma * (

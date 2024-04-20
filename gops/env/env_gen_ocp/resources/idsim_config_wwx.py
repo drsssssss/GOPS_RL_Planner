@@ -2,7 +2,7 @@ from typing import Dict, Union, Tuple
 import numpy as np
 
 MAP_ROOT_CROSSROAD = '/root/idsim-scenarios/idsim-crossroad'
-MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-cross-dense-v20-mix-multi-size/'
+MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-cross-dense-v20-mix-multi-size-v2/'
 pre_horizon = 30
 delta_t = 0.1
 
@@ -49,14 +49,14 @@ env_config_param_base = {
     "use_multiple_path_for_multilane": True,
     "random_ref_cooldown":  80,
 
-    "takeover_bias": True,  # only effective when vechicle speed is less than 0.1
+    "takeover_bias": True, 
     "takeover_bias_prob": 1.0,
-    "takeover_bias_x": (0.0, 0.),
-    "takeover_bias_y": (0.0, 0.),
-    "takeover_bias_phi": (0.0, 0.0),
+    "takeover_bias_x": (0.0, 0.2),
+    "takeover_bias_y": (0.0, 0.2),
+    "takeover_bias_phi": (0.0, 0.05),
     "takeover_bias_vx": (0.0, 0.0),
-    "takeover_bias_ax": (-0.6, 0.5),
-    "takeover_bias_steer": (0.0, 0.1),
+    "takeover_bias_ax": (0.0, 0.0),
+    "takeover_bias_steer": (0.0, 0.0),
     "minimum_clearance_when_takeover":-1,
     # model free reward config
     "punish_sur_mode": "max",
@@ -65,14 +65,14 @@ env_config_param_base = {
     "P_lat": 12.0,
     "P_long": 10.0,
     "P_phi": 3.0,
-    "P_yaw": 1.0,
+    "P_yaw": 2.0,
     "P_front": 10.0,
     "P_side": 10.0,
     "P_space": 10.0,
     "P_rear": 10.0,
-    "P_steer": 0.0,
+    "P_steer": 0.1,
     "P_acc": 0.1,
-    "P_delta_steer": 0.05,
+    "P_delta_steer": 0.15,
     "P_jerk": 0.1,
     "P_done": 2000.0,
     "P_boundary": 0,
@@ -94,8 +94,8 @@ model_config_base = {
     "ahead_lane_length_min": 6.0,
     "ahead_lane_length_max": 60.0,
     "v_discount_in_junction_straight": 0.75,
-    "v_discount_in_junction_left_turn": 0.5,
-    "v_discount_in_junction_right_turn": 0.375,
+    "v_discount_in_junction_left_turn": 0.25,
+    "v_discount_in_junction_right_turn": 0.25,
     "num_ref_lines": 3,
     "dec_before_junction_green": 0.8,
     "dec_before_junction_red": 1.3,
@@ -161,9 +161,9 @@ model_config_crossroad = model_config_base
 env_config_param_multilane = {
     **env_config_param_base,
     "scenario_root": MAP_ROOT_MULTILANE,
-    "action_lower_bound": (-2.5 * delta_t, -0.2 * delta_t),
-    "action_upper_bound": (2.5 * delta_t, 0.2 * delta_t),
-    "real_action_lower_bound": (-3.0, -0.571),
+    "action_lower_bound": (-2.5 * delta_t, -0.15 * delta_t),
+    "action_upper_bound": (2.5 * delta_t, 0.15 * delta_t),
+    "real_action_lower_bound": (-2.5, -0.571),
     "real_action_upper_bound": (0.8, 0.571),
     "use_random_acc": True,
     "random_acc_cooldown": (30, 50, 50), # cooldown for acceleration, deceleration and ref_v, respectively
@@ -174,8 +174,8 @@ env_config_param_multilane = {
 
 model_config_multilane = {
     **model_config_base,
-    "real_action_lower": (-3.0, -0.065),
-    "real_action_upper": (0.8, 0.065),
+    "real_action_lower": (-2.5, -0.571),
+    "real_action_upper": (0.8, 0.571),
     "Q": (
         0.,
         0.5,

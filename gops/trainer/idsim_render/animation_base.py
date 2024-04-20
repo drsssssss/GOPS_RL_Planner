@@ -195,6 +195,7 @@ class AnimationBase:
             else:
                 attn_weight = 1.0
             if mask == 1:
+                print(f"attn_weight: {attn_weight}")
                 facecolor_with_attn = SUR_FOCUS_COLOR_WITH_ALPHA[0:3] + (attn_weight,)
                 edgecolor_with_attn = SUR_FOCUS_COLOR[0:3] + (attn_weight,)
                 self.surr_focus_list.append(create_veh(ax, (x,y), phi, length, width, facecolor=facecolor_with_attn, edgecolor=edgecolor_with_attn, zorder=201))

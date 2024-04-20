@@ -14,8 +14,8 @@ base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 script_path = os.path.join(base_path, 'example_train')
 save_folder = os.path.join(base_path, 'results/idsim')
 
-exp_name = 'idsim_multilane_exp_0401_4' 
-exp_discription = 'based on exp DSACT_exp0308_14, fix bug in attention, change some env reward design, new attention and env config, without obs info, use attn origin dimension pi all direction mix scene, steer punish 0.0, add in junction mode( low tracking punish, as one event, dynamic live reward) action bound 0.2->0.15, buffer size 400000, fix init action, more turning car, fix the bug in direction selector, low init v in junction clip ego reward (-10,20) when in junction, fix vec sampler bug, fix init_steer range while turning, change turining condition, change reward coff when turning'
+exp_name = 'idsim_multilane_exp_0414_9' 
+exp_discription = 'new alg(form 3) old sampling config fix small bug in env, choose in junction veh prob 1->0.5, not filter ego when evluation, nominal steer, increase punish on steer and delta steer, decrease acc bound steer bound break dist 6->4 increas heading and steering punish when turning, low speed steer punish: 10->5, fix clip bug in dsact, low ref_v coff while turning 0.375->0.25, add activate collision conditio, punish overshoot of phi and tracking error when turning, dynamic living reward, add take over bias in cross scene, low nomimal steer punish, low speed mode condition ref_v: 1->0.1, new-map more small car'
 
 
 script_folder = "dsac"

@@ -434,14 +434,14 @@ class IdsimIDCEvaluator(Evaluator):
             eval_result.time_stamp_list.append(idsim_context.t)
             eval_result.selected_path_index_list.append(selected_path_index)
             for k in eval_result.reward_info.keys():
-                if k in info.keys() and  (k.startswith("env_scaled") or k in ["env_speed_error","env_tracking_error","env_delta_phi"]): 
+                if k in info.keys() and  ((k.startswith("env_scaled") or k in ["env_speed_error","env_tracking_error","env_delta_phi"]) or k.startswith("state")):
                     eval_result.reward_info[k].append(info[k])
             obs = next_obs
 
             if "TimeLimit.truncated" not in info.keys():
                 info["TimeLimit.truncated"] = False
             for eval_key in idsim_tb_eval_dict.keys():
-                if eval_key in info.keys() and (eval_key.startswith("env_scaled") or eval_key in ["env_speed_error","env_tracking_error","env_delta_phi"]):
+                if eval_key in info.keys() and ((eval_key.startswith("env_scaled") or eval_key in ["env_speed_error","env_tracking_error","env_delta_phi"]) or eval_key.startswith("state")):
                     idsim_tb_eval_dict[eval_key] += info[eval_key]
             # Draw environment animation
             if render:

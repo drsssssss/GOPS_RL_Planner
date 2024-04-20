@@ -23,6 +23,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Normal
 from torch.optim import Adam
+from torch.nn.functional import huber_loss
 
 from gops.algorithm.base import AlgorithmBase, ApprBase
 from gops.create_pkg.create_apprfunc import create_apprfunc
@@ -338,25 +339,49 @@ class DSACTPI(AlgorithmBase):
         q2_std_detach = torch.clamp(q2_std, min=0.).detach()
         bias = 0.1
 
-        q1_loss = (torch.pow(self.mean_std1, 2) + bias) * torch.mean(weight*(
-            -(target_q1 - q1).detach() / ( torch.pow(q1_std_detach, 2)+ bias)*q1
-            -((torch.pow(q1.detach() - target_q1_bound, 2)- q1_std_detach.pow(2) )/ (torch.pow(q1_std_detach, 3) +bias)
-            )*q1_std)
-        )
+        ratio1 = (torch.pow(self.mean_std1, 2) / (torch.pow(q1_std_detach, 2) + bias)).clamp(min=0.1, max=10)
+        ratio2 = (torch.pow(self.mean_std2, 2) / (torch.pow(q2_std_detach, 2) + bias)).clamp(min=0.1, max=10)
+        
 
-        q2_loss = (torch.pow(self.mean_std2, 2) + bias)*torch.mean(weight*(
-            -(target_q2 - q2).detach() / ( torch.pow(q2_std_detach, 2)+ bias)*q2
-            -((torch.pow(q2.detach() - target_q2_bound, 2)- q2_std_detach.pow(2) )/ (torch.pow(q2_std_detach, 3) +bias)
-            )*q2_std)
-        )
+        # form5
+        q1_loss = torch.mean(ratio1 *(huber_loss(q1, target_q1, delta = 50, reduction='none') 
+                                      + q1_std *(q1_std_detach.pow(2) - huber_loss(q1.detach(), target_q1_bound, delta = 50, reduction='none'))/(q1_std_detach +bias)
+                            ))
+        q2_loss = torch.mean(ratio2 *(huber_loss(q2, target_q2, delta = 50, reduction='none')
+                                      + q2_std *(q2_std_detach.pow(2) - huber_loss(q2.detach(), target_q2_bound, delta = 50, reduction='none'))/(q2_std_detach +bias)
+                            ))
+
+        # q1_loss = torch.mean(ratio1 * ((q1 - target_q1).pow(2) + torch.log(q1_std +bias) -q1_std * (q1.detach() - target_q1_bound).pow(2) / (q1_std_detach + bias)))
+        # q2_loss = torch.mean(ratio2 * ((q2 - target_q2).pow(2) + torch.log(q2_std +bias) -q2_std * (q2.detach() - target_q2_bound).pow(2) / (q2_std_detach + bias)))
+
+        # q1_loss = (torch.pow(self.mean_std1, 2) + bias) * torch.mean(weight*(
+        #     -(target_q1 - q1).detach() / ( torch.pow(q1_std_detach, 2)+ bias)*q1
+        #     -((torch.pow(q1.detach() - target_q1_bound, 2)- q1_std_detach.pow(2) )/ (torch.pow(q1_std_detach, 3) +bias)
+        #     )*q1_std)
+        # )
+
+        # q2_loss = (torch.pow(self.mean_std2, 2) + bias)*torch.mean(weight*(
+        #     -(target_q2 - q2).detach() / ( torch.pow(q2_std_detach, 2)+ bias)*q2
+        #     -((torch.pow(q2.detach() - target_q2_bound, 2)- q2_std_detach.pow(2) )/ (torch.pow(q2_std_detach, 3) +bias)
+        #     )*q2_std)
+        # )
         with torch.no_grad():
-            origin_q1_loss = (torch.pow(self.mean_std1, 2)) * torch.mean(
-                torch.pow((target_q1 - q1),2) / ( torch.pow(q1_std_detach, 2)+ 1e-6)  
-                + torch.log(q1_std_detach+1e-6)) # for numerical stability
-            origin_q2_loss = (torch.pow(self.mean_std2, 2)) * torch.mean(
-                torch.pow((target_q2 - q2),2) / ( torch.pow(q2_std_detach, 2)+ 1e-6)  
-                + torch.log(q2_std_detach+1e-6))
+            # only Q mean loss 
+            origin_q1_loss = torch.mean(ratio1 *(huber_loss(q1, target_q1, delta = 50, reduction='none')
+                                      )
+                            )
+            
+            origin_q2_loss = torch.mean(ratio2 *(huber_loss(q2, target_q2, delta = 30, reduction='none')
+                                      )
+                            )   
             origin_q_loss = origin_q1_loss + origin_q2_loss
+            # origin_q1_loss = (torch.pow(self.mean_std1, 2)) * torch.mean(
+            #     torch.pow((target_q1 - q1),2) / ( torch.pow(q1_std_detach, 2)+ 1e-6)  
+            #     + torch.log(q1_std_detach+1e-6)) # for numerical stability
+            # origin_q2_loss = (torch.pow(self.mean_std2, 2)) * torch.mean(
+            #     torch.pow((target_q2 - q2),2) / ( torch.pow(q2_std_detach, 2)+ 1e-6)  
+            #     + torch.log(q2_std_detach+1e-6))
+            # origin_q_loss = origin_q1_loss + origin_q2_loss
         
 
         if self.per_flag:
