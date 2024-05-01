@@ -91,17 +91,26 @@ class PINet(nn.Module):
             self.others_encoder = nn.Identity()
 
         if self.enable_self_attention:
+            embedding_dim = self.pi_out_dim
+            self.embedding_dim = embedding_dim
             warnings.warn("self_attention is enabled")
             if kwargs.get("attn_dim") is not None:
                 self.attn_dim = kwargs["attn_dim"]
             else:
                 self.attn_dim = self.pi_out_dim # default attn_dim is pi_out_dim
                 warnings.warn("attn_dim is not specified, using pi_out_dim as attn_dim")
-            Uq_net_size = [self.pi_out_dim + self.others_out_dim] + [self.attn_dim]*2
-            Ur_net_size = [self.pi_out_dim] + [self.attn_dim]
-            self.Uq = mlp( Uq_net_size, get_activation_func(kwargs["pi_hidden_activation"]),)
-            self.Ur = mlp( Ur_net_size, get_activation_func(kwargs["pi_hidden_activation"]),) 
-            self.attn_weights = None
+                if kwargs.get("head_num") is None:
+                    head_num = 1
+                    warnings.warn("head_num is not specified, using 1 as head_num")
+                else:
+                    head_num = kwargs["head_num"]
+                head_dim = embedding_dim // head_num
+                self.head_dim = head_dim
+                self.head_num = head_num
+                self.Wq =  nn.Linear(self.others_out_dim, head_dim*head_num)
+                self.Wk =  nn.Linear(head_dim, head_dim)
+                self.Wv =  nn.Linear(head_dim, head_dim)
+            self.attn_weights = None 
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         objs = obs[:, self.begin:self.end]
@@ -119,15 +128,28 @@ class PINet(nn.Module):
         embeddings = self.pi(objs)*mask.unsqueeze(-1) # [B, N, d_model]
 
         if self.enable_self_attention:
-            query = embeddings.sum(axis=-2) / (mask.sum(axis=-1) + 1e-5).unsqueeze(axis=-1) # [b, d_model] / [B, 1] --> [B, d_model]
-            query = torch.concat([query, others], dim=1) # [B, d_model + d_others]
-            logits = torch.bmm(self.Uq(query).unsqueeze(1), self.Ur(embeddings).transpose(-1, -2)).squeeze(1) / np.sqrt(self.attn_dim) # [B, N]
-            logits = logits + ((1 - mask) * -1e9)
-            self.attn_weights = torch.softmax(logits, axis=-1) # [B, N]
-            # self.attn_weights = (self.attn_weights + 0*mask)
-            # self.attn_weights = self.attn_weights / (self.attn_weights.sum(axis=-1, keepdim=True) + 1e-5)
-            # print(self.attn_weights)
-            embeddings = torch.matmul(self.attn_weights.unsqueeze(axis=1),embeddings).squeeze(axis=-2) # [B, d_model]
+            query = self.Wq(others).reshape(-1,1,self.head_num, self.head_dim) # [B, 1 head_num, head_dim]
+            reshaped_embeddings = embeddings.reshape(-1, self.num_objs, self.head_num, self.head_dim) # [B, N, head_num, head_dim]
+            key = self.Wk(reshaped_embeddings) # [B, N, head_num, head_dim]
+            value = self.Wv(reshaped_embeddings)
+            logits = torch.einsum("nqhd,nkhd->nhqk", [query, key]) / np.sqrt(self.embedding_dim) # [B, head_num, 1, N]
+            logits = logits.masked_fill(mask.unsqueeze(1).unsqueeze(2) == 0, -1e9)
+            attn_weights = torch.softmax(logits, axis=-1) # [B, head_num, 1, N]
+            embeddings = torch.einsum("nhqk,nkhd->nqhd", [attn_weights, value]).reshape(-1, self.embedding_dim) # [B, d_model]
+            self.attn_weights = attn_weights.squeeze(2).sum(1)/self.head_num
+
+
+
+            
+            # query = embeddings.sum(axis=-2) / (mask.sum(axis=-1) + 1e-5).unsqueeze(axis=-1) # [b, d_model] / [B, 1] --> [B, d_model]
+            # query = torch.concat([query, others], dim=1) # [B, d_model + d_others]
+            # logits = torch.bmm(self.Uq(query).unsqueeze(1), self.Ur(embeddings).transpose(-1, -2)).squeeze(1) / np.sqrt(self.attn_dim) # [B, N]
+            # logits = logits + ((1 - mask) * -1e9)  # mask ==1 means the object is the true vehicle
+            # self.attn_weights = torch.softmax(logits, axis=-1) # [B, N]
+            # # self.attn_weights = (self.attn_weights + 0*mask)
+            # # self.attn_weights = self.attn_weights / (self.attn_weights.sum(axis=-1, keepdim=True) + 1e-5)
+            # # print(self.attn_weights)
+            # embeddings = torch.matmul(self.attn_weights.unsqueeze(axis=1),embeddings).squeeze(axis=-2) # [B, d_model]
         else:
             embeddings = embeddings.sum(dim=1, keepdim=False) # [B, d_model]
         

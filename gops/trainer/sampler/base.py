@@ -47,6 +47,9 @@ class BaseSampler(metaclass=ABCMeta):
         self.env = create_env(**kwargs)
         _, self.env = set_seed(kwargs["trainer"], kwargs["seed"], index + 200, self.env)  #? seed here?
         self.networks = create_approx_contrainer(**kwargs)
+        if kwargs["use_gpu"]:
+            self.networks = self.networks.cuda()
+        self.device = self.networks.device
         self.networks.eval()
         self.noise_params = noise_params
         self.sample_batch_size = sample_batch_size
@@ -71,6 +74,8 @@ class BaseSampler(metaclass=ABCMeta):
         
         self.total_sample_number = 0
         self.obs, self.info = self.env.reset()
+        self.forward_time = 0
+        self.N = 0
         if self._is_vector:
             # convert a dict of batched data to a list of dict of unbatched data
             # e.g. next_info = {"a": [1, 2, 3], "b": [4, 5, 6]} ->
@@ -107,9 +112,22 @@ class BaseSampler(metaclass=ABCMeta):
             )
         else:
             batch_obs = torch.from_numpy(self.obs.astype("float32"))
-        logits = self.networks.policy(batch_obs)
-        action_distribution = self.networks.create_action_distributions(logits)
-        action, logp = action_distribution.sample()
+        
+        # t_1 = time.perf_counter_ns()
+        with torch.no_grad():
+            logits = self.networks.policy(batch_obs.to(self.device))
+            action_distribution = self.networks.create_action_distributions(logits)
+            action, logp = action_distribution.sample()
+            action = action.cpu()
+            logp = logp.cpu()
+        # t_2 = time.perf_counter_ns()
+
+        # self.forward_time += (t_2 - t_1)
+        # self.N += 1
+        # if self.N % 100 == 0:
+        #     print("average forward time: ", self.forward_time / self.N/ 1e6, "ms")
+
+
 
         if self._is_vector:
             action = action.detach().numpy()

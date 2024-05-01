@@ -41,8 +41,6 @@ class OffSerialIdsimTrainer(OffSerialTrainer):
         # create center network
         self.networks = self.alg.networks
         self.networks.eval()
-        self.sampler.networks = self.networks
-
 
         # initialize center network
         if kwargs["ini_network_dir"] is not None:
@@ -72,37 +70,45 @@ class OffSerialIdsimTrainer(OffSerialTrainer):
         with open(self.save_folder + "/buffer_y_ref_stat.csv", "w") as f:
             f.write(head)
 
-        # pre sampling
-        while self.buffer.size < kwargs["buffer_warm_size"]:
-            samples, _ = self.sampler.sample()
-            self.buffer.add_batch(samples)
+
+
         self.sampler_tb_dict = LogData()
 
         # create evaluation tasks
         self.evluate_tasks = TaskPool()
         self.last_eval_iteration = 0
 
+        # create sampler tasks
+        self.sampler_tasks = TaskPool()
+        self.last_sampler_network_update_iteration = 0
+        self.sampler_network_update_interval = kwargs.get("sampler_network_update_interval", 100)
+        self.last_sampler_save_iteration = 0
+
         self.use_gpu = kwargs["use_gpu"]
         if self.use_gpu:
             self.networks.cuda()
+
+
+        # pre sampling
+        while self.buffer.size < kwargs["buffer_warm_size"]:
+            samples, _ = ray.get(self.sampler.sample.remote())
+            self.buffer.add_batch(samples)
 
         self.start_time = time.time()
 
     def step(self):
         # sampling
         if self.iteration % self.sample_interval == 0:
-            with ModuleOnDevice(self.networks, "cpu"):
-                sampler_samples, sampler_tb_dict = self.sampler.sample()
-            self.buffer.add_batch(sampler_samples)
-            self.sampler_tb_dict.add_average(sampler_tb_dict)
+            if self.sampler_tasks.count == 0:
+                # There is no sampling task, add one.
+                self._add_sample_task()
 
         # replay
         replay_samples = self.buffer.sample_batch(self.replay_batch_size)
 
         # learning
-        if self.use_gpu:
-            for k, v in replay_samples.items():
-                replay_samples[k] = v.cuda()
+        for k, v in replay_samples.items():
+            replay_samples[k] = v.to(self.networks.device)
 
         self.networks.train()
         if self.per_flag:
@@ -113,6 +119,20 @@ class OffSerialIdsimTrainer(OffSerialTrainer):
         else:
             alg_tb_dict = self.alg.local_update(replay_samples, self.iteration)
         self.networks.eval()
+
+
+        # sampling
+        if self.iteration % self.sample_interval == 0:
+            while self.sampler_tasks.completed_num == 0:
+                # There is no completed sampling task, wait.
+                time.sleep(0.001)
+            # Sampling task is completed, get samples and add another one.
+            objID = next(self.sampler_tasks.completed())[1]
+            sampler_samples, sampler_tb_dict = ray.get(objID)
+            self._add_sample_task()
+            self.buffer.add_batch(sampler_samples)
+            if (self.iteration - self.last_sampler_save_iteration) >= self.log_save_interval:
+                self.sampler_tb_dict.add_average(sampler_tb_dict)
 
         # log
         if self.iteration % self.log_save_interval == 0:
@@ -183,7 +203,7 @@ class OffSerialIdsimTrainer(OffSerialTrainer):
                 self.writer.add_scalar(
                     tb_tags["TAR of collected samples"],
                     total_avg_return,
-                    self.sampler.get_total_sample_number(),
+                    ray.get(self.sampler.get_total_sample_number.remote()),
                 )
                 for key, value in avg_tb_eval_dict.items():
                     if key != "total_avg_return":
@@ -204,8 +224,7 @@ class OffSerialIdsimTrainer(OffSerialTrainer):
         )
 
     def _add_eval_task(self):
-        with ModuleOnDevice(self.networks, "cpu"):
-            self.evaluator.load_state_dict.remote(self.networks.state_dict())
+        self.evaluator.load_state_dict.remote(self.networks.state_dict())
         self.evluate_tasks.add(
             self.evaluator,
             self.evaluator.run_evaluation.remote(self.iteration)

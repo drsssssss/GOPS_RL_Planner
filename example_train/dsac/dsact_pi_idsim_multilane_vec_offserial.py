@@ -76,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("--repeat_num", type=int, default=4, help="action repeat num")
 
     parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
-    parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
+    parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=1, help="seed")
 
     ################################################
@@ -131,23 +131,23 @@ if __name__ == "__main__":
     # 2.3 Parameters of shared approximate function
     pi_paras = cal_idsim_pi_paras(env_config=base_env_config, env_model_config=base_env_model_config)
     parser.add_argument("--target_PI", type=bool, default=True)
-    parser.add_argument("--enable_self_attention", type=bool, default=False)
+    parser.add_argument("--enable_self_attention", type=bool, default=True)
     parser.add_argument("--pi_begin", type=int, default=pi_paras["pi_begin"])
     parser.add_argument("--pi_end", type=int, default=pi_paras["pi_end"])
     parser.add_argument("--enable_mask", type=bool, default=True)
     parser.add_argument("--obj_dim", type=int, default=pi_paras["obj_dim"])
-    parser.add_argument("--attn_dim", type=int, default=64)
-    parser.add_argument("--pi_out_dim", type=int, default=pi_paras["output_dim"])
-    parser.add_argument("--pi_hidden_sizes", type=list, default=[256,256,256])
+    parser.add_argument("--head_num", type=int, default=4)
+    parser.add_argument("--pi_out_dim", type=int, default= 256)
+    parser.add_argument("--pi_hidden_sizes", type=list, default=[256,256])
     parser.add_argument("--pi_hidden_activation", type=str, default="gelu")
-    parser.add_argument("--pi_output_activation", type=str, default="linear")
-    parser.add_argument("--freeze_pi_net", type=str, default="critic")
-    parser.add_argument("--encoding_others", type=bool, default=False)
-    parser.add_argument("--others_hidden_sizes", type=list, default=[64,64])
+    parser.add_argument("--pi_output_activation", type=str, default="gelu")
+    parser.add_argument("--freeze_pi_net", type=str, default="none")
+    parser.add_argument("--encoding_others", type=bool, default=True)
+    parser.add_argument("--others_hidden_sizes", type=list, default=[128,128])
     parser.add_argument("--others_hidden_activation", type=str, default="gelu")
-    parser.add_argument("--others_output_activation", type=str, default="linear")
-    parser.add_argument("--others_out_dim", type=int, default=32)
-    max_iter = 1_000_000
+    parser.add_argument("--others_output_activation", type=str, default="gelu")
+    parser.add_argument("--others_out_dim", type=int, default=64)
+    max_iter = 2_000_000
     parser.add_argument("--policy_scheduler", type=json.loads, default={
         "name": "CosineAnnealingLR",
         "params": {
@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
     # special parameter
     parser.add_argument("--gamma", type=float, default=0.99)
-    parser.add_argument("--tau", type=float, default=0.005)
+    parser.add_argument("--tau", type=float, default=0.0005)
     parser.add_argument("--auto_alpha", type=bool, default=True)
     parser.add_argument("--alpha", type=bool, default=0.2)
     parser.add_argument("--delay_update", type=int, default=2)

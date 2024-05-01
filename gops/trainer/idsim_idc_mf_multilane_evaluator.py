@@ -103,6 +103,7 @@ class IdsimIDCEvaluator(Evaluator):
                       'logging_root': self.kwargs['save_folder'], 'scenario_selector': str(0)}
         self.kwargs = {**self.kwargs, 'env_config': env_config}
         super().__init__(index, **self.kwargs)
+        self.networks.cpu()  #  for convenience
         # self.env: idSimEnv = create_env(**self.kwargs)
         self.envmodel: idSimEnvModel = create_env_model(**kwargs)
         self.kwargs["action_high_limit"] = self.env.action_space.high

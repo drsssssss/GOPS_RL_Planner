@@ -66,7 +66,13 @@ def create_sampler(**kwargs,) -> object:
         raise RuntimeError(f"{spec_.sampler_name} registered but entry_point is not specified")
 
     trainer_name = _kwargs.get("trainer", None)
-    if trainer_name is None or trainer_name.startswith("off_serial") or trainer_name.startswith("on_serial"):
+    if  trainer_name.startswith("off_serial_idsim"):
+        import ray
+        if _kwargs["use_gpu"]:
+            sam = ray.remote(num_gpus=0.5)(sampler_creator).remote( **_kwargs)
+        else:
+            sam = ray.remote(num_cpus=1)(sampler_creator).remote( **_kwargs)
+    elif trainer_name is None or trainer_name.startswith("off_serial") or trainer_name.startswith("on_serial"):
         sam = sampler_creator(**_kwargs)
     elif (
         trainer_name.startswith("off_async")

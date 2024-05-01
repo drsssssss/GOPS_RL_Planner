@@ -107,9 +107,9 @@ class PrioritizedStratifiedReplayBuffer(PrioritizedReplayBuffer):
 
     def update_batch(self, idxes: int, priorities: float) -> None:
         if isinstance(idxes, torch.Tensor):
-            idxes = idxes.detach().numpy()
+            idxes = idxes.cpu().detach().numpy()
         if isinstance(priorities, torch.Tensor):
-            priorities = priorities.detach().numpy()
+            priorities = priorities.cpu().detach().numpy()
         priorities = (priorities + self.epsilon) ** self.alpha
         mask = self.sum_tree[idxes] > 0
         self.sum_tree[idxes][mask] = priorities

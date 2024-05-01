@@ -51,6 +51,9 @@ class ApprBase(ABC, torch.nn.Module):
                     self.optimizer_dict[key.replace("_scheduler", "")],
                     **scheduler_args[key]["params"],
                 )
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 class AlgorithmBase(metaclass=ABCMeta):
     """Base Class of Algorithm

@@ -234,10 +234,10 @@ class DSACTPI(AlgorithmBase):
             loss_alpha.backward()
 
         # calculate gradient norm
-        q1_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.q1.ego_paras()]))
-        q2_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.q2.ego_paras()]))
-        policy_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.policy.ego_paras()]))
-        pi_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.pi_net.parameters()]))
+        q1_grad_norm = torch.nn.utils.clip_grad_norm_(self.networks.q1.ego_paras(), 10)
+        q2_grad_norm = torch.nn.utils.clip_grad_norm_(self.networks.q2.ego_paras(), 10)
+        policy_grad_norm = torch.nn.utils.clip_grad_norm_(self.networks.policy.ego_paras(), 10)
+        pi_grad_norm = torch.nn.utils.clip_grad_norm_(self.networks.pi_net.parameters(), 10)
         tb_info = {
             "DSAC2/critic_avg_q1-RL iter": q1.mean().detach().item(),
             "DSAC2/critic_avg_q2-RL iter": q2.mean().detach().item(),
