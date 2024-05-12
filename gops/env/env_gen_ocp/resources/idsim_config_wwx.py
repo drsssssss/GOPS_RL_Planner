@@ -104,7 +104,7 @@ model_config_base = {
     "ego_length": 5.0,
     "ego_width": 1.8,
     "safe_dist_incremental": 1.2,
-    "downsample_ref_point_index": (0, 1, 10, 30),
+    "downsample_ref_point_index": (0, 1,5, 10,15,20,30),
 
     "num_ref_points": pre_horizon + 1,
     "ego_feat_dim": 7,  # vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer

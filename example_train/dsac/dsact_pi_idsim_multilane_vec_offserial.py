@@ -142,7 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("--pi_hidden_activation", type=str, default="gelu")
     parser.add_argument("--pi_output_activation", type=str, default="gelu")
     parser.add_argument("--freeze_pi_net", type=str, default="none")
-    parser.add_argument("--encoding_others", type=bool, default=True)
+    parser.add_argument("--encoding_others", type=bool, default=False)
     parser.add_argument("--others_hidden_sizes", type=list, default=[128,128])
     parser.add_argument("--others_hidden_activation", type=str, default="gelu")
     parser.add_argument("--others_output_activation", type=str, default="gelu")
