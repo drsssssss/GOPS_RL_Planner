@@ -39,7 +39,6 @@ env_config_param_base = {
         "bicycle": 2,
         "pedestrian": 4,
     },
-    # "vehicle_spec":  (1412.0, 1536.7, 1.06, 1.85, -128915.5, -85943.6, 20.0, 0.0),
     "ref_v": 10.0,
     "ref_length": 48.0,
     "obs_num_ref_points": 2 * pre_horizon + 1,
@@ -104,7 +103,7 @@ model_config_base = {
     "ego_length": 5.0,
     "ego_width": 1.8,
     "safe_dist_incremental": 1.2,
-    "downsample_ref_point_index": (0, 1,5, 10,15,20,30),
+    "downsample_ref_point_index": (0, 1, 10, 30),
 
     "num_ref_points": pre_horizon + 1,
     "ego_feat_dim": 7,  # vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
@@ -165,7 +164,7 @@ env_config_param_multilane = {
     "scenario_root": MAP_ROOT_MULTILANE,
     "action_lower_bound": (-2.5 * delta_t, -0.15 * delta_t),
     "action_upper_bound": (2.5 * delta_t, 0.15 * delta_t),
-    "real_action_lower_bound": (-2, -0.571),
+    "real_action_lower_bound": (-2.5, -0.571),
     "real_action_upper_bound": (0.8, 0.571),
     "use_random_acc": True,
     "random_acc_cooldown": (30, 50, 50), # cooldown for acceleration, deceleration and ref_v, respectively
@@ -176,7 +175,7 @@ env_config_param_multilane = {
 
 model_config_multilane = {
     **model_config_base,
-    "real_action_lower": (-2, -0.571),
+    "real_action_lower": (-2.5, -0.571),
     "real_action_upper": (0.8, 0.571),
     "Q": (
         0.,
