@@ -52,8 +52,8 @@ env_config_param_base = {
 
     "takeover_bias": True, 
     "takeover_bias_prob": 1.0,
-    "takeover_bias_x": (0.0, 0.2),
-    "takeover_bias_y": (0.0, 0.2),
+    "takeover_bias_x": (0.0, 0.1),
+    "takeover_bias_y": (0.0, 0.1),
     "takeover_bias_phi": (0.0, 0.05),
     "takeover_bias_vx": (0.0, 0.0),
     "takeover_bias_ax": (0.0, 0.0),
@@ -62,7 +62,7 @@ env_config_param_base = {
     # model free reward config
     "punish_sur_mode": "max",
     "enable_slow_reward": True,
-    "R_step": 10.0,
+    "R_step": 15.0,
     "P_lat": 12.0,
     "P_long": 10.0,
     "P_phi": 3.0,
@@ -75,7 +75,7 @@ env_config_param_base = {
     "P_acc": 0.1,
     "P_delta_steer": 0.15,
     "P_jerk": 0.1,
-    "P_done": 2000.0,
+    "P_done": 200.0,
     "P_boundary": 100,
     "safety_lat_margin_front": 1.2,
     "safety_long_margin_front": 0.0,
@@ -95,8 +95,8 @@ model_config_base = {
     "ahead_lane_length_min": 6.0,
     "ahead_lane_length_max": 60.0,
     "v_discount_in_junction_straight": 0.75,
-    "v_discount_in_junction_left_turn": 0.25,
-    "v_discount_in_junction_right_turn": 0.25,
+    "v_discount_in_junction_left_turn": 0.3,
+    "v_discount_in_junction_right_turn": 0.3,
     "num_ref_lines": 3,
     "dec_before_junction_green": 0.8,
     "dec_before_junction_red": 1.3,
@@ -164,7 +164,7 @@ env_config_param_multilane = {
     "scenario_root": MAP_ROOT_MULTILANE,
     "action_lower_bound": (-2.5 * delta_t, -0.15 * delta_t),
     "action_upper_bound": (2.5 * delta_t, 0.15 * delta_t),
-    "real_action_lower_bound": (-2.5, -0.571),
+    "real_action_lower_bound": (-1.5, -0.571),
     "real_action_upper_bound": (0.8, 0.571),
     "use_random_acc": True,
     "random_acc_cooldown": (30, 50, 50), # cooldown for acceleration, deceleration and ref_v, respectively
@@ -175,7 +175,7 @@ env_config_param_multilane = {
 
 model_config_multilane = {
     **model_config_base,
-    "real_action_lower": (-2.5, -0.571),
+    "real_action_lower": (-1.5, -0.571),
     "real_action_upper": (0.8, 0.571),
     "Q": (
         0.,

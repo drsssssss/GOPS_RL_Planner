@@ -141,7 +141,7 @@ if __name__ == "__main__":
     parser.add_argument("--pi_hidden_sizes", type=list, default=[256,256,256])
     parser.add_argument("--pi_hidden_activation", type=str, default="gelu")
     parser.add_argument("--pi_output_activation", type=str, default="linear")
-    parser.add_argument("--freeze_pi_net", type=str, default="critic")
+    parser.add_argument("--freeze_pi_net", type=str, default="none")
     parser.add_argument("--encoding_others", type=bool, default=False)
     parser.add_argument("--others_hidden_sizes", type=list, default=[64,64])
     parser.add_argument("--others_hidden_activation", type=str, default="gelu")
@@ -184,7 +184,7 @@ if __name__ == "__main__":
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
     parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
-    parser.add_argument("--pi_learning_rate", type=float, default=1e-4)
+    parser.add_argument("--pi_learning_rate", type=float, default=1e-5)
     parser.add_argument("--alpha_learning_rate", type=float, default=3e-4)
 
     # special parameter
