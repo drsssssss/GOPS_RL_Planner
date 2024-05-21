@@ -201,7 +201,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--trainer",
         type=str,
-        default="off_serial_idsim_trainer",
+        default="off_serial_idcpu_trainer",
         help="Options: on_serial_trainer, on_sync_trainer, off_serial_trainer, off_async_trainer",
     )
     # Maximum iteration number
