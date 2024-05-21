@@ -131,11 +131,23 @@ class PINet(nn.Module):
             query = self.Wq(others).reshape(-1,1,self.head_num, self.head_dim) # [B, 1 head_num, head_dim]
             reshaped_embeddings = embeddings.reshape(-1, self.num_objs, self.head_num, self.head_dim) # [B, N, head_num, head_dim]
             key = self.Wk(reshaped_embeddings) # [B, N, head_num, head_dim]
-            value = self.Wv(reshaped_embeddings)
-            logits = torch.einsum("nqhd,nkhd->nhqk", [query, key]) / np.sqrt(self.embedding_dim) # [B, head_num, 1, N]
+            value = self.Wv(reshaped_embeddings) # [B, N, head_num, head_dim]
+            value = value*mask.unsqueeze(-1).unsqueeze(-1) # [B, N, head_num, head_dim]
+            # logits = torch.einsum("nqhd,nkhd->nhqk", [query, key]) / np.sqrt(self.embedding_dim) # [B, head_num, 1, N] donot use einsum
+            query = query.permute(0, 2, 1, 3)  #  [B, head_num, 1, head_dim]
+            key = key.permute(0, 2, 1, 3)  # 形状变为  [B, head_num, seq_len, head_dim]
+
+            # 进行矩阵乘法
+            logits = torch.matmul(query, key.transpose(-2, -1))  # 形状变为 [batch_size, num_heads, 1, seq_len]
+
+            # 缩放
+            logits = logits / np.sqrt(self.embedding_dim)  # head_dim 即 self.embedding_dim
             logits = logits.masked_fill(mask.unsqueeze(1).unsqueeze(2) == 0, -1e9)
             attn_weights = torch.softmax(logits, axis=-1) # [B, head_num, 1, N]
-            embeddings = torch.einsum("nhqk,nkhd->nqhd", [attn_weights, value]).reshape(-1, self.embedding_dim) # [B, d_model]
+            # embeddings = torch.einsum("nhqk,nkhd->nqhd", [attn_weights, value]).reshape(-1, self.embedding_dim) # [B, d_model]
+            attn_p = attn_weights
+            value_p = value.permute(0, 2, 1, 3)
+            embeddings = torch.matmul(attn_p, value_p).reshape(-1, self.embedding_dim) # [B, d_model]
             self.attn_weights = attn_weights.squeeze(2).sum(1)/self.head_num
 
 
