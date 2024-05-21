@@ -2,7 +2,7 @@ from typing import Dict, Union, Tuple
 import numpy as np
 
 MAP_ROOT_CROSSROAD = '/root/idsim-scenarios/idsim-crossroad'
-MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-cross-dense-v20-mix-multi-size-v2/'
+MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-cross-dense-v20-mix-multi-size-v3/'
 pre_horizon = 30
 delta_t = 0.1
 
@@ -11,7 +11,9 @@ env_config_param_base = {
     "seed": 1,
     "actuator": "ExternalActuator",
     "scenario_reuse": 4,
-    "num_scenarios": 28,
+    "num_scenarios": 34,
+    "multilane_scenarios": tuple(range(0, 22)),
+    "scenario_filter_surrounding_selector": '0,1,2,31,32,33',
     "detect_range": 60,
     "choose_vehicle_retries": 10,
     "choose_vehicle_step_time": 10,
@@ -36,8 +38,8 @@ env_config_param_base = {
     "real_action_upper_bound": (0.8, 0.571),
     "obs_num_surrounding_vehicles": {
         "passenger": 12,
-        "bicycle": 2,
-        "pedestrian": 4,
+        "bicycle": 4,
+        "pedestrian": 6,
     },
     "ref_v": 10.0,
     "ref_length": 48.0,
@@ -90,7 +92,7 @@ env_config_param_base = {
 model_config_base = {
     "N": pre_horizon,
     "sur_obs_padding": "rule",
-    "add_boundary_obs": False,
+    "add_boundary_obs": True,
     "full_horizon_sur_obs": False,
     "ahead_lane_length_min": 6.0,
     "ahead_lane_length_max": 60.0,

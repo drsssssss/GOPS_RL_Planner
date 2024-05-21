@@ -53,7 +53,7 @@ if __name__ == "__main__":
     base_env_model_config.update(extra_env_model_config)
     parser.add_argument("--env_config", type=dict, default=base_env_config)
     parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
-    parser.add_argument("--scenerios_list", type=list, default=[':19','19:'])
+    parser.add_argument("--scenerios_list", type=list, default=[':22','22:'])
 
     parser.add_argument("--vector_env_num", type=int, default=10, help="Number of vector envs")
     parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
