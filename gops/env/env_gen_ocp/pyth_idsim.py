@@ -315,6 +315,9 @@ class idSimEnv(CrossRoad, Env):
         scenarios = scenario_list[idx% len(scenario_list)]
         self.env_config.scenario_selector = scenarios
         print(f"INFO: change current scenario to {scenarios}")
+        direction_list = [ "r", "l", None]
+        self.env_config.direction_selector = direction_list[(idx // len(scenario_list))%len(direction_list)] # FIXME: this is a hack
+        print(f"INFO: change current direction to {self.env_config.direction_selector}")
         # direction_list = ["r", "s"]
         # self.env_config.direction_selector = direction_list[idx % len(direction_list)] # FIXME: this is a hack
         # print(f"INFO: change current direction to {self.env_config.direction_selector}")
