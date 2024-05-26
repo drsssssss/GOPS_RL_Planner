@@ -86,7 +86,7 @@ env_config_param_base = {
     "space_dist_thd": 12.0,
     "rel_v_thd": 1.0,
     "rel_v_rear_thd": 3.0,
-    "time_dist": 2.0,
+    "time_dist": 1.5,
 }
 
 model_config_base = {
