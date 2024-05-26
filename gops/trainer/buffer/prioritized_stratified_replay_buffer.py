@@ -135,7 +135,7 @@ class PrioritizedStratifiedReplayBuffer(PrioritizedReplayBuffer):
                 yscale = 'linear'
 
             plt.figure()
-            bar = plt.bar(np.arange(self.category_num), category, tick_label=['Non-terminal', 'Start', 'Braking', 'Collision', 'Out of lane', 'Turn'], color='skyblue')
+            bar = plt.bar(np.arange(self.category_num), category, tick_label=['Non-terminal', 'Out of lane', 'Collision', 'Braking ', 'Left turn', 'Right turn'], color='skyblue')
             plt.bar_label(bar, [f'$N_0={int(category[0])}$', f'$N_1={int(category[1])}$', f'$N_2={int(category[2])}$', f'$N_3={int(category[3])}$', f'$N_4={int(category[4])}$', f'$N_5={int(category[5])}$'], fmt='%d')
             plt.yscale(yscale)
             plt.title(r"Category distribution")
