@@ -14,8 +14,8 @@ base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 script_path = os.path.join(base_path, 'example_train')
 save_folder = os.path.join(base_path, 'results/idsim')
 
-exp_name = 'idsim_multilane_exp_0521' 
-exp_discription = 'enable multihead attntion had =8, low tau max iter=2_000_000, new veh param add boundary low safe margin, buffermax_size, new env reward and config (positive reward ending condition category critic and actor update pi) clip lower bound -1 add max num of bike and pedestrian add boundaryh obs(abs value), new map(no sur_obs) new pinet(add value mask)'
+exp_name = 'idsim_multilane_exp_0521_2' 
+exp_discription = 'enable multihead attntion had =8, low tau max iter=2_000_000, new veh param add boundary low safe margin, buffermax_size, new env reward and config (positive reward ending condition category critic and actor update pi) clip lower bound -1 add max num of bike and pedestrian add boundaryh obs(abs value), new map(no sur_obs) new pinet(add value mask) fix bug in sur obs filter'
 
 
 script_folder = "dsac"
