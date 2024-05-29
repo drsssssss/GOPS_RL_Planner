@@ -70,6 +70,7 @@ class AnimationLane(AnimationBase):
         fps=20,
         mode='debug',
         dpi = 50,
+        plot_reward=True,
     ):
         metadata = dict(title='Demo', artist='Guojian Zhan', comment='idsim')
         writer = FFMpegWriter(fps=fps, metadata=metadata)
@@ -195,16 +196,17 @@ class AnimationLane(AnimationBase):
             )
             
             # plot reward text info
-            reward_text = ''
-            if step > 0:
-                for handle in text_handles:
-                    handle.remove()
-                text_handles = []
-            for i in range(len(reward_text_labels)):
-                reward_text = f'{reward_text_labels[i]}: {reward_text_values[i][step]:.2f}\n'
-                x_pos = center_x + screen_width / 2 - 30
-                y_pos = center_y - i * 2
-                text_handles.append(ax.text(x_pos,y_pos, reward_text, color=reward_text_colors[i], fontsize=10))
+            if plot_reward:
+                reward_text = ''
+                if step > 0:
+                    for handle in text_handles:
+                        handle.remove()
+                    text_handles = []
+                for i in range(len(reward_text_labels)):
+                    reward_text = f'{reward_text_labels[i]}: {reward_text_values[i][step]:.2f}\n'
+                    x_pos = center_x + screen_width / 2 - 30
+                    y_pos = center_y - i * 2
+                    text_handles.append(ax.text(x_pos,y_pos, reward_text, color=reward_text_colors[i], fontsize=10))
 
 
 
