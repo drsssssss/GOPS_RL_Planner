@@ -24,7 +24,7 @@ env_config_param_base = {
     "warmup_time": 50.0,
     "max_steps": 200,
     "random_ref_v": True,
-    "ref_v_range": (0, 10.0),
+    "ref_v_range": (0, 12.0),
     "nonimal_acc": True,
     "ignore_traffic_lights": False,
     "no_done_at_collision": False, 
@@ -41,7 +41,7 @@ env_config_param_base = {
         "bicycle": 4,
         "pedestrian": 6,
     },
-    "ref_v": 10.0,
+    "ref_v": 12.0,
     "ref_length": 48.0,
     "obs_num_ref_points": 2 * pre_horizon + 1,
     "obs_ref_interval": 0.8,
@@ -60,19 +60,22 @@ env_config_param_base = {
     "takeover_bias_vx": (0.0, 0.0),
     "takeover_bias_ax": (0.0, 0.0),
     "takeover_bias_steer": (0.0, 0.0),
+    'add_sur_bias': True,
+    'bias_range': (-1, 1),
+    'bias_prob': 0.5,
     "minimum_clearance_when_takeover":-1,
     # model free reward config
     "punish_sur_mode": "max",
     "enable_slow_reward": True,
     "R_step": 15.0,
-    "P_lat": 12.0,
+    "P_lat": 8.0,
     "P_long": 10.0,
     "P_phi": 3.0,
     "P_yaw": 2.0,
     "P_front": 10.0,
     "P_side": 10.0,
     "P_space": 10.0,
-    "P_rear": 10.0,
+    "P_rear": 0.0,
     "P_steer": 0.1,
     "P_acc": 0.1,
     "P_delta_steer": 0.15,
@@ -80,13 +83,13 @@ env_config_param_base = {
     "P_done": 200.0,
     "P_boundary": 100,
     "safety_lat_margin_front": 1.2,
-    "safety_long_margin_front": 0.0,
-    "safety_long_margin_side": 0.0,
+    "safety_long_margin_front": 0.0, # front long margin base distance
+    "safety_long_margin_side": 8.0,
     "front_dist_thd": 50.0,
-    "space_dist_thd": 12.0,
+    "space_dist_thd": 8.0,
     "rel_v_thd": 1.0,
     "rel_v_rear_thd": 3.0,
-    "time_dist": 1.5,
+    "time_dist": 0.5,
 }
 
 model_config_base = {
@@ -97,15 +100,15 @@ model_config_base = {
     "ahead_lane_length_min": 6.0,
     "ahead_lane_length_max": 60.0,
     "v_discount_in_junction_straight": 0.75,
-    "v_discount_in_junction_left_turn": 0.3,
-    "v_discount_in_junction_right_turn": 0.3,
+    "v_discount_in_junction_left_turn": 0.6,
+    "v_discount_in_junction_right_turn": 0.5,
     "num_ref_lines": 3,
     "dec_before_junction_green": 0.8,
     "dec_before_junction_red": 1.3,
     "ego_length": 5.0,
     "ego_width": 1.8,
     "safe_dist_incremental": 1.2,
-    "downsample_ref_point_index": (0, 1, 10, 30),
+    "downsample_ref_point_index": (0, 1, 10,15,20, 30),
 
     "num_ref_points": pre_horizon + 1,
     "ego_feat_dim": 7,  # vx, vy, r, last_last_acc, last_last_steer, last_acc, last_steer
@@ -154,7 +157,7 @@ model_config_base = {
         1.0  # surr is in front of ego
     ),
     "C_road": 300.0,
-    "ref_v_lane": 10.0,
+    "ref_v_lane": 12.0,
     "filter_num": 5
 }
 
@@ -164,15 +167,15 @@ model_config_crossroad = model_config_base
 env_config_param_multilane = {
     **env_config_param_base,
     "scenario_root": MAP_ROOT_MULTILANE,
-    "action_lower_bound": (-2.5 * delta_t, -0.15 * delta_t),
-    "action_upper_bound": (2.5 * delta_t, 0.15 * delta_t),
-    "real_action_lower_bound": (-1.5, -0.571),
-    "real_action_upper_bound": (0.8, 0.571),
+    "action_lower_bound": (-2.5 * delta_t, -0.3 * delta_t),
+    "action_upper_bound": (2.5 * delta_t, 0.3 * delta_t),
+    "real_action_lower_bound": (-1.5, -0.6),
+    "real_action_upper_bound": (0.8, 0.6),
     "use_random_acc": True,
     "random_acc_cooldown": (30, 50, 50), # cooldown for acceleration, deceleration and ref_v, respectively
     "random_acc_prob": (0.1, 0.1), # probability to accelerate and decelerate, respectively
     "random_acc_range": (0.2, 0.8), # (m/s^2), used for acceleration
-    "random_dec_range": (-2.5, -0.5), # (m/s^2), used for deceleration
+    "random_dec_range": (-1.8, -0.2), # (m/s^2), used for deceleration
 }
 
 model_config_multilane = {

@@ -22,6 +22,7 @@ reward_tags = (
     "collision_flag",
 
     "state_nominal_steer",
+    "state_nominal_acc",
 
     "env_tracking_error",
     "env_delta_phi",
@@ -96,6 +97,7 @@ idsim_tb_tags = (
     "Evaluation/reward_penalty_road",
     "Evaluation/collision_flag",
     "Evaluation/nominal_steer",
+    "Evaluation/nominal_acc",
     
     "Evaluation/env_tracking_error",
     "Evaluation/env_delta_phi",
