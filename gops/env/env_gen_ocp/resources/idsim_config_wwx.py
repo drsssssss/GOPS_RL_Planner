@@ -15,6 +15,7 @@ env_config_param_base = {
     "multilane_scenarios": tuple(range(0, 22)),
     "scenario_filter_surrounding_selector": '0,1,2,31,32,33',
     "detect_range": 60,
+    "grab_vehicle_in_junction": True,
     "choose_vehicle_retries": 10,
     "choose_vehicle_step_time": 10,
     "scenario_root": MAP_ROOT_CROSSROAD,
@@ -24,7 +25,7 @@ env_config_param_base = {
     "warmup_time": 50.0,
     "max_steps": 200,
     "random_ref_v": True,
-    "ref_v_range": (0, 12.0),
+    "ref_v_range": (2, 12.0),
     "nonimal_acc": True,
     "ignore_traffic_lights": False,
     "no_done_at_collision": False, 
@@ -52,6 +53,10 @@ env_config_param_base = {
     "use_multiple_path_for_multilane": True,
     "random_ref_cooldown":  80,
 
+    'add_sur_bias': True,
+    'sur_bias_range': (-1, 1),
+    'sur_bias_prob': 0.5,
+
     "takeover_bias": True, 
     "takeover_bias_prob": 1.0,
     "takeover_bias_x": (0.0, 0.1),
@@ -60,9 +65,6 @@ env_config_param_base = {
     "takeover_bias_vx": (0.0, 0.0),
     "takeover_bias_ax": (0.0, 0.0),
     "takeover_bias_steer": (0.0, 0.0),
-    'add_sur_bias': True,
-    'bias_range': (-1, 1),
-    'bias_prob': 0.5,
     "minimum_clearance_when_takeover":-1,
     # model free reward config
     "punish_sur_mode": "max",
@@ -82,7 +84,7 @@ env_config_param_base = {
     "P_jerk": 0.1,
     "P_done": 200.0,
     "P_boundary": 100,
-    "safety_lat_margin_front": 1.2,
+    "safety_lat_margin_front": 0.3,
     "safety_long_margin_front": 0.0, # front long margin base distance
     "safety_long_margin_side": 8.0,
     "front_dist_thd": 50.0,
@@ -180,8 +182,8 @@ env_config_param_multilane = {
 
 model_config_multilane = {
     **model_config_base,
-    "real_action_lower": (-1.5, -0.571),
-    "real_action_upper": (0.8, 0.571),
+    "real_action_lower": (-1.5, -0.6),
+    "real_action_upper": (0.8, 0.6),
     "Q": (
         0.,
         0.5,

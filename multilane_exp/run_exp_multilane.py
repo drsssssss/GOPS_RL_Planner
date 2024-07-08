@@ -27,7 +27,7 @@ surfix_filter = 'offserial.py'
 run_config = {
     # 'env_id': ['gym_carracingraw'],
     'seed':[12345],
-    'buffer_max_size':[1000000],
+    'buffer_max_size':[2000000],
     # 'eval_interval':[2000],
     # 'sample_batch_size':[10],
     # 'sample_interval':[1],
