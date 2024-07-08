@@ -21,7 +21,7 @@ exp_discription = 'enable multihead attntion had =8, low tau max iter=2_000_000,
 script_folder = "dsac"
 algs = ['dsact']
 apprfuncs = ['pi']
-envs = ['idsim_multilane_vec']
+envs = ['idsim_mix_vec']
 repeats_num = 1
 surfix_filter = 'offserial.py'
 run_config = {
