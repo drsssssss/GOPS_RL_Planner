@@ -123,7 +123,7 @@ class IdsimTrainEvaluator(Evaluator):
                         "traffic_seed": int(eval_result.traffic_seed),
                         "ego_id": eval_result.ego_id,
                         "warmup_time": eval_result.warmup_time,
-                        "done_info": done_info
+                        "scene": done_info
                     }
                     json.dump(scenario_info, f, indent=4)
                     f.write(',\n')
