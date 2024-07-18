@@ -65,7 +65,7 @@ class AnimationCross(AnimationBase):
     def clear_text(self):
         self.text_counter = 0
 
-    def generate_animation(self, episode_data: EvalResult, save_video_path: str, episode_index: int, fps=20, mode='debug',dpi = 100, frame_skip=1,test_scene=None):
+    def generate_animation(self, episode_data: EvalResult, save_video_path: str, episode_index: int, fps=20, mode='debug',dpi = 100, frame_skip=1,test_scene=None,plot_reward= False):
         metadata = dict(title='Demo', artist='Guojian Zhan', comment='idsim',)
         writer = FFMpegWriter(fps=fps, metadata=metadata)
 
