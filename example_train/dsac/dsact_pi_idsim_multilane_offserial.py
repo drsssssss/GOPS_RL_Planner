@@ -25,7 +25,7 @@ from gops.create_pkg.create_trainer import create_trainer
 from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
-from gops.env.env_gen_ocp.resources.idsim_config_wwx import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
+from gops.env.env_gen_ocp.resources.idsim_config_ml import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
 
 os.environ["OMP_NUM_THREADS"] = "2"
 os.environ['RAY_memory_monitor_refresh_ms'] = "0"  # disable memory monitor
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     base_env_model_config.update(extra_env_model_config)
     parser.add_argument("--env_config", type=dict, default=base_env_config)
     parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
-    parser.add_argument("--scenerios_list", type=list, default=[':19','19:'])
+    parser.add_argument("--scenerios_list", type=list, default=[':22',':22','22:'])
 
     # parser.add_argument("--vector_env_num", type=int, default=10, help="Number of vector envs")
     # parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
@@ -76,14 +76,14 @@ if __name__ == "__main__":
     parser.add_argument("--repeat_num", type=int, default=4, help="action repeat num")
 
     parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
-    parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
+    parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=1, help="seed")
 
     ################################################
     # 1. Parameters for environment
     parser.add_argument("--reward_scale", type=float, default=1, help="reward scale factor")
     parser.add_argument("--action_type", type=str, default="continu", help="Options: continu/discret")
-    parser.add_argument("--is_render", type=bool, default=True, help="Draw environment animation")
+    parser.add_argument("--is_render", type=bool, default=False, help="Draw environment animation")
     parser.add_argument("--is_adversary", type=bool, default=False, help="Adversary training")
     parser.add_argument("--is_constrained", type=bool, default=False, help="Adversary training")
 
@@ -120,7 +120,7 @@ if __name__ == "__main__":
         default="TanhGaussDistribution",
         help="Options: default/TanhGaussDistribution/GaussDistribution",
     )
-    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256,256])
+    parser.add_argument("--policy_hidden_sizes", type=list, default=[256,256,256])
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
@@ -131,17 +131,17 @@ if __name__ == "__main__":
     # 2.3 Parameters of shared approximate function
     pi_paras = cal_idsim_pi_paras(env_config=base_env_config, env_model_config=base_env_model_config)
     parser.add_argument("--target_PI", type=bool, default=True)
-    parser.add_argument("--enable_self_attention", type=bool, default=False)
+    parser.add_argument("--enable_self_attention", type=bool, default=True)
     parser.add_argument("--pi_begin", type=int, default=pi_paras["pi_begin"])
     parser.add_argument("--pi_end", type=int, default=pi_paras["pi_end"])
     parser.add_argument("--enable_mask", type=bool, default=True)
     parser.add_argument("--obj_dim", type=int, default=pi_paras["obj_dim"])
-    parser.add_argument("--attn_dim", type=int, default=64)
-    parser.add_argument("--pi_out_dim", type=int, default=pi_paras["output_dim"])
-    parser.add_argument("--pi_hidden_sizes", type=list, default=[256,256,256])
+    parser.add_argument("--head_num", type=int, default=8)
+    parser.add_argument("--pi_out_dim", type=int, default= 256)
+    parser.add_argument("--pi_hidden_sizes", type=list, default=[256,256])
     parser.add_argument("--pi_hidden_activation", type=str, default="gelu")
-    parser.add_argument("--pi_output_activation", type=str, default="linear")
-    parser.add_argument("--freeze_pi_net", type=str, default="critic")
+    parser.add_argument("--pi_output_activation", type=str, default="gelu")
+    parser.add_argument("--freeze_pi_net", type=str, default="none")
     parser.add_argument("--encoding_others", type=bool, default=False)
     parser.add_argument("--others_hidden_sizes", type=list, default=[64,64])
     parser.add_argument("--others_hidden_activation", type=str, default="gelu")
@@ -184,12 +184,12 @@ if __name__ == "__main__":
     # 3. Parameters for RL algorithm
     parser.add_argument("--value_learning_rate", type=float, default=1e-4)
     parser.add_argument("--policy_learning_rate", type=float, default=1e-4)
-    parser.add_argument("--pi_learning_rate", type=float, default=1e-4)
+    parser.add_argument("--pi_learning_rate", type=float, default=1e-5)
     parser.add_argument("--alpha_learning_rate", type=float, default=3e-4)
 
     # special parameter
-    parser.add_argument("--gamma", type=float, default=0.99)
-    parser.add_argument("--tau", type=float, default=0.005)
+    parser.add_argument("--gamma", type=float, default=0.90)
+    parser.add_argument("--tau", type=float, default=0.001)
     parser.add_argument("--auto_alpha", type=bool, default=True)
     parser.add_argument("--alpha", type=bool, default=0.2)
     parser.add_argument("--delay_update", type=int, default=2)
@@ -219,9 +219,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--category_num", type=int, default=6, help="Number of categories for stratified replay buffer")
     # Size of collected samples before training
-    parser.add_argument("--buffer_warm_size", type=int, default=100)
+    parser.add_argument("--buffer_warm_size", type=int, default=10000)
     # Max size of reply buffer
-    parser.add_argument("--buffer_max_size", type=int, default=2250)
+    parser.add_argument("--buffer_max_size", type=int, default=225000)
     # Batch size of replay samples from buffer
     parser.add_argument("--replay_batch_size", type=int, default=256)
     # Period of sampling
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     # Batch size of sampler for buffer store
     parser.add_argument("--sample_batch_size", type=int, default=80)
     # Add noise to action for better exploration
-    parser.add_argument("--noise_params", type=dict, default={"mean": np.array([0,0], dtype=np.float32), "std": np.array([0.1,0.1], dtype=np.float32),},
+    parser.add_argument("--noise_params", type=dict, default={"mean": np.array([0,0], dtype=np.float32), "std": np.array([0.2,0.2], dtype=np.float32),},
         help="used for continuous action space")
 
     ################################################

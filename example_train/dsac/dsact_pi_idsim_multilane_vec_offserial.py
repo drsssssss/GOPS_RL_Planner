@@ -25,7 +25,7 @@ from gops.create_pkg.create_trainer import create_trainer
 from gops.utils.init_args import init_args
 from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
-from gops.env.env_gen_ocp.resources.idsim_config_mix_wwx import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
+from gops.env.env_gen_ocp.resources.idsim_config_ml import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
 
 os.environ["OMP_NUM_THREADS"] = "2"
 os.environ['RAY_memory_monitor_refresh_ms'] = "0"  # disable memory monitor
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     base_env_model_config.update(extra_env_model_config)
     parser.add_argument("--env_config", type=dict, default=base_env_config)
     parser.add_argument("--env_model_config", type=dict, default=base_env_model_config)
-    parser.add_argument("--scenerios_list", type=list, default=[':22','22:'])
+    parser.add_argument("--scenerios_list", type=list, default=[':22',':22','22:'])
 
     parser.add_argument("--vector_env_num", type=int, default=10, help="Number of vector envs")
     parser.add_argument("--vector_env_type", type=str, default='async', help="Options: sync/async")
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     parser.add_argument("--others_hidden_activation", type=str, default="gelu")
     parser.add_argument("--others_output_activation", type=str, default="linear")
     parser.add_argument("--others_out_dim", type=int, default=32)
-    max_iter = 2_000_000
+    max_iter = 1_000_000
     parser.add_argument("--policy_scheduler", type=json.loads, default={
         "name": "CosineAnnealingLR",
         "params": {
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     parser.add_argument("--alpha_learning_rate", type=float, default=3e-4)
 
     # special parameter
-    parser.add_argument("--gamma", type=float, default=0.93)
+    parser.add_argument("--gamma", type=float, default=0.90)
     parser.add_argument("--tau", type=float, default=0.001)
     parser.add_argument("--auto_alpha", type=bool, default=True)
     parser.add_argument("--alpha", type=bool, default=0.2)
