@@ -11,6 +11,7 @@ __all__ = [
     "FiniteHorizonPolicy",
     "FiniteHorizonFullPolicy",
     "StochaPolicy",
+    "StochaRNNPolicy",
     "ActionValue",
     "ActionValueDis",
     "ActionValueDistri",
@@ -287,6 +288,142 @@ class StochaPolicy(nn.Module, Action_Distribution):
             ).exp()
 
         return torch.cat((action_mean, action_std), dim=-1)
+
+
+# Stochastic Policy
+class StochaRNNPolicy(nn.Module, Action_Distribution):
+    """
+    Approximated function of stochastic policy.
+    Input: observation.
+    Output: parameters of action distribution.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        act_dim = kwargs["act_dim"]
+        act_seq_len = kwargs.get("act_seq_len", 1)
+        self.act_seq_len = 1 if act_seq_len is None else act_seq_len
+        assert act_dim % act_seq_len == 0, "act_dim should be divisible by act_seq_len"
+        self.actual_act_dim = act_dim // act_seq_len
+        hidden_sizes = kwargs["hidden_sizes"]
+        rnn_hidden_size = kwargs["rnn_hidden_size"]
+        self.std_type = kwargs["std_type"]
+        self.pi_net = kwargs["pi_net"]
+        self.freeze_pi_net = kwargs["freeze_pi_net"] == "actor" 
+        input_dim = self.pi_net.output_dim
+        # Encoder
+        self.hidden_encoder = mlp(
+            [input_dim, rnn_hidden_size],
+            get_activation_func(kwargs["hidden_activation"]),
+            get_activation_func(kwargs["hidden_activation"]),
+        )
+        # RNN
+        self.rnn_cell = nn.GRUCell(self.actual_act_dim * 2, rnn_hidden_size)
+        # Decoder
+        # 1. mean and log_std are calculated by different MLP
+        if self.std_type == "mlp_separated":
+            pi_sizes_first = [input_dim] + list(hidden_sizes) + [self.actual_act_dim]
+            self.mean_first = mlp(
+                pi_sizes_first,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            self.log_std_first = mlp(
+                pi_sizes_first,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            pi_sizes_other = [rnn_hidden_size] + list(hidden_sizes) + [self.actual_act_dim]
+            self.mean_other = mlp(
+                pi_sizes_other,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            self.log_std_other = mlp(
+                pi_sizes_other,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            self.policy = {
+                "first": lambda x: (self.mean_first(x), self.log_std_first(x)),
+                "other": lambda x: (self.mean_other(x), self.log_std_other(x)),
+            }
+        # 2. mean and log_std are calculated by same MLP
+        elif self.std_type == "mlp_shared":
+            pi_sizes_first = [input_dim] + list(hidden_sizes) + [self.actual_act_dim * 2]
+            self.policy_first = mlp(
+                pi_sizes_first,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            pi_sizes_other = [rnn_hidden_size] + list(hidden_sizes) + [self.actual_act_dim * 2]
+            self.policy_other = mlp(
+                pi_sizes_other,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            self.policy = {
+                "first": lambda x: torch.chunk(self.policy_first(x), chunks=2, dim=-1),
+                "other": lambda x: torch.chunk(self.policy_other(x), chunks=2, dim=-1),
+            }
+        # 3. mean is calculated by MLP, and log_std is learnable parameter
+        elif self.std_type == "parameter":
+            pi_sizes_first = [input_dim] + list(hidden_sizes) + [self.actual_act_dim]
+            self.mean_first = mlp(
+                pi_sizes_first,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            self.log_std_first = nn.Parameter(-0.5*torch.ones(1, self.actual_act_dim))
+            pi_sizes_other = [rnn_hidden_size] + list(hidden_sizes) + [self.actual_act_dim]
+            self.mean_other = mlp(
+                pi_sizes_other,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            self.log_std_other = nn.Parameter(-0.5*torch.ones(1, self.actual_act_dim))
+            self.policy = {
+                "first": lambda x: (self.mean_first(x), self.log_std_first + torch.zeros_like(self.mean_first(x))),
+                "other": lambda x: (self.mean_other(x), self.log_std_other + torch.zeros_like(self.mean_other(x))),
+            }
+            
+        self.min_log_std = kwargs["min_log_std"]
+        self.max_log_std = kwargs["max_log_std"]
+        self.register_buffer("act_high_lim", torch.from_numpy(kwargs["act_high_lim"]))
+        self.register_buffer("act_low_lim", torch.from_numpy(kwargs["act_low_lim"]))
+        self.action_distribution_cls = kwargs["action_distribution_cls"]
+
+    def shared_paras(self):
+        return self.pi_net.parameters()
+
+    def ego_paras(self):
+        return itertools.chain(*[modules.parameters() for modules in self.children() if modules != self.pi_net])
+        
+    def forward(self, obs):
+        # Initialize the action plan
+        batch_size = obs.size(0)
+        act_plan_mean = torch.zeros(batch_size, self.actual_act_dim * self.act_seq_len)
+        act_plan_logstd = torch.zeros(batch_size, self.actual_act_dim * self.act_seq_len)
+        
+        with FreezeParameters([self.pi_net], self.freeze_pi_net):
+            encoding = self.pi_net(obs) # [B, input_dim]
+            
+        act_mean, act_logstd = self.policy["first"](encoding) # [B, actual_act_dim], [B, actual_act_dim]
+        act_logstd = torch.clamp(act_logstd, self.min_log_std, self.max_log_std)
+        act_plan_mean[:, :self.actual_act_dim] = act_mean
+        act_plan_logstd[:, :self.actual_act_dim] = act_logstd
+        
+        hidden_state = self.hidden_encoder(encoding) # [B, rnn_input_size]
+        
+        for i in range(1, self.act_seq_len):
+            hidden_state = self.rnn_cell(torch.concat([act_mean, act_logstd], dim=-1), hidden_state)
+            act_mean, act_logstd = self.policy["other"](hidden_state)
+            act_logstd = torch.clamp(act_logstd, self.min_log_std, self.max_log_std)
+            act_plan_mean[:, i*self.actual_act_dim:(i+1)*self.actual_act_dim] = act_mean
+            act_plan_logstd[:, i*self.actual_act_dim:(i+1)*self.actual_act_dim] = act_logstd
+        
+        act_plan_std = act_plan_logstd.exp()
+        return torch.cat((act_plan_mean, act_plan_std), dim=-1)
 
 
 class ActionValue(nn.Module, Action_Distribution):
