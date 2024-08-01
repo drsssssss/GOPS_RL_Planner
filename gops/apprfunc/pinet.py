@@ -446,10 +446,7 @@ class StochaRNNPolicy(nn.Module, Action_Distribution):
             act_plan_logstd[:, i*self.actual_act_dim:(i+1)*self.actual_act_dim] = act_logstd
         
         act_plan_std = act_plan_logstd.exp()
-        return torch.cat((
-            act_plan_mean[..., :self.actual_act_dim * self.act_seq_len], 
-            act_plan_std[..., :self.actual_act_dim * self.act_seq_len]
-        ), dim=-1)
+        return torch.cat((act_plan_mean, act_plan_std), dim=-1)
 
 
 class ActionValue(nn.Module, Action_Distribution):
