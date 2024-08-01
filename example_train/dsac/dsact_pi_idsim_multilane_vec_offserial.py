@@ -77,6 +77,7 @@ if __name__ == "__main__":
     act_seq_len = 4
     parser.add_argument("--repeat_num", type=int, default=repeat_num, help="action repeat num")
     parser.add_argument("--act_seq_len", type=int, default=act_seq_len, help="action repeat num")
+    parser.add_argument("--act_seq_nn", type=int, default=act_seq_len, help="action repeat num")
 
     parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_func_name",
         type=str,
-        default="StochaPolicy",
+        default="StochaRNNPolicy",
         help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy",
     )
     parser.add_argument(
@@ -125,6 +126,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--policy_hidden_sizes", type=list, default=[256,256,256])
     parser.add_argument("--policy_rnn_hidden_size", type=int, default=256, help="Options: mlp_separated/mlp_shared")
+    parser.add_argument("--policy_rnn_type", type=str, default="GRU", help="Options: LSTM/GRU")
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )

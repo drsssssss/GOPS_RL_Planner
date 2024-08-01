@@ -67,6 +67,7 @@ def get_apprfunc_dict(key: str, **kwargs):
     var["pre_horizon"] = kwargs.get("pre_horizon", None)
     var["additional_info"] = kwargs.get("additional_info", None)
     var["act_seq_len"] = kwargs.get("act_seq_len", 1)
+    var["act_seq_nn"] = kwargs.get("act_seq_nn", 1)
 
     apprfunc_type = kwargs[key + "_func_type"]
     if key + "_output_activation" not in kwargs.keys():
@@ -142,6 +143,7 @@ def get_apprfunc_dict(key: str, **kwargs):
             var["hidden_activation"] = kwargs[key + "_hidden_activation"]
             var["output_activation"] = kwargs[key + "_output_activation"]
             var["rnn_hidden_size"] = kwargs.get(key + "_rnn_hidden_size", None)
+            var["rnn_type"] = kwargs.get(key + "_rnn_type", None)
     else:
         raise NotImplementedError
 
