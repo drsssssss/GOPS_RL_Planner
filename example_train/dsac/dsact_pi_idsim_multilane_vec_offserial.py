@@ -73,7 +73,10 @@ if __name__ == "__main__":
         env_model_config=base_env_model_config
     )
     parser.add_argument("--obs_scale", type=dict, default=obs_scale)
-    parser.add_argument("--repeat_num", type=int, default=4, help="action repeat num")
+    repeat_num = 1
+    act_seq_len = 4
+    parser.add_argument("--repeat_num", type=int, default=repeat_num, help="action repeat num")
+    parser.add_argument("--act_seq_len", type=int, default=act_seq_len, help="action repeat num")
 
     parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
@@ -121,6 +124,7 @@ if __name__ == "__main__":
         help="Options: default/TanhGaussDistribution/GaussDistribution",
     )
     parser.add_argument("--policy_hidden_sizes", type=list, default=[256,256,256])
+    parser.add_argument("--policy_rnn_hidden_size", type=int, default=256, help="Options: mlp_separated/mlp_shared")
     parser.add_argument(
         "--policy_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
     )
@@ -188,7 +192,8 @@ if __name__ == "__main__":
     parser.add_argument("--alpha_learning_rate", type=float, default=3e-4)
 
     # special parameter
-    parser.add_argument("--gamma", type=float, default=0.90)
+    gamma = 0.9 ** (repeat_num * act_seq_len / 4) 
+    parser.add_argument("--gamma", type=float, default=gamma)
     parser.add_argument("--tau", type=float, default=0.001)
     parser.add_argument("--auto_alpha", type=bool, default=True)
     parser.add_argument("--alpha", type=bool, default=0.2)
@@ -233,7 +238,10 @@ if __name__ == "__main__":
     # Batch size of sampler for buffer store
     parser.add_argument("--sample_batch_size", type=int, default=80)
     # Add noise to action for better exploration
-    parser.add_argument("--noise_params", type=dict, default={"mean": np.array([0,0], dtype=np.float32), "std": np.array([0.2,0.2], dtype=np.float32),},
+    action_seq_len = parser.parse_known_args()[0].act_seq_len or 1
+    mean = np.tile(np.array([0,0], dtype=np.float32), action_seq_len)
+    std = np.tile(np.array([0.2,0.2], dtype=np.float32), action_seq_len)
+    parser.add_argument("--noise_params", type=dict, default={"mean": mean, "std": std,},
         help="used for continuous action space")
 
     ################################################

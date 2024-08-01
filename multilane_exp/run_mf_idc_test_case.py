@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from gops.trainer.idsim_idc_mf_multilane_evaluator import IdsimIDCEvaluator, get_args_from_json
 from gops.trainer.idsim_render.animation_mf_multilane import AnimationLane
-from run_idc_eval import find_optimal_network
+from multilane_exp.run_idc_eval import find_optimal_network
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 os.environ["OMP_NUM_THREADS"] = "1"
