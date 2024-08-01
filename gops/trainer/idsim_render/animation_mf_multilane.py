@@ -38,6 +38,7 @@ class AnimationLane(AnimationBase):
         self.ax3_1 = None
         self.ax4_1, self.ax4_2 = None, None
         self.ref_artist_list = []
+        self.traj_artist_list = []
         self.scale_artist_list = []
         self.background_artist_list = []
         self.speed_dashboard_artist_list = []
@@ -53,6 +54,7 @@ class AnimationLane(AnimationBase):
     def clear_all_list(self):
         super().clear_all_list()
         self.ref_artist_list = []
+        self.traj_artist_list = []
         self.scale_artist_list = []
         self.background_artist_list = []
         self.speed_dashboard_artist_list = []
@@ -149,6 +151,9 @@ class AnimationLane(AnimationBase):
 
             # # ---------------- update ego ref------------------
             self.update_ego_ref(ax, episode_data, step)
+
+            # # ---------------- update traj line------------------
+            self.update_traj_line(ax, episode_data, step)
 
             # # ---------------- update sur participants------------------
             self.update_sur_participants(ax, cur_time, episode_data, step)
@@ -270,6 +275,60 @@ class AnimationLane(AnimationBase):
                 ref_x, ref_y, color=EGO_COLOR if i == selected_path_index else EGO_COLOR_WITH_ALPHA,
                 linewidth=self.REF_LINEWIDTH, zorder=101
             )))
+
+    def update_traj_line(self, ax, episode_data, step):
+        for traj in self.traj_artist_list:
+            traj.remove()
+
+        def scale_to_real(action: np.ndarray) -> np.ndarray:
+            action_upper_bound = np.array(self.config['env_config']['action_upper_bound'])
+            action_lower_bound = np.array(self.config['env_config']['action_lower_bound'])
+            action = (action + 1) / 2 * (action_upper_bound - action_lower_bound) + action_lower_bound
+            return action
+
+        def ego_model(ego_state: np.ndarray,
+                      action: np.ndarray,
+                      Ts: float = 0.1) -> np.ndarray:
+            # parameters
+            vehicle_spec = (1412.0, 1536.7, 1.06, 1.85, -128915.5, -85943.6, 20.0, 0.0)
+            m, Iz, lf, lr, Cf, Cr, vx_max, vx_min = vehicle_spec
+            x, y, vx, vy, phi, omega = ego_state
+            ax, steer = action
+
+            return np.stack([
+                x + Ts * (vx * np.cos(phi) - vy * np.sin(phi)),
+                y + Ts * (vy * np.cos(phi) + vx * np.sin(phi)),
+                np.clip(vx + Ts * ax, vx_min, vx_max),
+                (-(lf * Cf - lr * Cr) * omega + Cf * steer * vx + m * omega * vx * vx - m * vx * vy / Ts) / (Cf + Cr - m * vx / Ts),
+                phi + Ts * omega,
+                (-Iz * omega * vx / Ts - (lf * Cf - lr * Cr) * vy + lf * Cf * steer * vx) / (
+                    (lf * lf * Cf + lr * lr * Cr) - Iz * vx / Ts)
+            ], axis=-1)
+        
+        incre_action_seq = episode_data.action_list[step]
+        cur_real_action = episode_data.action_real_list[step]
+        seq_len = incre_action_seq.shape[0]/2 # '2' is the action dimension, as same as '2' in i*2:i*2+2
+        real_action_seq = []
+        repeat_num = 2
+        for i in range(int(seq_len)):
+            for _ in range(repeat_num):
+                incre_action_real = scale_to_real(incre_action_seq[i*2:i*2+2])
+            cur_real_action = cur_real_action + incre_action_real
+            real_action_seq.append(cur_real_action)
+        
+        self.traj_artist_list = []
+        ego_state = episode_data.ego_state_list[step]
+        traj_x = []
+        traj_y = []
+        for i in range(len(real_action_seq)):
+            ego_state = ego_model(ego_state, real_action_seq[i])
+            traj_x.append(ego_state[0])
+            traj_y.append(ego_state[1])
+
+        self.traj_artist_list.append(ax.add_line(Line2D(
+            traj_x, traj_y, color='b', linewidth=10, zorder=200, alpha=0.5
+        )))
+
 
     def adjust_lim(self, episode_data, eval_dict, step):
         index_min = max(0, step - 100)
