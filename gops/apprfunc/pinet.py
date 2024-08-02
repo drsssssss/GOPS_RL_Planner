@@ -11,6 +11,7 @@ __all__ = [
     "FiniteHorizonPolicy",
     "FiniteHorizonFullPolicy",
     "StochaPolicy",
+    "StochaGuassianPolicy",
     "StochaRNNPolicy",
     "ActionValue",
     "ActionValueDis",
@@ -19,6 +20,7 @@ __all__ = [
 ]
 import numpy as np
 import torch
+import torch.nn.functional as F
 import warnings
 import itertools
 import torch.nn as nn
@@ -290,6 +292,43 @@ class StochaPolicy(nn.Module, Action_Distribution):
         return torch.cat((action_mean, action_std), dim=-1)
 
 
+class StochaGuassianPolicy(StochaPolicy):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        act_dim = kwargs["act_dim"]
+        self.act_seq_len = kwargs.get("act_seq_len", 1)
+        self.act_seq_nn = kwargs.get("act_seq_nn", 1)
+        assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_len"
+        self.actual_act_dim = act_dim // self.act_seq_nn
+        
+        sigma = self.act_seq_nn / 6.0
+        kernel_size = int(2 * (sigma * 3) + 1)
+        self.gaussian_kernel = self.gaussian_kernel1d(kernel_size, sigma).view(1, 1, -1)
+        self.gaussian_kernel = self.gaussian_kernel.expand(self.actual_act_dim, 1, -1)
+    
+    @staticmethod
+    def gaussian_kernel1d(kernel_size: int, sigma: float) -> torch.Tensor:
+        x = torch.arange(kernel_size) - (kernel_size - 1) / 2
+        kernel = torch.exp(-0.5 * (x / sigma) ** 2)
+        kernel = kernel / kernel.sum()
+        return kernel
+
+    def forward(self, obs):
+        device = obs.device
+        self.gaussian_kernel = self.gaussian_kernel.to(device)
+        action_mean, action_std = super().forward(obs).chunk(2, dim=-1)
+        action_mean = action_mean.view(-1, self.act_seq_nn, self.actual_act_dim).permute(0, 2, 1)
+        padding = self.gaussian_kernel.size(-1) // 2
+        action_mean = F.conv1d(
+            F.pad(action_mean, (padding, padding), mode='replicate'),
+            self.gaussian_kernel, # [self.actual_act_dim, 1, kernel_size]
+            padding=0,
+            groups=self.actual_act_dim 
+        )
+        action_mean = action_mean.permute(0, 2, 1).reshape(-1, self.actual_act_dim * self.act_seq_nn)
+        return torch.cat((action_mean, action_std), dim=-1)
+        
+        
 # Stochastic RNN Policy
 class StochaRNNPolicy(nn.Module, Action_Distribution):
     """
@@ -305,8 +344,6 @@ class StochaRNNPolicy(nn.Module, Action_Distribution):
         act_dim = kwargs["act_dim"]
         self.act_seq_len = kwargs.get("act_seq_len", 1)
         self.act_seq_nn = kwargs.get("act_seq_nn", 1)
-        # self.act_seq_len = 1 if act_seq_len is None else act_seq_len
-        # self.act_seq_nn = 1 if act_seq_nn is None else act_seq_nn
         assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_len"
         self.actual_act_dim = act_dim // self.act_seq_nn
         
