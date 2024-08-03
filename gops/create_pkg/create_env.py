@@ -95,6 +95,7 @@ def create_env(
     obs_noise_data: Optional[list] = None,
     repeat_num: Optional[int] = None,
     act_seq_len: Optional[int] = None,
+    gamma: float = 1.0,
     sum_reward: bool = True,
     action_scale: bool = True,
     min_action: Union[float, int, np.ndarray, list] = -1.0,
@@ -156,9 +157,9 @@ def create_env(
             env = ScaleActionData(env, min_action, max_action)
 
         if repeat_num is not None:
-            env = ActionRepeatData(env, repeat_num, sum_reward)
+            env = ActionRepeatData(env, repeat_num, sum_reward, gamma)
         if act_seq_len is not None:
-            env = ActionSeqData(env, act_seq_len, sum_reward)
+            env = ActionSeqData(env, act_seq_len, sum_reward, gamma)
 
         env = ConvertType(env)
 

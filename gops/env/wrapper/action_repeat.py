@@ -34,16 +34,17 @@ class ActionRepeatData(gym.Wrapper):
         only use reward in last step.
     """
 
-    def __init__(self, env, repeat_num: int = 1, sum_reward: bool = True):
+    def __init__(self, env, repeat_num: int = 1, sum_reward: bool = True, gamma: float = 1.0):
         super(ActionRepeatData, self).__init__(env)
         self.repeat_num = repeat_num
         self.sum_reward = sum_reward
+        self.gamma = gamma
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, dict]:
         sum_r = 0
         for _ in range(self.repeat_num):
             obs, r, d, info = self.env.step(action)
-            sum_r += r
+            sum_r =  sum_r * self.gamma + r
             if d:
                 break
         if not self.sum_reward:
@@ -62,11 +63,12 @@ class ActionRepeatModel(ModelWrapper):
     """
 
     def __init__(
-        self, model: PythBaseModel, repeat_num: int = 1, sum_reward: bool = True
+        self, model: PythBaseModel, repeat_num: int = 1, sum_reward: bool = True, gamma: float = 1.0
     ):
         super(ActionRepeatModel, self).__init__(model)
         self.repeat_num = repeat_num
         self.sum_reward = sum_reward
+        self.gamma = gamma
 
     def forward(
         self,
@@ -80,7 +82,7 @@ class ActionRepeatModel(ModelWrapper):
             next_obs, reward, next_done, next_info = self.model.forward(
                 obs, action, done, info
             )
-            sum_reward += reward
+            sum_reward = sum_reward * self.gamma + reward
             obs, done, info = next_obs, done, info
         if not self.sum_reward:
             sum_reward = reward
