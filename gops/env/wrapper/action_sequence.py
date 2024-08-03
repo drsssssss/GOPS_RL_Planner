@@ -33,11 +33,10 @@ class ActionSeqData(gym.Wrapper):
         sum_reward (bool): If True, the reward is the sum of the rewards in the sequence.
     """
 
-    def __init__(self, env, seq_len: int = 1, sum_reward: bool = True, gamma: float = 1.0):
+    def __init__(self, env, seq_len: int = 1, sum_reward: bool = True):
         super(ActionSeqData, self).__init__(env)
         self.seq_len = seq_len
         self.sum_reward = sum_reward
-        self.gamma = gamma
         # action space
         self.origin_action_space = env.action_space
         self.action_dim = env.action_space.shape[0]
@@ -57,7 +56,7 @@ class ActionSeqData(gym.Wrapper):
             # the action is rolled out in sequence, get the real action by slicing
             real_action = action[i * self.action_dim : (i + 1) * self.action_dim]
             obs, r, d, info = self.env.step(real_action)
-            sum_r = sum_r * self.gamma + r
+            sum_r += r
             if d:
                 break
         if not self.sum_reward:
@@ -68,12 +67,11 @@ class ActionSeqData(gym.Wrapper):
 class ActionSeqModel(ModelWrapper):
 
     def __init__(
-        self, model: PythBaseModel, repeat_num: int = 1, sum_reward: bool = True, gamma: float = 1.0
+        self, model: PythBaseModel, repeat_num: int = 1, sum_reward: bool = True
     ):
         super(ActionSeqModel, self).__init__(model)
         self.repeat_num = repeat_num
         self.sum_reward = sum_reward
-        self.gamma = gamma
 
     def forward(
         self, obs: torch.Tensor, action: torch.Tensor
