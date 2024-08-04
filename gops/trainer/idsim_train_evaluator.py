@@ -37,6 +37,7 @@ class EvalResult:
 
 class IdsimTrainEvaluator(Evaluator):
     def __init__(self, index=0, **kwargs):
+        kwargs["env_config"]["max_steps"] = 2000
         super().__init__(index, **kwargs)
         self.max_iteration = kwargs["max_iteration"]
         self.env_seed_rng = np.random.default_rng(kwargs["seed"])
