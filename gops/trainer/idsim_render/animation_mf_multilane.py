@@ -50,7 +50,8 @@ class AnimationLane(AnimationBase):
             self.ref_points_num = len(downsample_ref_point_index)
         else:
             self.ref_points_num = self.config['env_model_config']['N'] +1 
-
+        self.repeat_num = self.config.get('repeat_num', 1)
+        
     def clear_all_list(self):
         super().clear_all_list()
         self.ref_artist_list = []
@@ -74,7 +75,7 @@ class AnimationLane(AnimationBase):
         dpi = 50,
         plot_reward=True,
     ):
-        metadata = dict(title='Demo', artist='Guojian Zhan', comment='idsim')
+        metadata = dict(title='Demo', artist='iDLab', comment='idsim')
         writer = FFMpegWriter(fps=fps, metadata=metadata)
         save_video_path = save_path / 'video'
         os.makedirs(save_video_path, exist_ok=True)
@@ -309,12 +310,11 @@ class AnimationLane(AnimationBase):
         cur_real_action = episode_data.action_real_list[step]
         seq_len = incre_action_seq.shape[0]/2 # '2' is the action dimension, as same as '2' in i*2:i*2+2
         real_action_seq = []
-        repeat_num = 2
         for i in range(int(seq_len)):
-            for _ in range(repeat_num):
-                incre_action_real = scale_to_real(incre_action_seq[i*2:i*2+2])
+            incre_action_real = scale_to_real(incre_action_seq[i*2:i*2+2])
             cur_real_action = cur_real_action + incre_action_real
-            real_action_seq.append(cur_real_action)
+            for _ in range(self.repeat_num):
+                real_action_seq.append(cur_real_action)
         
         self.traj_artist_list = []
         ego_state = episode_data.ego_state_list[step]

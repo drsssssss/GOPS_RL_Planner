@@ -328,15 +328,9 @@ class IdsimIDCEvaluator(Evaluator):
                 lane_list = env_context.scenario.network.get_edge_lanes(
                     vehicle.edge, vehicle.v_class)
                 cur_index = lane_list.index(vehicle.lane)
-                lc_cd, lc_cl = 0, 0
-                last_optimal_path_index = cur_index
-                selected_path_index = cur_index
             except:
                 cur_index = 0
                 lane_list = [0, 1, 2]
-                lc_cd, lc_cl = 0, 0
-                last_optimal_path_index = cur_index
-                selected_path_index = cur_index
         else:
             cur_index = 0
             lane_list = [0, 1, 2]
