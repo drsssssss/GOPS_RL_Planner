@@ -11,6 +11,7 @@ __all__ = [
     "FiniteHorizonPolicy",
     "FiniteHorizonFullPolicy",
     "StochaPolicy",
+    "StochaFourierPolicy",
     "StochaGuassianPolicy",
     "StochaRNNPolicy",
     "ActionValue",
@@ -292,19 +293,64 @@ class StochaPolicy(nn.Module, Action_Distribution):
         return torch.cat((action_mean, action_std), dim=-1)
 
 
+class StochaFourierPolicy(StochaPolicy):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        act_dim = kwargs["act_dim"]
+        self.act_seq_len = kwargs.get("act_seq_len", 1)
+        self.act_seq_nn = kwargs.get("act_seq_nn", 1)
+        assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_nn"
+        self.actual_act_dim = act_dim // self.act_seq_nn
+        
+        # shape of the mask matrix: [act_seq_nn//2+1, act_dim]
+        self.freq_mask = nn.Parameter(torch.ones(self.act_seq_nn//2+1, self.actual_act_dim))
+      
+    @staticmethod
+    def fourier_filter(signal: torch.Tensor, freq_mask: torch.Tensor) -> torch.Tensor:
+        """
+        Applies a Fourier filter to the input signal using the provided frequency mask.
+
+        This function performs a Fast Fourier Transform (FFT) on the real-valued input signal,
+        applies the frequency mask to the FFT coefficients, and then performs an inverse FFT to
+        obtain the filtered signal.
+
+        Parameters:
+        signal (torch.Tensor): The input signal tensor of shape (B, N, D), where B is the batch size
+                            and N is the length of the signal, and D is the number of features.
+        freq_mask (torch.Tensor): The frequency mask tensor of shape (F, D), 
+                            where F is the number of frequency components and D is the number of features.
+                            F = N//2+1 for real-to-complex FFT.
+        Returns:
+        torch.Tensor: The filtered signal tensor of shape (B, N, D).
+        """
+        fft_coeffs = torch.fft.rfft(signal, dim = 1) # [B, N//2+1, D]
+        fft_coeffs_filtered = fft_coeffs * freq_mask.unsqueeze(0) # [B, N//2+1, D]
+        filtered_signal = torch.fft.irfft(fft_coeffs_filtered, dim = 1)
+        return filtered_signal
+    
+    def forward(self, obs):
+        action_mean, action_std = super().forward(obs).chunk(2, dim=-1)
+        action_mean = action_mean.view(-1, self.act_seq_nn, self.actual_act_dim)
+        self.freq_mask.data = torch.clamp(self.freq_mask.data, 0, 1)
+        action_mean_filtered = self.fourier_filter(action_mean, self.freq_mask)
+        action_mean_filtered = action_mean.reshape(-1, self.actual_act_dim * self.act_seq_nn)
+        return torch.cat((action_mean_filtered, action_std), dim=-1)
+        
+    
 class StochaGuassianPolicy(StochaPolicy):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         act_dim = kwargs["act_dim"]
         self.act_seq_len = kwargs.get("act_seq_len", 1)
         self.act_seq_nn = kwargs.get("act_seq_nn", 1)
-        assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_len"
+        assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_nn"
         self.actual_act_dim = act_dim // self.act_seq_nn
         
         sigma = self.act_seq_nn / 6.0
         kernel_size = int(2 * (sigma * 3) + 1)
-        self.gaussian_kernel = self.gaussian_kernel1d(kernel_size, sigma).view(1, 1, -1)
-        self.gaussian_kernel = self.gaussian_kernel.expand(self.actual_act_dim, 1, -1)
+        gaussian_kernel = self.gaussian_kernel1d(kernel_size, sigma).view(1, 1, -1)
+        gaussian_kernel = self.gaussian_kernel.expand(self.actual_act_dim, 1, -1)
+        self.gaussian_kernel = nn.Parameter(gaussian_kernel, requires_grad=False)
     
     @staticmethod
     def gaussian_kernel1d(kernel_size: int, sigma: float) -> torch.Tensor:
@@ -314,8 +360,6 @@ class StochaGuassianPolicy(StochaPolicy):
         return kernel
 
     def forward(self, obs):
-        device = obs.device
-        self.gaussian_kernel = self.gaussian_kernel.to(device)
         action_mean, action_std = super().forward(obs).chunk(2, dim=-1)
         action_mean = action_mean.view(-1, self.act_seq_nn, self.actual_act_dim).permute(0, 2, 1)
         padding = self.gaussian_kernel.size(-1) // 2
@@ -344,7 +388,7 @@ class StochaRNNPolicy(nn.Module, Action_Distribution):
         act_dim = kwargs["act_dim"]
         self.act_seq_len = kwargs.get("act_seq_len", 1)
         self.act_seq_nn = kwargs.get("act_seq_nn", 1)
-        assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_len"
+        assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_nn"
         self.actual_act_dim = act_dim // self.act_seq_nn
         
         hidden_sizes = kwargs["hidden_sizes"]
