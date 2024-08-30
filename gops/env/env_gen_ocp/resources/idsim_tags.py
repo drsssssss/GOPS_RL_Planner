@@ -59,6 +59,9 @@ reward_tags = (
     "env_scaled_punish_boundary",
 )
 
+smoothed_tags = (
+    "action_fluctuation",
+)
 
 done_tags = (
     "done/arrival",
@@ -98,7 +101,6 @@ idsim_tb_tags = (
     "Evaluation/collision_flag",
     "Evaluation/nominal_steer",
     "Evaluation/nominal_acc",
-    
     "Evaluation/env_tracking_error",
     "Evaluation/env_delta_phi",
     "Evaluation/env_speed_error",
@@ -132,8 +134,9 @@ idsim_tb_tags = (
     "Evaluation/env_scaled_pun2space",
     "Evaluation/env_scaled_pun2rear",
     "Evaluation/env_scaled_punish_boundary",
+    "Smoothed/Action fluctuation",
 )
 
-idsim_tb_keys = (*done_tags, *reward_tags)
+idsim_tb_keys = (*done_tags, *reward_tags, *smoothed_tags)
 assert len(idsim_tb_keys) == len(idsim_tb_tags) == len(set(idsim_tb_keys)) == len(set(idsim_tb_tags)), "idsim_tb_keys and idsim_tb_tags should have the same length and no duplicates"
 idsim_tb_tags_dict = dict(zip(idsim_tb_keys, idsim_tb_tags))

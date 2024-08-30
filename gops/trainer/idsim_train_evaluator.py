@@ -71,6 +71,8 @@ class IdsimTrainEvaluator(Evaluator):
 
         done = 0
         info["TimeLimit.truncated"] = False
+        action_fluctuation = []
+        last_action = None
         while not (done or info["TimeLimit.truncated"]):
             batch_obs = torch.from_numpy(np.expand_dims(obs, axis=0).astype("float32"))
             with torch.no_grad():
@@ -78,6 +80,9 @@ class IdsimTrainEvaluator(Evaluator):
                 action_distribution = self.networks.create_action_distributions(logits)
             action = action_distribution.mode()
             action = action.cpu().detach().numpy()[0]
+            if last_action is not None:
+                action_fluctuation.append(np.linalg.norm(action - last_action)) # L2 norm of action difference
+            last_action = action
             next_obs, reward, done, next_info = self.env.step(action)
             eval_result.obs_list.append(obs)
             eval_result.action_list.append(action)
@@ -101,6 +106,7 @@ class IdsimTrainEvaluator(Evaluator):
         idsim_tb_eval_dict["total_avg_return"] = episode_return
         if iteration > 0*self.max_iteration / 5:
             self.save_eval_scenario(eval_result)
+        idsim_tb_eval_dict["action_fluctuation"] = np.mean(action_fluctuation)
 
         return idsim_tb_eval_dict
 
