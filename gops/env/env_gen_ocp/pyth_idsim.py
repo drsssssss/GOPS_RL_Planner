@@ -104,6 +104,8 @@ class idSimEnv(CrossRoad, Env):
         self.context = idSimContext() # fake idsim context
         self.set_scenario(scenario)
         self.ref_index = None
+        self.allow_lc = False
+        self.new_ref_index = self.ref_index
 
     def seed(self, seed=None):
         super(idSimEnv, self).seed(seed)
@@ -141,6 +143,7 @@ class idSimEnv(CrossRoad, Env):
             self.model_config.ref_v_lane = float(ref_v)
             self.env_config.ref_v = float(ref_v)
             # print(f"INFO: change ref_v to {ref_v}")
+        self.new_ref_index = self.ref_index
             
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         self._fix_state()
@@ -171,6 +174,13 @@ class idSimEnv(CrossRoad, Env):
             self.engine.context.vehicle.init_vx(init_vx)
             print(f"INFO: fix state, init_action: {init_action}")
             self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
+            
+    def unfreeze_lc(self):
+        if self.allow_lc:
+            self.ref_index = self.new_ref_index
+            self.lc_cooldown_counter = 0
+            self.allow_lc = False
+        
     # @cal_ave_exec_time(print_interval=1000)
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
@@ -180,11 +190,10 @@ class idSimEnv(CrossRoad, Env):
         if self.lc_cooldown_counter > self.lc_cooldown:
             # lane change is allowable
             if not self.engine.context.vehicle.in_junction and self.use_random_ref_param and np.random.rand() < self.random_ref_probability :
-                new_ref_index = np.random.choice(np.arange(self.model_config.num_ref_lines))
-                if new_ref_index != self.ref_index:
-                    # lane change
-                    self.ref_index = new_ref_index
-                    self.lc_cooldown_counter = 0
+                self.new_ref_index = np.random.choice(np.arange(self.model_config.num_ref_lines))
+                if self.new_ref_index != self.ref_index:
+                    # allow lane change
+                    self.allow_lc = True
         reward_model, reward_details = self._get_reward(action)
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         reward_model_free, mf_info = self._get_model_free_reward(action)
