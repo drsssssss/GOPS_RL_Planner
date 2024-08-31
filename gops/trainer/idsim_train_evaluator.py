@@ -106,7 +106,10 @@ class IdsimTrainEvaluator(Evaluator):
         idsim_tb_eval_dict["total_avg_return"] = episode_return
         if iteration > 0*self.max_iteration / 5:
             self.save_eval_scenario(eval_result)
-        idsim_tb_eval_dict["action_fluctuation"] = np.mean(action_fluctuation)
+        if action_fluctuation:
+            idsim_tb_eval_dict["action_fluctuation"] = np.mean(action_fluctuation)
+        else:
+            idsim_tb_eval_dict["action_fluctuation"] = 0
 
         return idsim_tb_eval_dict
 
