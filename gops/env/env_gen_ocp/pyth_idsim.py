@@ -63,7 +63,7 @@ class idSimEnv(CrossRoad, Env):
         return super(idSimEnv, cls).__new__(cls, env_config)
     
     def __init__(self, env_config: Config, model_config: ModelConfig, 
-                 scenario: str, rou_config: Dict[str, Any]=None,env_idx: int=None, scenerios_list: List[str]=None):
+                 scenario: str, rou_config: Dict[str, Any]=None, env_idx: int=None, scenerios_list: List[str]=None):
         self.env_idx = env_idx  
         print('env_idx:', env_idx)
         self.rou_config = rou_config
@@ -96,6 +96,8 @@ class idSimEnv(CrossRoad, Env):
             print('INFO: using random acceleration')
         if model_config.track_closest_ref_point:
             print('INFO: tracking closest reference point')
+        if env_config.choose_closest:
+            print("INFO: choosing closest lane")
 
         self.lc_cooldown = self.env_config.random_ref_cooldown
         self.lc_cooldown_counter = 0
@@ -105,12 +107,12 @@ class idSimEnv(CrossRoad, Env):
         self.set_scenario(scenario)
         self.ref_index = None
         self.allow_lc = False
-        self.new_ref_index = self.ref_index
+        self.new_ref_index = None
+        self.choose_closest = self.env_config.choose_closest
 
     def seed(self, seed=None):
         super(idSimEnv, self).seed(seed)
         
-    
     def reset(self, **kwargs) -> Tuple[np.ndarray, dict]:
         self.lc_cooldown_counter = 0
         if self.rou_config is not None:
@@ -194,6 +196,9 @@ class idSimEnv(CrossRoad, Env):
                 if self.new_ref_index != self.ref_index:
                     # allow lane change
                     self.allow_lc = True
+        # TODO: add condition to allow choosing the closest lane
+        if self.choose_closest:
+            self.choose_closest_lane()
         reward_model, reward_details = self._get_reward(action)
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         reward_model_free, mf_info = self._get_model_free_reward(action)
@@ -213,6 +218,14 @@ class idSimEnv(CrossRoad, Env):
 
         return self._get_obs(), total_reward, done, self._info
 
+    def choose_closest_lane(self):
+        # set self.ref_index to the closest lane according to self._state.context_state.reference and self._state.robot_state
+        self.ref_index = np.argmin(
+            np.linalg.norm(
+                self._state.robot_state[:2] - self._state.context_state.reference[:, 0, :2], axis=1
+            )
+        )
+        
     def set_ref_index(self, ref_index: int):
         self.ref_index = ref_index
     

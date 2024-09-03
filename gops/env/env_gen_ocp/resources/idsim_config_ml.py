@@ -91,6 +91,7 @@ env_config_param_base = {
     "rel_v_thd": 1.0,
     "rel_v_rear_thd": 3.0,
     "time_dist": 0.5,
+    "choose_closest": False, # TODO: 
 }
 
 model_config_base = {
