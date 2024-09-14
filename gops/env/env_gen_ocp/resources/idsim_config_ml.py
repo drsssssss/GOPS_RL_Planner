@@ -91,7 +91,9 @@ env_config_param_base = {
     "rel_v_thd": 1.0,
     "rel_v_rear_thd": 3.0,
     "time_dist": 0.5,
-    "choose_closest": False, # TODO: 
+    # TODO: add config to idSim/idsim/config.py
+    "choose_closest": False,
+    "mid_line_obs": False,
 }
 
 model_config_base = {

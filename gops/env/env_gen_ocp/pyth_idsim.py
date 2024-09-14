@@ -98,6 +98,8 @@ class idSimEnv(CrossRoad, Env):
             print('INFO: tracking closest reference point')
         if env_config.choose_closest:
             print("INFO: choosing closest lane")
+        if env_config.mid_line_obs:
+            print("INFO: using mid line as observation")
 
         self.lc_cooldown = self.env_config.random_ref_cooldown
         self.lc_cooldown_counter = 0
@@ -109,6 +111,7 @@ class idSimEnv(CrossRoad, Env):
         self.allow_lc = False
         self.new_ref_index = None
         self.choose_closest = self.env_config.choose_closest
+        self.mid_line_obs = self.env_config.mid_line_obs
 
     def seed(self, seed=None):
         super(idSimEnv, self).seed(seed)
@@ -196,11 +199,10 @@ class idSimEnv(CrossRoad, Env):
                 if self.new_ref_index != self.ref_index:
                     # allow lane change
                     self.allow_lc = True
-        # TODO: add condition to allow choosing the closest lane
         if self.choose_closest:
             self.choose_closest_lane()
         reward_model, reward_details = self._get_reward(action)
-        self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
+        self._state = self._get_state_from_idsim(ref_index_param=self.ref_index) # get state using ref_index to calculate reward
         reward_model_free, mf_info = self._get_model_free_reward(action)
         info.update(mf_info)
 
@@ -216,6 +218,9 @@ class idSimEnv(CrossRoad, Env):
         # if not terminated:
         #     total_reward = np.maximum(total_reward, 0.05)
 
+        if self.mid_line_obs:
+            mid_index = self._state.context_state.reference.shape[0] // 2
+            self._state = self._get_state_from_idsim(ref_index_param=mid_index) # get state using mid_index to calculate obs
         return self._get_obs(), total_reward, done, self._info
 
     def choose_closest_lane(self):
