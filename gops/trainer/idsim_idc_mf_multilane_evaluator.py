@@ -91,6 +91,12 @@ class EvalResult:
 class IdsimIDCEvaluator(Evaluator):
     def __init__(self, index=0, **kwargs):
         kwargs['env_config']['singleton_mode'] = 'invalidate'
+        self.act_seq_len = kwargs.get("act_seq_len", 1)
+        self.RHC_mode = kwargs.get("RHC_mode", False)
+        print(f"IDSimIDCEvaluator: act_seq_len={self.act_seq_len}") 
+        print(f"IDSimIDCEvaluator: RHC_mode={self.RHC_mode}")
+        # NOTE: if set act_seq_len = 1, the 1st value of action from policy will be passed to the environment
+        # if set act_seq_len = None, the whole action from policy will be passed.
         kwargs.update({
             "reward_scale": None,
             "repeat_num": 1,
@@ -98,6 +104,7 @@ class IdsimIDCEvaluator(Evaluator):
             "gym2gymnasium": False,
             "vector_env_num": None,
         })
+        self.actual_act_dim = kwargs["action_dim"] // kwargs["act_seq_nn"]
         self.kwargs = kwargs
         # update env_config in kwargs
         env_config = {**self.kwargs['env_config'],
@@ -316,6 +323,9 @@ class IdsimIDCEvaluator(Evaluator):
         eval_result.save_folder = str(self.save_folder)
         eval_result.ego_id = str(vehicle.id)
         eval_result.ego_route = vehicle.route
+
+        plan_action = None
+        pre_horizon_index = 0
         
         idsim_tb_eval_dict = {key: 0. for key in idsim_tb_tags_dict.keys()}
         
@@ -399,7 +409,15 @@ class IdsimIDCEvaluator(Evaluator):
 
             else:
                 q_value = -999  # TODO: fix this
-            action = action.detach().numpy()[0]
+            if self.RHC_mode:
+                policy_action = action.detach().numpy()[0]
+                if pre_horizon_index == 0:
+                    plan_action = policy_action
+                # Only the pre_horizon_index-th action will be used if act_seq_len is set to 1
+                action = plan_action[pre_horizon_index * self.actual_act_dim:]
+                pre_horizon_index = (pre_horizon_index + 1) % self.act_seq_len
+            else:
+                action = action.detach().numpy()[0]
 
             if hasattr(self.networks.policy, "pi_net"):
                 if hasattr(self.networks.policy.pi_net, "attn_weights") and self.networks.policy.pi_net.attn_weights is not None:
@@ -412,7 +430,7 @@ class IdsimIDCEvaluator(Evaluator):
                 action, res = self.opt_controller(state)
 
             # ----------- step ------------
-            self.env.set_ref_index(selected_path_index)
+            self.env.set_ref_index(selected_path_index) # ref index will be reset if choose_closest and mid_line_obs
             next_obs, reward, done, info = self.env.step(action)
 
             # ----------- save to list------------
