@@ -13,6 +13,7 @@
 import torch
 import scipy.integrate as integrate
 import numpy as np
+import torch.autograd.functional as F
 
 EPS = 1e-6
 
@@ -181,3 +182,72 @@ class ValueDiracDistribution:
 
     def mode(self):
         return torch.argmax(self.logits, dim=-1)
+
+
+class GaussNNDistribution:
+    def __init__(self, logits):
+        self.logits, self.planing_policy = logits
+        self.mean, self.std = torch.chunk(self.logits, chunks=2, dim=-1)
+        self.gauss_distribution = torch.distributions.Independent(
+            base_distribution=torch.distributions.Normal(self.mean, self.std),
+            reinterpreted_batch_ndims=1,
+        )
+        self.act_high_lim = torch.tensor([1.0])
+        self.act_low_lim = torch.tensor([-1.0])
+    
+    def get_bounded_state(self, lat_state):
+        if torch.all(self.act_high_lim == 1.0) and torch.all(self.act_low_lim == -1.0):
+            return lat_state
+        else:
+            raise NotImplementedError
+        
+    def sample(self):
+        # Step1: sample action from Gaussian distribution
+        lat_state = self.gauss_distribution.sample()
+        state_limited = self.get_bounded_state(lat_state)
+        # Step2: calculate the planning action using hidden state
+        planning_action = self.planing_policy(state_limited)
+        planning_action_lim = (self.act_high_lim - self.act_low_lim) / 2 * torch.tanh(
+            planning_action
+        ) + (self.act_high_lim + self.act_low_lim) / 2
+        # Step3: calculate the log probability
+        log_prob = (
+            self.gauss_distribution.log_prob(lat_state)
+            - torch.log(1 + EPS - torch.pow(torch.tanh(lat_state), 2)).sum(-1)
+            - torch.log((self.act_high_lim - self.act_low_lim) / 2).sum(-1)
+        )     
+        return planning_action_lim, log_prob
+
+    def rsample(self):
+        # Step1: sample action from Gaussian distribution
+        lat_state = self.gauss_distribution.rsample()
+        state_limited = self.get_bounded_state(lat_state)
+        # Step2: calculate the planning action using hidden state
+        planning_action = self.planing_policy(state_limited)
+        planning_action_lim = (self.act_high_lim - self.act_low_lim) / 2 * torch.tanh(
+            planning_action
+        ) + (self.act_high_lim + self.act_low_lim) / 2
+        # Step3: calculate the log probability
+        log_prob = (
+            self.gauss_distribution.log_prob(lat_state)
+            - torch.log(1 + EPS - torch.pow(torch.tanh(lat_state), 2)).sum(-1)
+            - torch.log((self.act_high_lim - self.act_low_lim) / 2).sum(-1)
+        )     
+        return planning_action_lim, log_prob
+
+    def log_prob(self, action_limited) -> torch.Tensor:
+        raise NotImplementedError
+
+    def entropy(self):
+        raise NotImplementedError
+
+    def mode(self):
+        # calculate the planning action using hidden state
+        planning_action = self.planing_policy(self.mean)
+        planning_action_lim = (self.act_high_lim - self.act_low_lim) / 2 * torch.tanh(
+            planning_action
+        ) + (self.act_high_lim + self.act_low_lim) / 2
+        return planning_action_lim
+
+    def kl_divergence(self, other: "GaussDistribution") -> torch.Tensor:
+        raise NotImplementedError

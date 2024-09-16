@@ -11,6 +11,7 @@ __all__ = [
     "FiniteHorizonPolicy",
     "FiniteHorizonFullPolicy",
     "StochaPolicy",
+    "StochaCoherentPolicy",
     "StochaFourierPolicy",
     "StochaGuassianPolicy",
     "StochaRNNPolicy",
@@ -266,7 +267,6 @@ class StochaPolicy(nn.Module, Action_Distribution):
     def ego_paras(self):
         return itertools.chain(*[modules.parameters() for modules in self.children() if modules != self.pi_net])
         
-
     def forward(self, obs):
         with FreezeParameters([self.pi_net], self.freeze_pi_net):
             encoding = self.pi_net(obs)
@@ -293,11 +293,108 @@ class StochaPolicy(nn.Module, Action_Distribution):
         return torch.cat((action_mean, action_std), dim=-1)
 
 
+# coherent noise Policy of MLP
+class StochaCoherentPolicy(nn.Module, Action_Distribution):
+    """
+    Approximated function of stochastic policy.
+    Input: observation.
+    Output: parameters of action distribution.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        act_dim = kwargs["act_dim"]
+        hidden_sizes = kwargs["hidden_sizes"]
+        self.std_type = kwargs["std_type"]
+        self.pi_net = kwargs["pi_net"]
+        self.freeze_pi_net = kwargs["freeze_pi_net"] == "actor" 
+        input_dim = self.pi_net.output_dim
+
+        self.act_seq_nn = kwargs.get("act_seq_nn", 1)
+        assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_nn"
+        self.actual_act_dim = act_dim // self.act_seq_nn
+
+        self.policy_latent_dim = 10 # FIXME: hard code
+
+        # mean and log_std are calculated by different MLP
+        if self.std_type == "mlp_separated":
+            pi_sizes = [input_dim] + list(hidden_sizes) + [self.policy_latent_dim]
+            self.mean = mlp(
+                pi_sizes,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            self.log_std = mlp(
+                pi_sizes,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+        # mean and log_std are calculated by same MLP
+        elif self.std_type == "mlp_shared":
+            pi_sizes = [input_dim] + list(hidden_sizes) + [self.policy_latent_dim * 2]
+            self.policy = mlp(
+                pi_sizes,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+        # mean is calculated by MLP, and log_std is learnable parameter
+        elif self.std_type == "parameter":
+            pi_sizes = [input_dim] + list(hidden_sizes) + [self.policy_latent_dim]
+            self.mean = mlp(
+                pi_sizes,
+                get_activation_func(kwargs["hidden_activation"]),
+                get_activation_func(kwargs["output_activation"]),
+            )
+            self.log_std = nn.Parameter(-0.5*torch.ones(1, self.policy_latent_dim))
+
+        # FIXME: hard code
+        self.planing_policy = mlp(
+            [self.policy_latent_dim] + [64, 64] + [act_dim], 
+            get_activation_func(kwargs["hidden_activation"]),
+            get_activation_func(kwargs["output_activation"]),
+        )
+
+        self.min_log_std = kwargs["min_log_std"]
+        self.max_log_std = kwargs["max_log_std"]
+        self.register_buffer("act_high_lim", torch.from_numpy(kwargs["act_high_lim"]))
+        self.register_buffer("act_low_lim", torch.from_numpy(kwargs["act_low_lim"]))
+        self.action_distribution_cls = kwargs["action_distribution_cls"]
+
+    def shared_paras(self):
+        return self.pi_net.parameters()
+
+    def ego_paras(self):
+        return itertools.chain(*[modules.parameters() for modules in self.children() if modules != self.pi_net])
+        
+    def forward(self, obs):
+        with FreezeParameters([self.pi_net], self.freeze_pi_net):
+            encoding = self.pi_net(obs)
+        if self.std_type == "mlp_separated":
+            action_mean = self.mean(encoding)
+            action_std = torch.clamp(
+                self.log_std(encoding), self.min_log_std, self.max_log_std
+            ).exp()
+        elif self.std_type == "mlp_shared":
+            logits = self.policy(encoding)
+            action_mean, action_log_std = torch.chunk(
+                logits, chunks=2, dim=-1
+            )  # output the mean
+            action_std = torch.clamp(
+                action_log_std, self.min_log_std, self.max_log_std
+            ).exp()
+        elif self.std_type == "parameter":
+            action_mean = self.mean(encoding)
+            action_log_std = self.log_std + torch.zeros_like(action_mean)
+            action_std = torch.clamp(
+                action_log_std, self.min_log_std, self.max_log_std
+            ).exp()
+
+        return torch.cat((action_mean, action_std), dim=-1), self.planing_policy
+
 class StochaFourierPolicy(StochaPolicy):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         act_dim = kwargs["act_dim"]
-        self.act_seq_len = kwargs.get("act_seq_len", 1)
         self.act_seq_nn = kwargs.get("act_seq_nn", 1)
         assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_nn"
         self.actual_act_dim = act_dim // self.act_seq_nn
@@ -341,7 +438,6 @@ class StochaGuassianPolicy(StochaPolicy):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         act_dim = kwargs["act_dim"]
-        self.act_seq_len = kwargs.get("act_seq_len", 1)
         self.act_seq_nn = kwargs.get("act_seq_nn", 1)
         assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_nn"
         self.actual_act_dim = act_dim // self.act_seq_nn
@@ -386,7 +482,6 @@ class StochaRNNPolicy(nn.Module, Action_Distribution):
         # In training, act_dim is the dimension of action sequence, and act_seq_len and act_seq_nn is the length of action sequence
         # In evaluation, act_dim is the dimension of action sequence, act_seq_len is 1, and act_seq_nn is the length of action sequence
         act_dim = kwargs["act_dim"]
-        self.act_seq_len = kwargs.get("act_seq_len", 1)
         self.act_seq_nn = kwargs.get("act_seq_nn", 1)
         assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_nn"
         self.actual_act_dim = act_dim // self.act_seq_nn

@@ -198,7 +198,10 @@ class DSACTPI(AlgorithmBase):
 
         obs = data["obs"]
         logits = self.networks.policy(obs)
-        logits_mean, logits_std = torch.chunk(logits, chunks=2, dim=-1)
+        if type(logits) is tuple:
+            logits_mean, logits_std = torch.chunk(logits[0], chunks=2, dim=-1)
+        else:
+            logits_mean, logits_std = torch.chunk(logits, chunks=2, dim=-1)
         policy_mean = torch.tanh(logits_mean).mean().item()
         policy_std = logits_std.mean().item()
 
