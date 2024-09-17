@@ -13,6 +13,7 @@ __all__ = [
     "StochaPolicy",
     "StochaCoherentPolicy",
     "StochaFourierPolicy",
+    "StochaFourierCoherentPolicy",
     "StochaGuassianPolicy",
     "StochaRNNPolicy",
     "ActionValue",
@@ -391,11 +392,11 @@ class StochaCoherentPolicy(nn.Module, Action_Distribution):
 
         return torch.cat((action_mean, action_std), dim=-1), self.planing_policy
 
-class StochaFourierPolicy(StochaPolicy):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        act_dim = kwargs["act_dim"]
-        self.act_seq_nn = kwargs.get("act_seq_nn", 1)
+
+class FourierFilterWrapper:
+    def __init__(self, policy, act_dim, act_seq_nn=1):
+        self.policy = policy
+        self.act_seq_nn = act_seq_nn
         assert act_dim % self.act_seq_nn == 0, "act_dim should be divisible by act_seq_nn"
         self.actual_act_dim = act_dim // self.act_seq_nn
         
@@ -420,20 +421,35 @@ class StochaFourierPolicy(StochaPolicy):
         Returns:
         torch.Tensor: The filtered signal tensor of shape (B, N, D).
         """
-        fft_coeffs = torch.fft.rfft(signal, dim = 1) # [B, N//2+1, D]
-        fft_coeffs_filtered = fft_coeffs * freq_mask.unsqueeze(0) # [B, N//2+1, D]
-        filtered_signal = torch.fft.irfft(fft_coeffs_filtered, dim = 1)
+        fft_coeffs = torch.fft.rfft(signal, dim=1)  # [B, N//2+1, D]
+        fft_coeffs_filtered = fft_coeffs * freq_mask.unsqueeze(0)  # [B, N//2+1, D]
+        filtered_signal = torch.fft.irfft(fft_coeffs_filtered, dim=1)
         return filtered_signal
     
     def forward(self, obs):
-        action_mean, action_std = super().forward(obs).chunk(2, dim=-1)
+        action_mean, action_std = self.policy.forward(obs).chunk(2, dim=-1)
         action_mean = action_mean.view(-1, self.act_seq_nn, self.actual_act_dim)
         self.freq_mask.data = torch.clamp(self.freq_mask.data, 0, 1)
         action_mean_filtered = self.fourier_filter(action_mean, self.freq_mask)
-        action_mean_filtered = action_mean.reshape(-1, self.actual_act_dim * self.act_seq_nn)
+        action_mean_filtered = action_mean_filtered.reshape(-1, self.actual_act_dim * self.act_seq_nn)
         return torch.cat((action_mean_filtered, action_std), dim=-1)
+
+
+class StochaFourierPolicy(StochaPolicy):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.wrapper = FourierFilterWrapper(self, kwargs["act_dim"], kwargs.get("act_seq_nn", 1))
+    
+    def forward(self, obs):
+        return self.wrapper.forward(obs)
         
     
+class StochaFourierCoherentPolicy(StochaCoherentPolicy):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.planning_policy = FourierFilterWrapper(self.planing_policy, kwargs["act_dim"], kwargs["act_seq_nn"])
+
+
 class StochaGuassianPolicy(StochaPolicy):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
