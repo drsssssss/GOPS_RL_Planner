@@ -96,6 +96,7 @@ def create_env(
     repeat_num: Optional[int] = None,
     act_seq_len: Optional[int] = None,
     sum_reward: bool = True,
+    truncated_reward: bool = False,
     action_scale: bool = True,
     min_action: Union[float, int, np.ndarray, list] = -1.0,
     max_action: Union[float, int, np.ndarray, list] = 1.0,
@@ -158,7 +159,7 @@ def create_env(
         if repeat_num is not None:
             env = ActionRepeatData(env, repeat_num, sum_reward)
         if act_seq_len is not None:
-            env = ActionSeqData(env, act_seq_len, sum_reward)
+            env = ActionSeqData(env, act_seq_len, sum_reward, truncated_reward)
 
         env = ConvertType(env)
 

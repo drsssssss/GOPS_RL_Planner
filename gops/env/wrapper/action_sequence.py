@@ -33,10 +33,11 @@ class ActionSeqData(gym.Wrapper):
         sum_reward (bool): If True, the reward is the sum of the rewards in the sequence.
     """
 
-    def __init__(self, env, seq_len: int = 1, sum_reward: bool = True):
+    def __init__(self, env, seq_len: int = 1, sum_reward: bool = True, truncated_reward: bool = False):
         super(ActionSeqData, self).__init__(env)
         self.seq_len = seq_len
         self.sum_reward = sum_reward
+        self.truncated_reward = truncated_reward
         # action space
         self.origin_action_space = env.action_space
         self.action_dim = env.action_space.shape[0]
@@ -56,6 +57,8 @@ class ActionSeqData(gym.Wrapper):
             # the action is rolled out in sequence, get the real action by slicing
             real_action = action[i * self.action_dim : (i + 1) * self.action_dim]
             obs, r, d, info = self.env.step(real_action)
+            if self.truncated_reward and i >= self.seq_len / 4 and i < self.seq_len * 3 / 4:
+                r = 0
             sum_r += r
             if d:
                 break
