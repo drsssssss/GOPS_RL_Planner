@@ -93,8 +93,10 @@ class IdsimIDCEvaluator(Evaluator):
         kwargs['env_config']['singleton_mode'] = 'invalidate'
         self.act_seq_len = kwargs.get("act_seq_len", 1)
         self.RHC_mode = kwargs.get("RHC_mode", False)
+        self.mid_line_obs = kwargs["env_config"].get("mid_line_obs", False)
         print(f"IDSimIDCEvaluator: act_seq_len={self.act_seq_len}") 
         print(f"IDSimIDCEvaluator: RHC_mode={self.RHC_mode}")
+        print(f"IDSimIDCEvaluator: mid_line_obs={self.mid_line_obs}")
         # NOTE: if set act_seq_len = 1, the 1st value of action from policy will be passed to the environment
         # if set act_seq_len = None, the whole action from policy will be passed.
         kwargs.update({
@@ -379,6 +381,12 @@ class IdsimIDCEvaluator(Evaluator):
                     selected_path_index = 0
 
             # ----------- get obs ------------
+            if self.mid_line_obs:
+                mid_index = len(lane_list) // 2
+                if selected_path_index != mid_index:
+                    print(f"path is changed from {selected_path_index} to {mid_index}")
+                selected_path_index = mid_index
+                
             if self.env.scenario == "crossroad":
                 idsim_context = CrossRoadContext.from_env(self.env, self.env.model_config, selected_path_index)
             elif self.env.scenario == "multilane":
@@ -406,9 +414,9 @@ class IdsimIDCEvaluator(Evaluator):
                 q2_std = q2_value_std[:, 1]
                 q_value = min(q1_value, q2_value).item()
                 # print(f"q1_std: {q1_std.item()} q2_std: {q2_std.item()}")
-
             else:
                 q_value = -999  # TODO: fix this
+
             if self.RHC_mode:
                 policy_action = action.detach().numpy()[0]
                 if pre_horizon_index == 0:
