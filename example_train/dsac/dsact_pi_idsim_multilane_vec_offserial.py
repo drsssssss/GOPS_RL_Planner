@@ -74,7 +74,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--obs_scale", type=dict, default=obs_scale)
     repeat_num = 1
-    act_seq_len = 4
+    act_seq_len = 20
     parser.add_argument("--repeat_num", type=int, default=repeat_num, help="action repeat num")
     parser.add_argument("--act_seq_len", type=int, default=act_seq_len, help="action repeat num")
     parser.add_argument("--act_seq_nn", type=int, default=act_seq_len, help="action repeat num")
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         help="Options: StateValue/ActionValue/ActionValueDis/ActionValueDistri",
     )
     parser.add_argument("--value_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS")
-    parser.add_argument("--value_hidden_sizes", type=list, default=[256, 256,256])
+    parser.add_argument("--value_hidden_sizes", type=list, default=[256, 256, 256])
     parser.add_argument("--value_std_type", type=str, default='mlp_separated', help="Options: mlp_separated/mlp_shared")
     parser.add_argument(
         "--value_hidden_activation", type=str, default="gelu", help="Options: relu/gelu/elu/selu/sigmoid/tanh"
@@ -112,9 +112,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--policy_func_name",
         type=str,
-        default="StochaRNNPolicy",
-        help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy",
+        default="StochaPolicy",
+        help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy/StochaCoherentPolicy/StochaFourierPolicy/StochaGuassianPolicy/StochaRNNPolicy",
     )
+    # truncated_reward
+    parser.add_argument("--truncated_reward", type=bool, default=False)
     parser.add_argument(
         "--policy_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS"
     )
@@ -124,7 +126,7 @@ if __name__ == "__main__":
         default="TanhGaussDistribution",
         help="Options: default/TanhGaussDistribution/GaussDistribution",
     )
-    parser.add_argument("--policy_hidden_sizes", type=list, default=[256,256,256])
+    parser.add_argument("--policy_hidden_sizes", type=list, default=[256, 256, 256])
     parser.add_argument("--policy_rnn_hidden_size", type=int, default=256, help="Options: mlp_separated/mlp_shared")
     parser.add_argument("--policy_rnn_type", type=str, default="GRU", help="Options: LSTM/GRU")
     parser.add_argument(
