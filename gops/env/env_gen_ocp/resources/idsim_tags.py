@@ -56,7 +56,7 @@ reward_tags = (
     "env_scaled_pun2side",
     "env_scaled_pun2space",
     "env_scaled_pun2rear",
-    "env_scaled_punish_boundary",
+    "env_scaled_reward_boundary",
 )
 
 smoothed_tags = (
@@ -133,7 +133,7 @@ idsim_tb_tags = (
     "Evaluation/env_scaled_pun2side",
     "Evaluation/env_scaled_pun2space",
     "Evaluation/env_scaled_pun2rear",
-    "Evaluation/env_scaled_punish_boundary",
+    "Evaluation/env_scaled_reward_boundary",
     "Smoothed/Action fluctuation",
 )
 
