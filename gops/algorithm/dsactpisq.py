@@ -14,7 +14,7 @@
 #  Update: 2021-03-05, Ziqing Gu: create DSAC algorithm
 #  Update: 2021-03-05, Wenxuan Wang: debug DSAC algorithm
 
-__all__=["ApproxContainer","DSACTPI"]
+__all__=["ApproxContainer","DSACTPISQ"]
 import time
 from copy import deepcopy
 from typing import Tuple
@@ -32,6 +32,26 @@ from gops.utils.gops_typing import DataDict
 from gops.utils.common_utils import get_apprfunc_dict
 
 
+critic_dict = {
+    "sur_reward": [
+        "env_scaled_reward_done",
+        "env_scaled_reward_collision",
+        "env_reward_collision_risk",
+        "env_scaled_reward_boundary"
+    ],
+    "ego_reward": [
+        "env_scaled_reward_step",
+        "env_scaled_reward_dist_lat",
+        "env_scaled_reward_vel_long",
+        "env_scaled_reward_head_ang",
+        "env_scaled_reward_yaw_rate",
+        "env_scaled_reward_steering",
+        "env_scaled_reward_acc_long",
+        "env_scaled_reward_delta_steer",
+        "env_scaled_reward_jerk"
+    ]
+}
+
 class ApproxContainer(ApprBase):
     """Approximate function container for DSAC.
 
@@ -47,16 +67,36 @@ class ApproxContainer(ApprBase):
         self.pi_net = self.q1.pi_net
         self.q2.pi_net = self.pi_net
 
-        
+        self.critic1 = {}
+        self.critic2 = {}
+        for reward_type in critic_dict:
+            self.critic1[reward_type] = create_apprfunc(**q_args)
+            self.critic2[reward_type] = create_apprfunc(**q_args)
+            self.critic1[reward_type].pi_net = self.pi_net
+            self.critic2[reward_type].pi_net = self.pi_net
+    
         self.q1_target = deepcopy(self.q1)
         self.q2_target = deepcopy(self.q2)
+
+        self.critic1_target = {}
+        self.critic2_target = {}
+        for reward_type in critic_dict:
+            self.critic1_target[reward_type] = deepcopy(self.critic1[reward_type])
+            self.critic2_target[reward_type] = deepcopy(self.critic2[reward_type])
+
         if kwargs["target_PI"]:
             self.pi_net_target = deepcopy(self.pi_net)   # use target pi
             self.q1_target.pi_net = self.pi_net_target
             self.q2_target.pi_net = self.pi_net_target
+            for reward_type in critic_dict:
+                self.critic1_target[reward_type].pi_net = self.pi_net_target
+                self.critic2_target[reward_type].pi_net = self.pi_net_target
         else:
             self.q1_target.pi_net = self.pi_net   # use online pi
             self.q2_target.pi_net = self.pi_net
+            for reward_type in critic_dict:
+                self.critic1_target[reward_type].pi_net = self.pi_net
+                self.critic2_target[reward_type].pi_net = self.pi_net
 
         # create policy network
         policy_args = get_apprfunc_dict("policy", **kwargs)
@@ -72,6 +112,11 @@ class ApproxContainer(ApprBase):
             p.requires_grad = False
         for p in self.q2_target.ego_paras():
             p.requires_grad = False
+        for reward_type in critic_dict:
+            for p in self.critic1_target[reward_type].ego_paras():
+                p.requires_grad = False
+            for p in self.critic2_target[reward_type].ego_paras():
+                p.requires_grad = False
         if kwargs["target_PI"]:
             for p in self.pi_net_target.parameters():
                 p.requires_grad = False
@@ -82,6 +127,11 @@ class ApproxContainer(ApprBase):
         # create optimizers
         self.q1_optimizer = Adam(self.q1.ego_paras(), lr=kwargs["value_learning_rate"])
         self.q2_optimizer = Adam(self.q2.ego_paras(), lr=kwargs["value_learning_rate"])
+        self.critic1_optimizer = {}
+        self.critic2_optimizer = {}
+        for reward_type in critic_dict:
+            self.critic1_optimizer[reward_type] = Adam(self.critic1[reward_type].ego_paras(), lr=kwargs["value_learning_rate"])
+            self.critic2_optimizer[reward_type] = Adam(self.critic2[reward_type].ego_paras(), lr=kwargs["value_learning_rate"])
         self.policy_optimizer = Adam(
             self.policy.ego_paras(), lr=kwargs["policy_learning_rate"]
         )
@@ -95,6 +145,9 @@ class ApproxContainer(ApprBase):
             "pi": self.pi_optimizer,
             "alpha": self.alpha_optimizer,
         }
+        for reward_type in critic_dict:
+            self.optimizer_dict["critic1_"+reward_type] = self.critic1_optimizer[reward_type]
+            self.optimizer_dict["critic2_"+reward_type] = self.critic2_optimizer[reward_type]
         self.init_scheduler(**kwargs)
 
 
@@ -102,7 +155,7 @@ class ApproxContainer(ApprBase):
         return self.policy.get_act_dist(logits)
 
 
-class DSACTPI(AlgorithmBase):
+class DSACTPISQ(AlgorithmBase):
     """DSAC algorithm with three refinements, higher performance and more stable.
 
     Paper: https://arxiv.org/abs/2310.05858
@@ -127,9 +180,12 @@ class DSACTPI(AlgorithmBase):
         self.delay_update = kwargs["delay_update"]
         self.mean_std1= None
         self.mean_std2= None
+        self.critic_mean_std1 = {}
+        self.critic_mean_std2 = {}
         self.tau_b = kwargs.get("tau_b", self.tau)
         self.target_PI = kwargs["target_PI"]
         self.per_flag = kwargs["buffer_name"].startswith("prioritized") # FIXME: hard code
+        self.critic_weight = torch.ones(len(critic_dict))
 
     @property
     def adjustable_parameters(self):
@@ -158,6 +214,9 @@ class DSACTPI(AlgorithmBase):
              "pi_grad": [p._grad for p in self.networks.pi_net.parameters()],
             "iteration": iteration,
         }
+        for reward_type in critic_dict:
+            update_info["critic1_"+reward_type+"_grad"] = [p._grad for p in self.networks.critic1[reward_type].ego_paras()]
+            update_info["critic2_"+reward_type+"_grad"] = [p._grad for p in self.networks.critic2[reward_type].ego_paras()]
         if self.auto_alpha:
             update_info.update({"log_alpha_grad":self.networks.log_alpha.grad})
 
@@ -180,6 +239,14 @@ class DSACTPI(AlgorithmBase):
             p._grad = grad
         if self.auto_alpha:
             self.networks.log_alpha._grad = update_info["log_alpha_grad"]
+
+        for reward_type in critic_dict:
+            critic1_grad = update_info["critic1_"+reward_type+"_grad"]
+            critic2_grad = update_info["critic2_"+reward_type+"_grad"]
+            for p, grad in zip(self.networks.critic1[reward_type].ego_paras(), critic1_grad):
+                p._grad = grad
+            for p, grad in zip(self.networks.critic2[reward_type].ego_paras(), critic2_grad):
+                p._grad = grad
 
         self.__update(iteration)
 
@@ -213,7 +280,11 @@ class DSACTPI(AlgorithmBase):
         self.networks.q2_optimizer.zero_grad()
         self.networks.policy_optimizer.zero_grad()
         self.networks.pi_optimizer.zero_grad()
-        loss_q, q1, q2, std1, std2, origin_q_loss, idx, td_err  = self.__compute_loss_q(data)
+        for reward_type in critic_dict:
+            self.networks.critic1_optimizer[reward_type].zero_grad()
+            self.networks.critic2_optimizer[reward_type].zero_grad()
+
+        loss_q, q1, q2, std1, std2, origin_q_loss, idx, td_err, critic_loss, critic1, critic2, critic1_std, critic2_std, origin_critic_loss  = self.__compute_loss_q(data)
         loss_q.backward()
 
         for p in self.networks.q1.ego_paras():
@@ -221,6 +292,12 @@ class DSACTPI(AlgorithmBase):
 
         for p in self.networks.q2.ego_paras():
             p.requires_grad = False
+
+        for reward_type in critic_dict:
+            for p in self.networks.critic1[reward_type].ego_paras():
+                p.requires_grad = False
+            for p in self.networks.critic2[reward_type].ego_paras():
+                p.requires_grad = False
 
  
         loss_policy, entropy = self.__compute_loss_policy(data)
@@ -230,6 +307,12 @@ class DSACTPI(AlgorithmBase):
             p.requires_grad = True
         for p in self.networks.q2.ego_paras():
             p.requires_grad = True
+
+        for reward_type in critic_dict:
+            for p in self.networks.critic1[reward_type].ego_paras():
+                p.requires_grad = True
+            for p in self.networks.critic2[reward_type].ego_paras():
+                p.requires_grad = True
 
         if self.auto_alpha:
             self.networks.alpha_optimizer.zero_grad()
@@ -241,6 +324,9 @@ class DSACTPI(AlgorithmBase):
         q2_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.q2.ego_paras()]))
         policy_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.policy.ego_paras()]))
         pi_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.pi_net.parameters()]))
+        critic1_grad_norm = {reward_type: torch.norm( torch.cat([p.grad.flatten() for p in self.networks.critic1[reward_type].ego_paras()])) for reward_type in critic_dict}
+        critic2_grad_norm = {reward_type: torch.norm( torch.cat([p.grad.flatten() for p in self.networks.critic2[reward_type].ego_paras()])) for reward_type in critic_dict}           
+
         tb_info = {
             "DSAC2/critic_avg_q1-RL iter": q1.mean().detach().item(),
             "DSAC2/critic_avg_q2-RL iter": q2.mean().detach().item(),
@@ -263,6 +349,17 @@ class DSACTPI(AlgorithmBase):
             "DSAC2/pi_grad_norm": pi_grad_norm.item(),
             tb_tags["alg_time"]: (time.time() - start_time) * 1000,
         }
+        for reward_type in critic_dict:
+            tb_info["DSAC2/"+reward_type+"_critic_avg_q1-RL iter"] = critic1[reward_type].mean().detach().item()
+            tb_info["DSAC2/"+reward_type+"_critic_avg_q2-RL iter"] = critic2[reward_type].mean().detach().item()
+            tb_info["DSAC2/"+reward_type+"_critic_avg_std1-RL iter"] = critic1_std[reward_type].mean().detach().item()
+            tb_info["DSAC2/"+reward_type+"_critic_avg_std2-RL iter"] = critic2_std[reward_type].mean().detach().item()
+            tb_info["DSAC2/"+reward_type+"_critic_avg_min_std1-RL iter"] = critic1_std[reward_type].min().detach().item()
+            tb_info["DSAC2/"+reward_type+"_critic_avg_min_std2-RL iter"] = critic2_std[reward_type].min().detach().item()
+            tb_info["DSAC2/"+reward_type+"_critic_avg_max_std1-RL iter"] = critic1_std[reward_type].max().detach().item()
+            tb_info["DSAC2/"+reward_type+"_critic_avg_max_std2-RL iter"] = critic2_std[reward_type].max().detach().item()
+            tb_info["DSAC2/"+reward_type+"_critic_grad_norm"] = (critic1_grad_norm[reward_type] + critic2_grad_norm[reward_type]).item()/2
+
         if self.per_flag:
             return tb_info, idx, td_err
         else:
@@ -297,15 +394,26 @@ class DSACTPI(AlgorithmBase):
         q1, q1_std, _ = self.__q_evaluate(obs, act, self.networks.q1)
 
         q2, q2_std, _ = self.__q_evaluate(obs, act, self.networks.q2)
+
+        critic1_evaluate = {reward_type: self.__q_evaluate(obs, act, self.networks.critic1[reward_type]) for reward_type in critic_dict}
+        critic1, critic1_std = {k: v[0] for k, v in critic1_evaluate.items()}, {k: v[1] for k, v in critic1_evaluate.items()}
+
+        critic2_evaluate = {reward_type: self.__q_evaluate(obs, act, self.networks.critic2[reward_type]) for reward_type in critic_dict}
+        critic2, critic2_std = {k: v[0] for k, v in critic2_evaluate.items()}, {k: v[1] for k, v in critic2_evaluate.items()}
+  
         if self.mean_std1 is None:
             self.mean_std1 = torch.mean(q1_std.detach())
+            self.critic_mean_std1 = {reward_type: torch.mean(critic1_std[reward_type].detach()) for reward_type in critic_dict}
         else:
             self.mean_std1 = (1 - self.tau_b) * self.mean_std1 + self.tau_b * torch.mean(q1_std.detach())
+            self.critic_mean_std1 = {reward_type: (1 - self.tau_b) * self.critic_mean_std1[reward_type] + self.tau_b * torch.mean(critic1_std[reward_type].detach()) for reward_type in critic_dict}
 
         if self.mean_std2 is None:
             self.mean_std2 = torch.mean(q2_std.detach())
+            self.critic_mean_std2 = {reward_type: torch.mean(critic2_std[reward_type].detach()) for reward_type in critic_dict}
         else:
             self.mean_std2 = (1 - self.tau_b) * self.mean_std2 + self.tau_b * torch.mean(q2_std.detach())
+            self.critic_mean_std2 = {reward_type: (1 - self.tau_b) * self.critic_mean_std2[reward_type] + self.tau_b * torch.mean(critic2_std[reward_type].detach()) for reward_type in critic_dict}
 
         with torch.no_grad():
             q1_next, _, q1_next_sample = self.__q_evaluate(
@@ -317,6 +425,14 @@ class DSACTPI(AlgorithmBase):
             )
             q_next = torch.min(q1_next, q2_next)
             q_next_sample = torch.where(q1_next < q2_next, q1_next_sample, q2_next_sample)
+
+            critic1_next_evaluate = {reward_type: self.__q_evaluate(obs2, act2, self.networks.critic1_target[reward_type]) for reward_type in critic_dict}
+            critic1_next, critic1_next_sample = {k: v[0] for k, v in critic1_next_evaluate.items()}, {k: v[2] for k, v in critic1_next_evaluate.items()}
+            critic2_next_evaluate = {reward_type: self.__q_evaluate(obs2, act2, self.networks.critic2_target[reward_type]) for reward_type in critic_dict}
+            critic2_next, critic2_next_sample = {k: v[0] for k, v in critic2_next_evaluate.items()}, {k: v[2] for k, v in critic2_next_evaluate.items()}
+
+            critic_next = {reward_type: torch.min(critic1_next[reward_type], critic2_next[reward_type]) for reward_type in critic_dict}
+            critic_next_sample = {reward_type: torch.where(critic1_next[reward_type] < critic2_next[reward_type], critic1_next_sample[reward_type], critic2_next_sample[reward_type]) for reward_type in critic_dict}
 
         target_q1, target_q1_bound = self.__compute_target_q(
             rew,
@@ -338,13 +454,42 @@ class DSACTPI(AlgorithmBase):
             log_prob_act2.detach(),
         )
 
+        # calculate target q for each reward type
+        target_critic1_evaluate = {reward_type: self.__compute_target_q(
+            sum([data[reward_name] for reward_name in critic_dict[reward_type]]),
+            done,
+            critic1[reward_type].detach(),
+            self.critic_mean_std1[reward_type].detach(),
+            critic_next[reward_type].detach(),
+            critic_next_sample[reward_type].detach(),
+            log_prob_act2.detach(),
+        ) for reward_type in critic_dict}
+        target_critic1, target_critic1_bound = {reward_type: target_critic1_evaluate[reward_type][0] for reward_type in critic_dict}, {reward_type: target_critic1_evaluate[reward_type][1] for reward_type in critic_dict}
+
+        target_critic2_evaluate = {reward_type: self.__compute_target_q(
+            sum([data[reward_name] for reward_name in critic_dict[reward_type]]),
+            done,
+            critic2[reward_type].detach(),
+            self.critic_mean_std2[reward_type].detach(),
+            critic_next[reward_type].detach(),
+            critic_next_sample[reward_type].detach(),
+            log_prob_act2.detach(),
+        ) for reward_type in critic_dict}
+        target_critic2, target_critic2_bound = {reward_type: target_critic2_evaluate[reward_type][0] for reward_type in critic_dict}, {reward_type: target_critic2_evaluate[reward_type][1] for reward_type in critic_dict}
+
+
         q1_std_detach = torch.clamp(q1_std, min=0.).detach()
         q2_std_detach = torch.clamp(q2_std, min=0.).detach()
         bias = 0.1
 
         ratio1 = (torch.pow(self.mean_std1, 2) / (torch.pow(q1_std_detach, 2) + bias)).clamp(min=0.1, max=10)
         ratio2 = (torch.pow(self.mean_std2, 2) / (torch.pow(q2_std_detach, 2) + bias)).clamp(min=0.1, max=10)
-        
+
+        critic1_std_detach = {reward_type: torch.clamp(critic1_std[reward_type], min=0.).detach() for reward_type in critic_dict}
+        critic2_std_detach = {reward_type: torch.clamp(critic2_std[reward_type], min=0.).detach() for reward_type in critic_dict}
+
+        critic1_ratio = {reward_type: (torch.pow(self.critic_mean_std1[reward_type], 2) / (torch.pow(critic1_std_detach[reward_type], 2) + bias)).clamp(min=0.1, max=10) for reward_type in critic_dict}
+        critic2_ratio = {reward_type: (torch.pow(self.critic_mean_std2[reward_type], 2) / (torch.pow(critic2_std_detach[reward_type], 2) + bias)).clamp(min=0.1, max=10) for reward_type in critic_dict}
 
         # form5
         q1_loss = torch.mean(ratio1 *(huber_loss(q1, target_q1, delta = 50, reduction='none') 
@@ -353,6 +498,14 @@ class DSACTPI(AlgorithmBase):
         q2_loss = torch.mean(ratio2 *(huber_loss(q2, target_q2, delta = 50, reduction='none')
                                       + q2_std *(q2_std_detach.pow(2) - huber_loss(q2.detach(), target_q2_bound, delta = 50, reduction='none'))/(q2_std_detach +bias)
                             ))
+        
+        critic1_loss = {reward_type: torch.mean(critic1_ratio[reward_type] * (huber_loss(critic1[reward_type], target_critic1[reward_type], delta = 50, reduction='none')
+            + critic1_std[reward_type] *(critic1_std[reward_type].pow(2) - huber_loss(critic1[reward_type].detach(), target_critic1_bound[reward_type], delta = 50, reduction='none'))/(critic1_std_detach[reward_type] +bias)
+        )) for reward_type in critic_dict}
+
+        critic2_loss = {reward_type: torch.mean(critic2_ratio[reward_type] * (huber_loss(critic2[reward_type], target_critic2[reward_type], delta = 50, reduction='none')
+            + critic2_std[reward_type] *(critic2_std[reward_type].pow(2) - huber_loss(critic2[reward_type].detach(), target_critic2_bound[reward_type], delta = 50, reduction='none'))/(critic2_std_detach[reward_type] +bias)
+        )) for reward_type in critic_dict}
 
         # q1_loss = torch.mean(ratio1 * ((q1 - target_q1).pow(2) + torch.log(q1_std +bias) -q1_std * (q1.detach() - target_q1_bound).pow(2) / (q1_std_detach + bias)))
         # q2_loss = torch.mean(ratio2 * ((q2 - target_q2).pow(2) + torch.log(q2_std +bias) -q2_std * (q2.detach() - target_q2_bound).pow(2) / (q2_std_detach + bias)))
@@ -378,6 +531,13 @@ class DSACTPI(AlgorithmBase):
                                       )
                             )   
             origin_q_loss = origin_q1_loss + origin_q2_loss
+
+            origin_critic1_loss = {reward_type: torch.mean(critic1_ratio[reward_type] * (huber_loss(critic1[reward_type], target_critic1[reward_type], delta = 50, reduction='none')
+            )) for reward_type in critic_dict}
+            origin_critic2_loss = {reward_type: torch.mean(critic2_ratio[reward_type] * (huber_loss(critic2[reward_type], target_critic2[reward_type], delta = 50, reduction='none')
+            )) for reward_type in critic_dict}
+            origin_critic_loss = {reward_type: origin_critic1_loss[reward_type] + origin_critic2_loss[reward_type] for reward_type in critic_dict}
+
             # origin_q1_loss = (torch.pow(self.mean_std1, 2)) * torch.mean(
             #     torch.pow((target_q1 - q1),2) / ( torch.pow(q1_std_detach, 2)+ 1e-6)  
             #     + torch.log(q1_std_detach+1e-6)) # for numerical stability
@@ -397,7 +557,10 @@ class DSACTPI(AlgorithmBase):
             idx = None
             per = None
 
-        return q1_loss + q2_loss, q1, q2, q1_std, q2_std, origin_q_loss, idx, per
+        q_loss = q1_loss + q2_loss
+        q_loss = sum(self.critic_weight[i] * (critic1_loss[reward_type] + critic2_loss[reward_type]) for i, reward_type in enumerate(critic_dict))
+        
+        return q_loss, q1, q2, q1_std, q2_std, origin_q_loss, idx, per, critic1, critic2, critic1_std, critic2_std, origin_critic_loss
 
     def __compute_target_q(self, r, done, q,q_std, q_next, q_next_sample, log_prob_a_next):
         target_q = r + (1 - done) * self.gamma * (
@@ -415,7 +578,15 @@ class DSACTPI(AlgorithmBase):
         obs, new_act, new_log_prob = data["obs"], data["new_act"], data["new_log_prob"]
         q1, _, _ = self.__q_evaluate(obs, new_act, self.networks.q1)
         q2, _, _ = self.__q_evaluate(obs, new_act, self.networks.q2)
-        loss_policy = (self.__get_alpha() * new_log_prob - torch.min(q1,q2)).mean()
+
+        critic1_evaluate = {reward_type: self.__q_evaluate(obs, new_act, self.networks.critic1[reward_type]) for reward_type in critic_dict}
+        critic1 = {k: v[0] for k, v in critic1_evaluate.items()}
+        critic2_evaluate = {reward_type: self.__q_evaluate(obs, new_act, self.networks.critic2[reward_type]) for reward_type in critic_dict}
+        critic2 = {k: v[0] for k, v in critic2_evaluate.items()}
+
+        critic_value = sum(self.critic_weight[i] * torch.min(critic1[reward_type], critic2[reward_type]) for i, reward_type in enumerate(critic_dict))
+        loss_policy = (self.__get_alpha() * new_log_prob - critic_value).mean()
+        # loss_policy = (self.__get_alpha() * new_log_prob - torch.min(q1,q2)).mean()
         entropy = -new_log_prob.detach().mean()
         return loss_policy, entropy
 
@@ -456,6 +627,20 @@ class DSACTPI(AlgorithmBase):
                 ):
                     p_targ.data.mul_(polyak)
                     p_targ.data.add_((1 - polyak) * p.data)
+
+                for reward_type in critic_dict:
+                    for p, p_targ in zip(
+                        self.networks.critic1[reward_type].ego_paras(),
+                        self.networks.critic1_target[reward_type].ego_paras(),
+                    ):
+                        p_targ.data.mul_(polyak)
+                        p_targ.data.add_((1 - polyak) * p.data)
+                    for p, p_targ in zip(
+                        self.networks.critic2[reward_type].ego_paras(),
+                        self.networks.critic2_target[reward_type].ego_paras(),
+                    ):
+                        p_targ.data.mul_(polyak)
+                        p_targ.data.add_((1 - polyak) * p.data)
 
                 if self.target_PI:
                     for p, p_targ in zip(
