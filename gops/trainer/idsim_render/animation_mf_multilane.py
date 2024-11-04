@@ -135,11 +135,13 @@ class AnimationLane(AnimationBase):
         reward_text_values = [line.get_ydata() for line in self.ax3_1.get_lines()]
         text_handles = []
         # ---------------------- update-----------------------
-        for step in range(0, len(episode_data.time_stamp_list), frame_skip):
+        for step in range(0, len(episode_data.time_stamp_list) - 1, frame_skip):
             if mode == 'debug' and step % 10 == 0:
                 print(f'step={step}/{len(episode_data.time_stamp_list)}')
             cur_time = episode_data.time_stamp_list[step]
             cur_time = round(cur_time * 10) / 10
+
+            step = step + 1
 
             # # ---------------- set limit of figure ------------------
             self.adjust_lim(episode_data, eval_dict, step)
@@ -306,8 +308,9 @@ class AnimationLane(AnimationBase):
                     (lf * lf * Cf + lr * lr * Cr) - Iz * vx / Ts)
             ], axis=-1)
         
+        # real action sequence
         incre_action_seq = episode_data.action_list[step]
-        cur_real_action = episode_data.action_real_list[step]
+        cur_real_action = episode_data.action_last_real_list[step]
         seq_len = incre_action_seq.shape[0]/2 # '2' is the action dimension, as same as '2' in i*2:i*2+2
         real_action_seq = []
         for i in range(int(seq_len)):
@@ -317,18 +320,40 @@ class AnimationLane(AnimationBase):
                 real_action_seq.append(cur_real_action)
         
         self.traj_artist_list = []
-        ego_state = episode_data.ego_state_list[step]
-        traj_x = []
-        traj_y = []
-        for i in range(len(real_action_seq)):
-            ego_state = ego_model(ego_state, real_action_seq[i])
-            traj_x.append(ego_state[0])
-            traj_y.append(ego_state[1])
-
-        self.traj_artist_list.append(ax.add_line(Line2D(
-            traj_x, traj_y, color='b', linewidth=10, zorder=200, alpha=0.5
-        )))
-
+        # multi-modal trajectory
+        if hasattr(episode_data, 'multi_modal_action_list'):
+            multi_modal_incre_action_list = episode_data.multi_modal_action_list[step]
+            colors = ['red', 'green', 'yellow', 'purple'] 
+            for idx, incre_action in enumerate(multi_modal_incre_action_list):
+                cur_real_action = episode_data.action_last_real_list[step]
+                multi_modal_real_action_seq = []
+                for i in range(int(seq_len)):
+                    incre_action_real = scale_to_real(incre_action[i*2:i*2+2])
+                    cur_real_action = cur_real_action + incre_action_real
+                    for _ in range(self.repeat_num):
+                        multi_modal_real_action_seq.append(cur_real_action)
+                ego_state = episode_data.ego_state_list[step]
+                multi_modal_traj_x = []
+                multi_modal_traj_y = []
+                for i in range(len(multi_modal_real_action_seq)):
+                    ego_state = ego_model(ego_state, multi_modal_real_action_seq[i])
+                    multi_modal_traj_x.append(ego_state[0])
+                    multi_modal_traj_y.append(ego_state[1])
+                color = colors[idx % len(colors)]
+                self.traj_artist_list.append(ax.add_line(Line2D(
+                    multi_modal_traj_x, multi_modal_traj_y, color=color, linewidth=2, zorder=200, alpha=0.8
+                )))
+        else:
+            ego_state = episode_data.ego_state_list[step]
+            traj_x = []
+            traj_y = []
+            for i in range(len(real_action_seq)):
+                ego_state = ego_model(ego_state, real_action_seq[i])
+                traj_x.append(ego_state[0])
+                traj_y.append(ego_state[1])
+            self.traj_artist_list.append(ax.add_line(Line2D(
+                traj_x, traj_y, color='b', linewidth=10, zorder=200, alpha=0.5
+            )))
 
     def adjust_lim(self, episode_data, eval_dict, step):
         index_min = max(0, step - 100)
