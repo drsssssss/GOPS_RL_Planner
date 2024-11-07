@@ -320,8 +320,9 @@ class DSACTPISQ(AlgorithmBase):
             loss_alpha.backward()
 
         # calculate gradient norm
-        q1_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.q1.ego_paras()]))
-        q2_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.q2.ego_paras()]))
+        # Since there is no backward for q1 and q2, here p.grad is None
+        # q1_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.q1.ego_paras()]))
+        # q2_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.q2.ego_paras()]))
         policy_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.policy.ego_paras()]))
         pi_grad_norm = torch.norm( torch.cat([p.grad.flatten() for p in self.networks.pi_net.parameters()]))
         critic1_grad_norm = {reward_type: torch.norm( torch.cat([p.grad.flatten() for p in self.networks.critic1[reward_type].ego_paras()])) for reward_type in critic_dict}
@@ -344,7 +345,7 @@ class DSACTPISQ(AlgorithmBase):
             "DSAC2/alpha-RL iter": self.__get_alpha(),
             "DSAC2/mean_std1": self.mean_std1,
             "DSAC2/mean_std2": self.mean_std2,
-            "DSAC2/q_grad_norm": (q1_grad_norm+ q2_grad_norm).item()/2,
+            "DSAC2/q_grad_norm": 0,
             "DSAC2/policy_grad_norm": policy_grad_norm.item(),
             "DSAC2/pi_grad_norm": pi_grad_norm.item(),
             tb_tags["alg_time"]: (time.time() - start_time) * 1000,
