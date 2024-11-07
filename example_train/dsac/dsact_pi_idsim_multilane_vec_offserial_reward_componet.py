@@ -79,7 +79,7 @@ if __name__ == "__main__":
     parser.add_argument("--act_seq_len", type=int, default=act_seq_len, help="action repeat num")
     parser.add_argument("--act_seq_nn", type=int, default=act_seq_len, help="action repeat num")
 
-    parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
+    parser.add_argument("--algorithm", type=str, default="DSACTPISQ", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=1, help="seed")
 

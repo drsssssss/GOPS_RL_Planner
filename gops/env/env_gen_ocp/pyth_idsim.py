@@ -19,6 +19,24 @@ from idsim_model.multilane.context import MultiLaneContext
 from idsim_model.model_context import State as ModelState
 from idsim_model.params import ModelConfig
 
+
+reward_type = [
+    "env_scaled_reward_done",
+    "env_scaled_reward_collision",
+    "env_reward_collision_risk",
+    "env_scaled_reward_boundary",
+    "env_scaled_reward_step",
+    "env_scaled_reward_dist_lat",
+    "env_scaled_reward_vel_long",
+    "env_scaled_reward_head_ang",
+    "env_scaled_reward_yaw_rate",
+    "env_scaled_reward_steering",
+    "env_scaled_reward_acc_long",
+    "env_scaled_reward_delta_steer",
+    "env_scaled_reward_jerk",
+]
+
+
 def cal_ave_exec_time(print_interval=100):
     def decorator(func):
         total_time = 0
@@ -240,18 +258,21 @@ class idSimEnv(CrossRoad, Env):
             info["reward_comps"] = np.array([info[i] for i in self._reward_comp_list], dtype=np.float32)
         else:
             info["reward_comps"] = np.zeros(len(self._reward_comp_list), dtype=np.float32)
+        info.update({k: 0.0 for k in reward_type if k not in info})
         return info
     
     @property
     def additional_info(self) -> dict:
-        info = super().additional_info
-        info.update({
-            "reward_comps":{
-                "shape":(len(self._reward_comp_list),), 
-                "dtype":np.float32
-            }
-        })
-        return {}
+        # info = super().additional_info
+        # info.update({
+        #     "reward_comps":{
+        #         "shape":(len(self._reward_comp_list),), 
+        #         "dtype":np.float32
+        #     }
+        # })
+        reward_shape = {"shape":(), "dtype":np.float32}
+        info = {k: reward_shape for k in reward_type}
+        return info
     
     def _get_obs(self) -> np.ndarray:
         idsim_context = get_idsimcontext(
