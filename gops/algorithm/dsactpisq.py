@@ -41,14 +41,16 @@ critic_dict = {
     ],
     "ego_reward": [
         "env_scaled_reward_step",
-        "env_scaled_reward_dist_lat",
         "env_scaled_reward_vel_long",
-        "env_scaled_reward_head_ang",
-        "env_scaled_reward_yaw_rate",
         "env_scaled_reward_steering",
         "env_scaled_reward_acc_long",
         "env_scaled_reward_delta_steer",
         "env_scaled_reward_jerk"
+    ],
+    "tracking_reward": [
+        "env_scaled_reward_dist_lat",
+        "env_scaled_reward_head_ang",
+        "env_scaled_reward_yaw_rate"
     ]
 }
 
