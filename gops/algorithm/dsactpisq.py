@@ -284,7 +284,7 @@ class DSACTPISQ(AlgorithmBase):
             self.networks.critic1_optimizer[reward_type].zero_grad()
             self.networks.critic2_optimizer[reward_type].zero_grad()
 
-        loss_q, q1, q2, std1, std2, origin_q_loss, idx, td_err, critic_loss, critic1, critic2, critic1_std, critic2_std, origin_critic_loss  = self.__compute_loss_q(data)
+        loss_q, q1, q2, std1, std2, origin_q_loss, idx, td_err, critic1, critic2, critic1_std, critic2_std, origin_critic_loss  = self.__compute_loss_q(data)
         loss_q.backward()
 
         for p in self.networks.q1.ego_paras():
@@ -456,7 +456,7 @@ class DSACTPISQ(AlgorithmBase):
 
         # calculate target q for each reward type
         target_critic1_evaluate = {reward_type: self.__compute_target_q(
-            sum([data[reward_name] for reward_name in critic_dict[reward_type]]),
+            sum([data["next_" + reward_name] for reward_name in critic_dict[reward_type]]),
             done,
             critic1[reward_type].detach(),
             self.critic_mean_std1[reward_type].detach(),
@@ -467,7 +467,7 @@ class DSACTPISQ(AlgorithmBase):
         target_critic1, target_critic1_bound = {reward_type: target_critic1_evaluate[reward_type][0] for reward_type in critic_dict}, {reward_type: target_critic1_evaluate[reward_type][1] for reward_type in critic_dict}
 
         target_critic2_evaluate = {reward_type: self.__compute_target_q(
-            sum([data[reward_name] for reward_name in critic_dict[reward_type]]),
+            sum([data["next_" + reward_name] for reward_name in critic_dict[reward_type]]),
             done,
             critic2[reward_type].detach(),
             self.critic_mean_std2[reward_type].detach(),
