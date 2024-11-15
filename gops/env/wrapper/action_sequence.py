@@ -64,8 +64,8 @@ class ActionSeqData(gym.Wrapper):
                 break
         if not self.sum_reward:
             sum_r = r
-        if hasattr(self.env, "unfreeze_lc"):
-            self.env.unfreeze_lc()
+        if hasattr(self.env, "end_planning"):
+            self.env.end_planning()
         return obs, sum_r, d, info
 
 

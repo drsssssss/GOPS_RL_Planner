@@ -108,7 +108,7 @@ class idSimEnvPlanning(idSimEnv):
         self._info = self._get_info(info)
         return self._get_obs(), self._info
     
-    def unfreeze_lc(self):
+    def end_planning(self):
         if self.allow_lc:
             self.ref_index = self.new_ref_index
             self.lc_cooldown_counter = 0

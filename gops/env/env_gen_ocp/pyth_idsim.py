@@ -198,7 +198,7 @@ class idSimEnv(CrossRoad, Env):
             print(f"INFO: fix state, init_action: {init_action}")
             self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
             
-    def unfreeze_lc(self):
+    def end_planning(self):
         if self.allow_lc:
             self.ref_index = self.new_ref_index
             self.lc_cooldown_counter = 0
