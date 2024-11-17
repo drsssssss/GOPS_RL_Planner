@@ -164,7 +164,7 @@ class idSimEnvPlanning(idSimEnv):
                  scenario: str, rou_config: Dict[str, Any]=None, env_idx: int=None, scenerios_list: List[str]=None):
         super(idSimEnvPlanning, self).__init__(env_config, model_config, scenario, rou_config, env_idx, scenerios_list)
 
-        self.ref_replann = True
+        self.begin_planning = True
         self.ref = None
         self.planning_horizon = 0
         self.cum_reward = None
@@ -218,10 +218,11 @@ class idSimEnvPlanning(idSimEnv):
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         self._fix_state()
         self._info = self._get_info(info)
+        self.begin_planning = True
         return self._get_obs(), self._info
     
     def end_planning(self):
-        self.ref_replann = True
+        self.begin_planning = True
         self.planning_horizon = 0
             
     # @cal_ave_exec_time(print_interval=1000)
@@ -231,11 +232,11 @@ class idSimEnvPlanning(idSimEnv):
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
 
         #  ----- ref replanning-----
-        if self.ref_replann:
-            self.ref_replann = False
+        if self.begin_planning:
+            self.begin_planning = False
             self.ref = self.dense_ref(self._state.context_state.reference)
-            self.cum_reward = [0] * self.ref.shape[0]
-            init_reward_info = {key: 0 for key in reward_type}
+            self.cum_reward = [0.0] * self.ref.shape[0]
+            init_reward_info = {key: 0.0 for key in reward_type}
             self.cum_reward_info = [init_reward_info.copy() for _ in range(self.ref.shape[0])]
 
         # ----- recalculate ref and time horizon -----
@@ -250,6 +251,10 @@ class idSimEnvPlanning(idSimEnv):
         # reward_model_free_list, mf_info_list = [], []
         reward_model_free_list, mf_info_list = zip(*[self._get_model_free_reward_by_state(replan_state, action, np.array(idx)) for idx in np.arange(self.ref.shape[0])])
         
+        done = terminated or truncated
+        if truncated:
+            info["TimeLimit.truncated"] = True # for gym
+            
         for idx in range(self.ref.shape[0]):
             self.cum_reward[idx] += reward_model_free_list[idx] + reward
             for key in mf_info_list[idx]:
@@ -262,13 +267,10 @@ class idSimEnvPlanning(idSimEnv):
                     self.cum_reward_info[idx][key] += info[key]
                 else:
                     self.cum_reward_info[idx][key] = info[key]
-        
-        done = terminated or truncated
-        if truncated:
-            info["TimeLimit.truncated"] = True # for gym
 
         opt_ref_index = np.argmax(self.cum_reward)
         self._info = self._get_info(self.cum_reward_info[opt_ref_index])
+        self._info["reward_details"] = {}
         total_reward = self.cum_reward[opt_ref_index]
         # if not terminated:
         #     total_reward = np.maximum(total_reward, 0.05)
