@@ -78,6 +78,7 @@ if __name__ == "__main__":
     parser.add_argument("--repeat_num", type=int, default=repeat_num, help="action repeat num")
     parser.add_argument("--act_seq_len", type=int, default=act_seq_len, help="action repeat num")
     parser.add_argument("--act_seq_nn", type=int, default=act_seq_len, help="action repeat num")
+    parser.add_argument("--sum_reward", type=bool, default=False, help="sum reward")
 
     parser.add_argument("--algorithm", type=str, default="DSACTPISQ", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")

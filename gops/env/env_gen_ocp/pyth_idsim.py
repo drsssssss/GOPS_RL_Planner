@@ -130,6 +130,7 @@ class idSimEnv(CrossRoad, Env):
         self.new_ref_index = None
         self.choose_closest = self.env_config.choose_closest
         self.mid_line_obs = self.env_config.mid_line_obs
+        self.begin_planning = True
 
     def seed(self, seed=None):
         super(idSimEnv, self).seed(seed)
@@ -171,6 +172,8 @@ class idSimEnv(CrossRoad, Env):
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
         self._fix_state()
         self._info = self._get_info(info)
+
+        self.begin_planning = True
         return self._get_obs(), self._info
     
     def _fix_state(self,):  # FIXME: this is a hack
@@ -199,10 +202,13 @@ class idSimEnv(CrossRoad, Env):
             self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
             
     def end_planning(self):
+        # IDC mode
         if self.allow_lc:
             self.ref_index = self.new_ref_index
             self.lc_cooldown_counter = 0
             self.allow_lc = False
+        # general case
+        self.planning_end = True
         
     # @cal_ave_exec_time(print_interval=1000)
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
@@ -219,6 +225,13 @@ class idSimEnv(CrossRoad, Env):
                     self.allow_lc = True
         if self.choose_closest:
             self.choose_closest_lane()
+        
+        # calculate cumulative reward at beginning of planning
+        if self.begin_planning:
+            self.begin_planning = False
+            self.cum_reward = 0.0
+            self.cum_reward_info = {key: 0.0 for key in reward_type}
+
         reward_model, reward_details = self._get_reward(action)
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index) # get state using ref_index to calculate reward
         reward_model_free, mf_info = self._get_model_free_reward(action)
@@ -231,8 +244,15 @@ class idSimEnv(CrossRoad, Env):
         if truncated:
             info["TimeLimit.truncated"] = True # for gym
 
+        for key in info:
+            if key in reward_type:
+                self.cum_reward_info[key] += info[key]
+            else:
+                self._info[key] = info[key]
+        self.cum_reward += reward_model + reward_model_free
+
         self._info = self._get_info(info)
-        total_reward = reward + reward_model_free
+        total_reward = self.cum_reward
         # if not terminated:
         #     total_reward = np.maximum(total_reward, 0.05)
 
