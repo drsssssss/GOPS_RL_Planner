@@ -126,6 +126,11 @@ class ApproxContainer(ApprBase):
         # create entropy coefficient
         self.log_alpha = nn.Parameter(torch.tensor(1, dtype=torch.float32))
 
+        # create critic weight
+        # TODO: critic weight should be adjustable
+        # self.critic_weight = F.softmax(torch.ones(len(critic_dict)), dim=0)
+        self.critic_weight = torch.ones(len(critic_dict))
+
         # create optimizers
         self.q1_optimizer = Adam(self.q1.ego_paras(), lr=kwargs["value_learning_rate"])
         self.q2_optimizer = Adam(self.q2.ego_paras(), lr=kwargs["value_learning_rate"])
@@ -151,6 +156,7 @@ class ApproxContainer(ApprBase):
             self.optimizer_dict["critic1_"+reward_type] = self.critic1_optimizer[reward_type]
             self.optimizer_dict["critic2_"+reward_type] = self.critic2_optimizer[reward_type]
         self.init_scheduler(**kwargs)
+
 
 
     def create_action_distributions(self, logits):
@@ -187,7 +193,6 @@ class DSACTPISQ(AlgorithmBase):
         self.tau_b = kwargs.get("tau_b", self.tau)
         self.target_PI = kwargs["target_PI"]
         self.per_flag = kwargs["buffer_name"].startswith("prioritized") # FIXME: hard code
-        self.critic_weight = torch.ones(len(critic_dict))
 
     @property
     def adjustable_parameters(self):
@@ -458,7 +463,10 @@ class DSACTPISQ(AlgorithmBase):
         )
 
         # calculate target q for each reward type
-        target_critic1_evaluate = {reward_type: self.__compute_target_q(
+        __compute_target_q = lambda entrop_flag, *arg, **kwarg: self.__compute_target_q(*arg, **kwarg) if entrop_flag else self.__compute_non_entropy_target_q(*arg, **kwarg)
+
+        target_critic1_evaluate = {reward_type: __compute_target_q(
+            (reward_type == "ego_reward"),
             sum([data["next_" + reward_name] for reward_name in critic_dict[reward_type]]),
             done,
             critic1[reward_type].detach(),
@@ -469,7 +477,8 @@ class DSACTPISQ(AlgorithmBase):
         ) for reward_type in critic_dict}
         target_critic1, target_critic1_bound = {reward_type: target_critic1_evaluate[reward_type][0] for reward_type in critic_dict}, {reward_type: target_critic1_evaluate[reward_type][1] for reward_type in critic_dict}
 
-        target_critic2_evaluate = {reward_type: self.__compute_target_q(
+        target_critic2_evaluate = {reward_type: __compute_target_q(
+            (reward_type == "ego_reward"),
             sum([data["next_" + reward_name] for reward_name in critic_dict[reward_type]]),
             done,
             critic2[reward_type].detach(),
@@ -560,8 +569,8 @@ class DSACTPISQ(AlgorithmBase):
             idx = None
             per = None
 
-        q_loss = q1_loss + q2_loss
-        q_loss = sum(self.critic_weight[i] * (critic1_loss[reward_type] + critic2_loss[reward_type]) for i, reward_type in enumerate(critic_dict))
+        # q_loss = q1_loss + q2_loss
+        q_loss = sum(self.network.critic_weight[i]**2 * (critic1_loss[reward_type] + critic2_loss[reward_type]) for i, reward_type in enumerate(critic_dict))
         
         return q_loss, q1, q2, q1_std, q2_std, origin_q_loss, idx, per, critic1, critic2, critic1_std, critic2_std, origin_critic_loss
 
@@ -572,6 +581,14 @@ class DSACTPISQ(AlgorithmBase):
         target_q_sample = r + (1 - done) * self.gamma * (
             q_next_sample - self.__get_alpha() * log_prob_a_next
         )
+        td_bound = 3 * q_std
+        difference = torch.clamp(target_q_sample - q, -td_bound, td_bound)
+        target_q_bound = q + difference
+        return target_q.detach(), target_q_bound.detach()
+    
+    def __compute_non_entropy_target_q(self, r, done, q,q_std, q_next, q_next_sample, log_prob_a_next):
+        target_q = r + (1 - done) * self.gamma * q_next
+        target_q_sample = r + (1 - done) * self.gamma * q_next_sample
         td_bound = 3 * q_std
         difference = torch.clamp(target_q_sample - q, -td_bound, td_bound)
         target_q_bound = q + difference
@@ -587,7 +604,7 @@ class DSACTPISQ(AlgorithmBase):
         critic2_evaluate = {reward_type: self.__q_evaluate(obs, new_act, self.networks.critic2[reward_type]) for reward_type in critic_dict}
         critic2 = {k: v[0] for k, v in critic2_evaluate.items()}
 
-        critic_value = sum(self.critic_weight[i] * torch.min(critic1[reward_type], critic2[reward_type]) for i, reward_type in enumerate(critic_dict))
+        critic_value = sum(self.network.critic_weight[i] * torch.min(critic1[reward_type], critic2[reward_type]) for i, reward_type in enumerate(critic_dict))
         loss_policy = (self.__get_alpha() * new_log_prob - critic_value).mean()
         # loss_policy = (self.__get_alpha() * new_log_prob - torch.min(q1,q2)).mean()
         entropy = -new_log_prob.detach().mean()

@@ -297,6 +297,15 @@ class IdsimIDCEvaluator(Evaluator):
                     action_distribution = self.networks.create_action_distributions(logits)
                     action = action_distribution.mode().float()
                     value = torch.min(self.networks.q1(scaled_obs,action)[:,0], self.networks.q2(scaled_obs,action)[:,0]).item() /100
+                elif self.kwargs['algorithm'] == "DSACTPISQ":
+                    logits = self.networks.policy(scaled_obs)
+                    action_distribution = self.networks.create_action_distributions(logits)
+                    action = action_distribution.mode().float()
+
+                    if self.networks.critic1.keys() != self.networks.critic2.keys():
+                        raise ValueError("critic1 and critic2 must have the same keys")
+
+                    value = sum(self.network.critic_weight[i] * torch.min(self.networks.critic1[reward_type](scaled_obs, action)[:,0], self.networks.critic2[reward_type](scaled_obs, action)[:,0]) for i, reward_type in enumerate(self.networks.critic1.keys())).item() /100
                 elif self.kwargs['algorithm'] == "DSACTPIR":
                     logits = self.networks.policy(scaled_obs)
                     action_distribution = self.networks.create_action_distributions(logits)
