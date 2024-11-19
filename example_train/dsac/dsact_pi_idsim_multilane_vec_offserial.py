@@ -83,6 +83,9 @@ if __name__ == "__main__":
     parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
     parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
     parser.add_argument("--seed", default=1, help="seed")
+    
+    # truncated_reward
+    parser.add_argument("--truncated_reward", type=bool, default=False)
 
     ################################################
     # 1. Parameters for environment
@@ -116,8 +119,6 @@ if __name__ == "__main__":
         default="StochaPolicy",
         help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy/StochaCoherentPolicy/StochaFourierPolicy/StochaGuassianPolicy/StochaRNNPolicy",
     )
-    # truncated_reward
-    parser.add_argument("--truncated_reward", type=bool, default=False)
     parser.add_argument(
         "--policy_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS"
     )

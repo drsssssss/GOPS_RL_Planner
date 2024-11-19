@@ -108,6 +108,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--value_output_activation", type=str, default="linear", help="Options: linear/tanh")
 
+    # truncated_reward
+    parser.add_argument("--truncated_reward", type=bool, default=False)
 
     # 2.2 Parameters of policy approximate function
     parser.add_argument(
@@ -116,8 +118,6 @@ if __name__ == "__main__":
         default="StochaPolicy",
         help="Options: None/DetermPolicy/FiniteHorizonPolicy/StochaPolicy/StochaCoherentPolicy/StochaFourierPolicy/StochaGuassianPolicy/StochaRNNPolicy",
     )
-    # truncated_reward
-    parser.add_argument("--truncated_reward", type=bool, default=False)
     parser.add_argument(
         "--policy_func_type", type=str, default="PINet", help="Options: MLP/CNN/CNN_SHARED/RNN/POLY/GAUSS"
     )
