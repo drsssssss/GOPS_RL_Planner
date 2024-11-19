@@ -114,6 +114,8 @@ class idSimEnv(CrossRoad, Env):
         self.choose_closest = self.env_config.choose_closest
         self.mid_line_obs = self.env_config.mid_line_obs
         self.begin_planning = True
+        self.cum_reward = None
+        self.cum_critic_comps = None
 
     def seed(self, seed=None):
         super(idSimEnv, self).seed(seed)
@@ -207,9 +209,12 @@ class idSimEnv(CrossRoad, Env):
                     # allow lane change
                     self.allow_lc = True
 
-        # ----- choose closest lane -----
+        # ----- choose closest lane to calculate reward -----
         if self.choose_closest:
             self.choose_closest_lane()
+
+        # ----- get state -----
+        self._state = self._get_state_from_idsim(ref_index_param=self.ref_index) # get state using ref_index to calculate reward
         
         # ----- initialize cumulative reward at beginning of planning -----
         if self.begin_planning:
@@ -219,7 +224,6 @@ class idSimEnv(CrossRoad, Env):
 
         # ----- get reward -----
         reward_model, reward_details = self._get_reward(action)
-        self._state = self._get_state_from_idsim(ref_index_param=self.ref_index) # get state using ref_index to calculate reward
         reward_model_free, mf_info = self._get_model_free_reward(action)
         info.update(mf_info)
 
@@ -270,7 +274,8 @@ class idSimEnv(CrossRoad, Env):
     
     @property
     def additional_info(self) -> dict:
-        info = super().additional_info
+        # info = super().additional_info # If we put the state in the info, the replay buffer will be too large
+        info = {}
         info.update({
             "critic_comps":{
                 "shape":(len(self.critic_dict),), 
