@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from gops.env.env_gen_ocp.pyth_base import (Context, ContextState, Env, State, stateType)
 from gops.env.env_gen_ocp.resources.idsim_tags import reward_tags
-from gops.env.env_gen_ocp.pyth_idsim import idSimEnv, get_idsimcontext, reward_type
+from gops.env.env_gen_ocp.pyth_idsim import idSimEnv, get_idsimcontext
 from idsim.config import Config
 from idsim.envs.env import CrossRoad
 from idsim_model.model import IdSimModel
@@ -19,23 +19,6 @@ from idsim_model.crossroad.context import CrossRoadContext
 from idsim_model.multilane.context import MultiLaneContext
 from idsim_model.model_context import State as ModelState
 from idsim_model.params import ModelConfig
-
-
-reward_type = [
-    "env_scaled_reward_done",
-    "env_scaled_reward_collision",
-    "env_reward_collision_risk",
-    "env_scaled_reward_boundary",
-    "env_scaled_reward_step",
-    "env_scaled_reward_dist_lat",
-    "env_scaled_reward_vel_long",
-    "env_scaled_reward_head_ang",
-    "env_scaled_reward_yaw_rate",
-    "env_scaled_reward_steering",
-    "env_scaled_reward_acc_long",
-    "env_scaled_reward_delta_steer",
-    "env_scaled_reward_jerk",
-]
 
 
 def cal_ave_exec_time(print_interval=100):
@@ -90,7 +73,7 @@ def generate_bezier_curve_with_phi(origin_point:np.array, dest_point:np.array, n
     return bezier_points
 
 
-def dense_ref_by_bessel(ref_param: np.ndarray, ratio_list: list = [1]):
+def dense_ref_by_bessel(ref_param: np.ndarray, ratio_list: list = [0.5, 1]):
     """
     Densify reference parameters by add Bessel curves.
 
@@ -164,11 +147,10 @@ class idSimEnvPlanning(idSimEnv):
                  scenario: str, rou_config: Dict[str, Any]=None, env_idx: int=None, scenerios_list: List[str]=None):
         super(idSimEnvPlanning, self).__init__(env_config, model_config, scenario, rou_config, env_idx, scenerios_list)
 
-        self.begin_planning = True
-        self.ref = None
+        self.ref_vocabulary = None
         self.planning_horizon = 0
-        self.cum_reward = None
-        self.cum_reward_info = None
+        self. cum_reward_list = None
+        self.cum_critic_comps_list = None
         
         self.set_dense_ref_function()
 
@@ -181,46 +163,6 @@ class idSimEnvPlanning(idSimEnv):
             raise ValueError(f"Unknown dense_ref_mode: {self.env_config.dense_ref_mode}")
         print(f"INFO: dense ref mode: {self.env_config.dense_ref_mode}")
 
-    def reset(self, **kwargs) -> Tuple[np.ndarray, dict]:
-        self.lc_cooldown_counter = 0
-        if self.rou_config is not None:
-            if self.engine is None:
-                # first create engine
-                print("INFO: change rou")
-                self.change_rou_file()
-            else:
-                print(self.engine.context.episode_count, self.config.scenario_reuse)
-                if (self.engine.context.episode_count+1) % self.config.scenario_reuse == 0:
-                    # need to change new map
-                    print("INFO: change rou")
-                    self.change_rou_file()
-        obs, info = super(idSimEnv, self).reset(**kwargs)
-        env_context = self.engine.context
-        vehicle = env_context.vehicle
-        self.ref_index = None
-        if self.scenario == "multilane" and self.use_random_ref_param and not env_context.vehicle.in_junction:
-            lane_list = env_context.scenario.network.get_edge_lanes(
-                vehicle.edge, vehicle.v_class)
-            cur_index = lane_list.index(vehicle.lane)
-            self.ref_index = np.random.choice([0,1,-1]) + cur_index # only allow lane change by 1
-            self.ref_index = np.clip(self.ref_index, 0, len(lane_list)-1)
-        else:
-            self.ref_index = np.random.choice(
-                np.arange(self.model_config.num_ref_lines)
-            ) if self.use_random_ref_param else None
-        if self.random_ref_v and not env_context.vehicle.in_junction:  # TODO: check if this is correct
-            ref_v = np.random.uniform(*self.ref_v_range)
-            self.model_config.ref_v_lane = float(ref_v)
-            self.env_config.ref_v = float(ref_v)
-            # print(f"INFO: change ref_v to {ref_v}")
-        self.new_ref_index = self.ref_index
-            
-        self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
-        self._fix_state()
-        self._info = self._get_info(info)
-        self.begin_planning = True
-        return self._get_obs(), self._info
-    
     def end_planning(self):
         self.begin_planning = True
         self.planning_horizon = 0
@@ -229,52 +171,51 @@ class idSimEnvPlanning(idSimEnv):
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
 
+        # ----- get state with arbitrary ref-----
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
 
-        #  ----- ref replanning-----
+        #  ----- initialize cumulative reward and replan ref at beginning of planning -----
         if self.begin_planning:
             self.begin_planning = False
-            self.ref = self.dense_ref(self._state.context_state.reference)
-            self.cum_reward = [0.0] * self.ref.shape[0]
-            init_reward_info = {key: 0.0 for key in reward_type}
-            self.cum_reward_info = [init_reward_info.copy() for _ in range(self.ref.shape[0])]
+            # TODO: create ref_vocabulary from real-world driving data
+            self.ref_vocabulary = self.dense_ref(self._state.context_state.reference)
+            self.cum_reward_list = [0.0] * self.ref_vocabulary.shape[0]
+            cum_critic_comps = np.zeros(len(self.critic_dict), dtype=np.float32)
+            self.cum_critic_comps_list = [copy.deepcopy(cum_critic_comps) for _ in range(self.ref_vocabulary.shape[0])]
 
-        # ----- recalculate ref and time horizon -----
+        # ----- re-calculate ref and time horizon -----
         replan_state = copy.deepcopy(self._state)
         replan_state.context_state.t = np.array(self.planning_horizon, dtype=np.int32)
-        replan_state.context_state.reference = self.ref
+        replan_state.context_state.reference = self.ref_vocabulary
         self.planning_horizon += 1
 
-        # ----- cal the next_obs, reward -----
-        # 
-        # test = self._get_model_free_reward(action)
-        # reward_model_free_list, mf_info_list = [], []
-        reward_model_free_list, mf_info_list = zip(*[self._get_model_free_reward_by_state(replan_state, action, np.array(idx)) for idx in np.arange(self.ref.shape[0])])
+        # ----- get reward for each reference -----
+        # TODO: calculate reward in batch
+        reward_model_free_list, mf_info_list = zip(*[self._get_model_free_reward_by_state(replan_state, action, np.array(idx)) for idx in np.arange(self.ref_vocabulary.shape[0])])
+
+        # ----- get cumulated reward and critic components for each reference -----
+        self.cum_reward_list = [cum_r + r for cum_r, r in zip(self.cum_reward_list, reward_model_free_list)]
+        critic_comps_list = [self.get_critic_comps({**info, **mf_info}) for mf_info in mf_info_list]
+        self.cum_critic_comps_list = [cum_r + r for cum_r, r in zip(self.cum_critic_comps_list, critic_comps_list)]
+
+        # ----- choose highest cumulated reward -----
+        opt_ref_index = np.argmax(self.cum_reward_list)
+        total_reward = self.cum_reward_list[opt_ref_index]
         
+        # ----- update info -----
+        info.update(mf_info_list[opt_ref_index])
+        info["reward_details"] = {}
         done = terminated or truncated
         if truncated:
             info["TimeLimit.truncated"] = True # for gym
-            
-        for idx in range(self.ref.shape[0]):
-            self.cum_reward[idx] += reward_model_free_list[idx] + reward
-            for key in mf_info_list[idx]:
-                if key in reward_type:
-                    self.cum_reward_info[idx][key] += mf_info_list[idx][key]
-                else:
-                    self.cum_reward_info[idx][key] = mf_info_list[idx][key]
-            for key in info:
-                if key in reward_type:
-                    self.cum_reward_info[idx][key] += info[key]
-                else:
-                    self.cum_reward_info[idx][key] = info[key]
 
-        opt_ref_index = np.argmax(self.cum_reward)
-        self._info = self._get_info(self.cum_reward_info[opt_ref_index])
-        self._info["reward_details"] = {}
-        total_reward = self.cum_reward[opt_ref_index]
+        self._info = self._get_info(info)
+        self._info["critic_comps"] = self.cum_critic_comps_list[opt_ref_index]
+
         # if not terminated:
         #     total_reward = np.maximum(total_reward, 0.05)
 
+        # ----- set ref_index to the middle lane to calculate obs -----
         mid_index = self._state.context_state.reference.shape[0] // 2
         self._state = self._get_state_from_idsim(ref_index_param=mid_index) # get state using mid_index to calculate obs
 
