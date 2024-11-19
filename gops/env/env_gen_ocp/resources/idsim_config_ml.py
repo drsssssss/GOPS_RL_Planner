@@ -52,7 +52,7 @@ env_config_param_base = {
     "use_multiple_path_for_multilane": True,
     "random_ref_cooldown":  80,
 
-    'add_sur_bias': True,
+    'add_sur_bias': False,
     'sur_bias_range': (1, 2),
     'sur_bias_prob': 0.5,
 
@@ -69,10 +69,10 @@ env_config_param_base = {
     "punish_sur_mode": "max",
     "enable_slow_reward": True,
     "R_step": 12.0,
-    "P_lat": 7.5,
+    "P_lat": 7.5, # 7.5 to 5
     "P_long": 8.0,
-    "P_phi": 2.0,
-    "P_yaw": 1.5,
+    "P_phi": 2.0, # 2.0 to 1.0
+    "P_yaw": 1.5, # 1.5 to 0.5
     "P_front": 5.0,
     "P_side": 0.0,
     "P_space": 5.0,
@@ -91,9 +91,9 @@ env_config_param_base = {
     "rel_v_thd": 1.0,
     "rel_v_rear_thd": 3.0,
     "time_dist": 0.5,
-    # TODO: add config to idSim/idsim/config.py
-    "choose_closest": False,
-    "mid_line_obs": False,
+    "choose_closest": True,
+    "mid_line_obs": True,
+    "dense_ref_mode": "bessel" # "boundary" or "bessel"
 }
 
 model_config_base = {
@@ -225,7 +225,28 @@ model_config_multilane = {
         "env_reward_acc_long",
         "env_reward_delta_steer",
         "env_reward_jerk",
-    )
+    ),
+    "critic_dict": {
+        "sur_reward": [
+            "env_scaled_reward_done",
+            "env_scaled_reward_collision",
+            "env_reward_collision_risk",
+            "env_scaled_reward_boundary"
+        ],
+        "ego_reward": [
+            "env_scaled_reward_step",
+            "env_scaled_reward_vel_long",
+            "env_scaled_reward_steering",
+            "env_scaled_reward_acc_long",
+            "env_scaled_reward_delta_steer",
+            "env_scaled_reward_jerk"
+        ],
+        "tracking_reward": [
+            "env_scaled_reward_dist_lat",
+            "env_scaled_reward_head_ang",
+            "env_scaled_reward_yaw_rate"
+        ]
+    }
 }
 
 
