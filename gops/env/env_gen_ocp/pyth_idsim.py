@@ -20,23 +20,6 @@ from idsim_model.model_context import State as ModelState
 from idsim_model.params import ModelConfig
 
 
-reward_type = [
-    "env_scaled_reward_done",
-    "env_scaled_reward_collision",
-    "env_reward_collision_risk",
-    "env_scaled_reward_boundary",
-    "env_scaled_reward_step",
-    "env_scaled_reward_dist_lat",
-    "env_scaled_reward_vel_long",
-    "env_scaled_reward_head_ang",
-    "env_scaled_reward_yaw_rate",
-    "env_scaled_reward_steering",
-    "env_scaled_reward_acc_long",
-    "env_scaled_reward_delta_steer",
-    "env_scaled_reward_jerk",
-]
-
-
 def cal_ave_exec_time(print_interval=100):
     def decorator(func):
         total_time = 0
@@ -94,8 +77,8 @@ class idSimEnv(CrossRoad, Env):
         self.scenario = scenario
 
         self._state = None
-        self._info = {"reward_comps": np.zeros(len(model_config.reward_comps), dtype=np.float32)}
-        self._reward_comp_list = model_config.reward_comps
+        self._info = {"critic_comps": np.zeros(len(model_config.critic_dict), dtype=np.float32)}
+        self.critic_dict = model_config.critic_dict
         # get observation_space
         self.model = IdSimModel(env_config, model_config)
         obs_dim = self.model.obs_dim
@@ -214,7 +197,7 @@ class idSimEnv(CrossRoad, Env):
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         obs, reward, terminated, truncated, info = super(idSimEnv, self).step(action)
 
-        # ----- cal the next_obs, reward -----
+        # ----- random lane changing -----
         self.lc_cooldown_counter += 1
         if self.lc_cooldown_counter > self.lc_cooldown:
             # lane change is allowable
@@ -223,20 +206,29 @@ class idSimEnv(CrossRoad, Env):
                 if self.new_ref_index != self.ref_index:
                     # allow lane change
                     self.allow_lc = True
+
+        # ----- choose closest lane -----
         if self.choose_closest:
             self.choose_closest_lane()
         
-        # calculate cumulative reward at beginning of planning
+        # ----- initialize cumulative reward at beginning of planning -----
         if self.begin_planning:
             self.begin_planning = False
             self.cum_reward = 0.0
-            self.cum_reward_info = {key: 0.0 for key in reward_type}
+            self.cum_critic_comps = np.zeros(len(self.critic_dict), dtype=np.float32)
 
+        # ----- get reward -----
         reward_model, reward_details = self._get_reward(action)
         self._state = self._get_state_from_idsim(ref_index_param=self.ref_index) # get state using ref_index to calculate reward
         reward_model_free, mf_info = self._get_model_free_reward(action)
         info.update(mf_info)
 
+        # ----- get cumulated reward and critic components -----
+        critic_comps = self.get_critic_comps(info)
+        self.cum_critic_comps += critic_comps
+        self.cum_reward += (reward_model + reward_model_free)
+
+        # ----- update info -----
         info["reward_details"] = dict(
             zip(reward_tags, [i.item() for i in reward_details])
         )
@@ -244,22 +236,18 @@ class idSimEnv(CrossRoad, Env):
         if truncated:
             info["TimeLimit.truncated"] = True # for gym
 
-        for key in info:
-            if key in reward_type:
-                self.cum_reward_info[key] += info[key]
-            else:
-                self._info[key] = info[key]
-        self.cum_reward += reward_model + reward_model_free
-
         self._info = self._get_info(info)
-        total_reward = self.cum_reward
+        # TODO: check the other keys in info
+        self._info["critic_comps"] = self.cum_critic_comps
+
         # if not terminated:
         #     total_reward = np.maximum(total_reward, 0.05)
 
+        # ----- set ref_index to the middle lane to calculate obs -----
         if self.mid_line_obs:
             mid_index = self._state.context_state.reference.shape[0] // 2
             self._state = self._get_state_from_idsim(ref_index_param=mid_index) # get state using mid_index to calculate obs
-        return self._get_obs(), total_reward, done, self._info
+        return self._get_obs(), self.cum_reward, done, self._info
 
     def choose_closest_lane(self):
         # set self.ref_index to the closest lane according to self._state.context_state.reference and self._state.robot_state
@@ -271,27 +259,24 @@ class idSimEnv(CrossRoad, Env):
         
     def set_ref_index(self, ref_index: int):
         self.ref_index = ref_index
-    
+
+    def get_critic_comps(self, info: dict) -> np.ndarray:
+        return np.array([sum(info[reward_type] for reward_type in critic_type) for critic_type in self.critic_dict.values()], dtype=np.float32)
+
     def _get_info(self, info) -> dict:
         info.update(Env._get_info(self))
-        if "env_reward_step" in info.keys():
-            info["reward_comps"] = np.array([info[i] for i in self._reward_comp_list], dtype=np.float32)
-        else:
-            info["reward_comps"] = np.zeros(len(self._reward_comp_list), dtype=np.float32)
-        info.update({k: 0.0 for k in reward_type if k not in info})
+        info.update({"critic_comps": np.zeros(len(self.model_config.critic_dict), dtype=np.float32)})
         return info
     
     @property
     def additional_info(self) -> dict:
-        # info = super().additional_info
-        # info.update({
-        #     "reward_comps":{
-        #         "shape":(len(self._reward_comp_list),), 
-        #         "dtype":np.float32
-        #     }
-        # })
-        reward_shape = {"shape":(), "dtype":np.float32}
-        info = {k: reward_shape for k in reward_type}
+        info = super().additional_info
+        info.update({
+            "critic_comps":{
+                "shape":(len(self.critic_dict),), 
+                "dtype":np.float32
+            }
+        })
         return info
     
     def _get_obs(self) -> np.ndarray:
