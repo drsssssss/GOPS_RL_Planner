@@ -203,7 +203,7 @@ class idSimEnv(CrossRoad, Env):
         self.lc_cooldown_counter += 1
         if self.lc_cooldown_counter > self.lc_cooldown:
             # lane change is allowable
-            if not self.engine.context.vehicle.in_junction and self.use_random_ref_param and np.random.rand() < self.random_ref_probability :
+            if not self.engine.context.vehicle.in_junction and self.use_random_ref_param and np.random.rand() < self.random_ref_probability:
                 self.new_ref_index = np.random.choice(np.arange(self.model_config.num_ref_lines))
                 if self.new_ref_index != self.ref_index:
                     # allow lane change

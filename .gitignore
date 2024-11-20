@@ -162,6 +162,7 @@ dmypy.json
 
 # experiment file
 experiment
+/exp/*
 
 # network file
 /transform_onnx_network/*
