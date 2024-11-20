@@ -163,7 +163,7 @@ class idSimEnvPlanning(idSimEnv):
             raise ValueError(f"Unknown dense_ref_mode: {self.env_config.dense_ref_mode}")
         print(f"INFO: dense ref mode: {self.env_config.dense_ref_mode}")
 
-    def end_planning(self):
+    def set_plan_beginning(self):
         self.begin_planning = True
         self.planning_horizon = 0
             

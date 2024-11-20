@@ -186,7 +186,7 @@ class idSimEnv(CrossRoad, Env):
             print(f"INFO: fix state, init_action: {init_action}")
             self._state = self._get_state_from_idsim(ref_index_param=self.ref_index)
             
-    def end_planning(self):
+    def set_plan_beginning(self):
         # IDC mode
         if self.allow_lc:
             self.ref_index = self.new_ref_index

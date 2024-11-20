@@ -52,6 +52,8 @@ class ActionSeqData(gym.Wrapper):
 
 
     def step(self, action: ActType) -> Tuple[ObsType, float, bool, dict]:
+        if hasattr(self.env, "set_plan_beginning"):
+            self.env.set_plan_beginning()
         sum_r = 0
         for i in range(self.seq_len):
             # the action is rolled out in sequence, get the real action by slicing
@@ -64,8 +66,6 @@ class ActionSeqData(gym.Wrapper):
                 break
         if not self.sum_reward:
             sum_r = r
-        if hasattr(self.env, "end_planning"):
-            self.env.end_planning()
         return obs, sum_r, d, info
 
 
