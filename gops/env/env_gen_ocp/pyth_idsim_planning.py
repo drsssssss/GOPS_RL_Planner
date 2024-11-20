@@ -194,7 +194,7 @@ class idSimEnvPlanning(idSimEnv):
         reward_model_free_list, mf_info_list = zip(*[self._get_model_free_reward_by_state(replan_state, action, np.array(idx)) for idx in np.arange(self.ref_vocabulary.shape[0])])
 
         # ----- get cumulated reward and critic components for each reference -----
-        self.cum_reward_list = [cum_r + r for cum_r, r in zip(self.cum_reward_list, reward_model_free_list)]
+        self.cum_reward_list = [cum_r + r + reward for cum_r, r in zip(self.cum_reward_list, reward_model_free_list)]
         critic_comps_list = [self.get_critic_comps({**info, **mf_info}) for mf_info in mf_info_list]
         self.cum_critic_comps_list = [cum_r + r for cum_r, r in zip(self.cum_critic_comps_list, critic_comps_list)]
 
