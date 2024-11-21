@@ -14,7 +14,7 @@ from gops.trainer.idsim_idc_mf_multilane_evaluator import (
 )
 from gops.trainer.idsim_render.animation_mf_multilane import AnimationLane
 from gops.trainer.idsim_render.animation_crossroad import AnimationCross
-from exp.run_idc_eval import find_optimal_network
+from multilane_exp.run_idc_eval import find_optimal_network
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 os.environ["OMP_NUM_THREADS"] = "1"
