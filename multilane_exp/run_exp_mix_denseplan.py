@@ -5,6 +5,8 @@ import json
 import logging
 from multilane_exp.exp_runner import BaseExpRunner
 
+# os.environ["OMP_NUM_THREADS"] = "16"
+
 
 
 base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

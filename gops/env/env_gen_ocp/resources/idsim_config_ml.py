@@ -1,8 +1,8 @@
 from typing import Dict, Union, Tuple
 import numpy as np
 
-MAP_ROOT_CROSSROAD = '/root/idsim-scenarios/idsim-crossroad'
-MAP_ROOT_MULTILANE = '/root/idsim-scenarios/idsim-multilane-cross-dense-v20-mix-multi-size-v3/'
+MAP_ROOT_CROSSROAD = '/root/GOPS/idSim/idsim-scenarios/idsim-crossroad/idsim-crossroad'
+MAP_ROOT_MULTILANE = '/root/GOPS/idSim/idsim-scenarios/idsim-multilane-cross-dense-v20-mix-multi-size-v3/idsim-multilane-cross-dense-v20-mix-multi-size-v3'
 pre_horizon = 30
 delta_t = 0.1
 

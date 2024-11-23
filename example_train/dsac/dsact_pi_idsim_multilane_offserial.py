@@ -27,7 +27,7 @@ from gops.utils.plot_evaluation import plot_all
 from gops.utils.tensorboard_setup import start_tensorboard, save_tb_to_csv
 from gops.env.env_gen_ocp.resources.idsim_config_ml import get_idsim_env_config, get_idsim_model_config, pre_horizon, cal_idsim_obs_scale, cal_idsim_pi_paras
 
-os.environ["OMP_NUM_THREADS"] = "2"
+os.environ["OMP_NUM_THREADS"] = "16"
 os.environ['RAY_memory_monitor_refresh_ms'] = "0"  # disable memory monitor
 if __name__ == "__main__":
     # Parameters Setup
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     # Key Parameters for users
     parser.add_argument("--env_id", type=str, default="pyth_idsim", help="id of environment")
     parser.add_argument("--env_scenario", type=str, default="multilane", help="crossroad / multilane")
-    parser.add_argument("--num_threads_main", type=int, default=4, help="Number of threads in main process")
+    parser.add_argument("--num_threads_main", type=int, default=16, help="Number of threads in main process")
     env_scenario = parser.parse_known_args()[0].env_scenario
 
     base_env_config = get_idsim_env_config(env_scenario)
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("--repeat_num", type=int, default=4, help="action repeat num")
 
     parser.add_argument("--algorithm", type=str, default="DSACTPI", help="RL algorithm")
-    parser.add_argument("--enable_cuda", default=True, help="Enable CUDA")
+    parser.add_argument("--enable_cuda", default=False, help="Enable CUDA")
     parser.add_argument("--seed", default=1, help="seed")
 
     ################################################

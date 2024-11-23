@@ -93,6 +93,7 @@ class IdsimIDCEvaluator(Evaluator):
     def __init__(self, index=0, **kwargs):
         kwargs['env_config']['singleton_mode'] = 'invalidate'
         self.act_seq_len = kwargs.get("act_seq_len", 1)
+        self.act_seq_nn = kwargs.get("act_seq_nn", 1) # clf add
         self.RHC_mode = kwargs.get("RHC_mode", False)
         self.mid_line_obs = kwargs["env_config"].get("mid_line_obs", False)
         print(f"IDSimIDCEvaluator: act_seq_len={self.act_seq_len}") 
@@ -104,6 +105,7 @@ class IdsimIDCEvaluator(Evaluator):
             "reward_scale": None,
             "repeat_num": 1,
             "act_seq_len": 1,
+            # "act_seq_nn": 1,
             "gym2gymnasium": False,
             "vector_env_num": None,
         })
