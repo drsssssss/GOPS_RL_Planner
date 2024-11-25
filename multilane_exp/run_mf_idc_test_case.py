@@ -74,14 +74,14 @@ def get_args():
     scenario = "multilane"
     
     ini_network_root = (
-        r"/root/GOPS/results/pyth_idsim/DSACTPI_241122-213600"
+        r"results/pyth_idsim_planning/DSACTPI_241123-173659"
     )
     test_case_file = "/root/GOPS/multilane_exp/test_case_training_ml.json"
     # test_case_multilane
     test_filter = {"seed": 971823494}
                    # iteration > 500000
     test_filter = None
-    nn_index = '150000'
+    nn_index = '0'
     act_seq_len = None
     RHC_mode = (act_seq_len != 1) or act_seq_len is None
     dpi = 60

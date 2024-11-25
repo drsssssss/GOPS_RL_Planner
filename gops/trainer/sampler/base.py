@@ -115,6 +115,10 @@ class BaseSampler(metaclass=ABCMeta):
         
         # t_1 = time.perf_counter_ns()
         with torch.no_grad():
+            # print(batch_obs.device)  # 检查 `batch_obs` 的设备
+            # print(self.device)       # 检查目标设备
+            # print(batch_obs.device)  # 检查 `batch_obs` 的设备
+            self.networks.policy = self.networks.policy.to(self.device)
             logits = self.networks.policy(batch_obs.to(self.device))
             action_distribution = self.networks.create_action_distributions(logits)
             action, logp = action_distribution.sample()
